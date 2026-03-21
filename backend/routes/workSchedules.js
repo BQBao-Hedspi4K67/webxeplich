@@ -1,0 +1,25 @@
+import express from 'express';
+import * as workCtrl from '../controllers/workSchedulesController.js';
+import { verifyToken, requireRole } from '../middleware/auth.js';
+
+const router = express.Router();
+
+// All routes require authentication
+router.use(verifyToken);
+
+// Get work schedules (all roles can view)
+router.get('/', workCtrl.getWorkSchedules);
+
+// Get single schedule
+router.get('/:id', workCtrl.getWorkScheduleById);
+
+// Create schedule (admin/manager only)
+router.post('/', requireRole('admin', 'manager'), workCtrl.createWorkSchedule);
+
+// Update schedule (admin/manager only)
+router.put('/:id', requireRole('admin', 'manager'), workCtrl.updateWorkSchedule);
+
+// Delete schedule (admin/manager only)
+router.delete('/:id', requireRole('admin', 'manager'), workCtrl.deleteWorkSchedule);
+
+export default router;
