@@ -1,161 +1,158 @@
-# HVKTCNAN Schedule Management - Backend API
+# Backend - HVKTCNAN Schedule Management
 
-Phần mềm quản lý lịch công tác và lịch trực ban cho Học viện Kỹ thuật và Công nghệ An ninh.
+## 1. Vai tro backend
+Backend cung cap API cho toan bo nghiep vu:
+- Dang nhap/xac thuc JWT
+- Quan ly can bo
+- Quan ly lich cong tac
+- Quan ly lich truc ban
+- Quan ly y kien truc ban
+- Thong bao target theo user/role
+- Tong hop dashboard
+- Xuat du lieu va lich su xuat
 
-## 🚀 Quick Start
+## 2. Cong nghe
+- Node.js + Express
+- mysql2/promise
+- jsonwebtoken
+- bcryptjs
+- joi
+- cors
+- dotenv
 
-### Install dependencies
+## 3. Chay backend
 ```bash
 npm install
-```
-
-### Configure environment
-Create `.env` file based on `.env.example`:
-```bash
-cp .env.example .env
-```
-
-### Initialize database
-1. Start XAMPP MySQL (phpMyAdmin, or command line)
-2. Create database and import schema:
-```bash
-# Using phpMyAdmin: Tools → SQL → Upload init.sql
-# Or using command line:
-mysql -u root < database/init.sql
-```
-
-### Start development server
-```bash
 npm run dev
 ```
 
-Server will run on http://localhost:3000
+Server mac dinh: `http://localhost:3000`
 
-## 📚 API Documentation
+Health check:
+`GET /health`
 
-### Base URL
-```
-http://localhost:3000/api
-```
+## 4. Bien moi truong
+Tao `.env` dua tren `.env.example`.
 
-### Authentication
-All protected endpoints require JWT token in header:
-```
-Authorization: Bearer <token>
-```
+Bien quan trong:
+- `PORT`
+- `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
+- `JWT_SECRET`, `JWT_EXPIRES_IN`
+- `CORS_ORIGIN`
 
-### Main Endpoints
+`CORS_ORIGIN` ho tro nhieu origin, tach bang dau phay.
 
-#### Auth
-- `POST /auth/login` - Login và nhận JWT token
-- `GET /auth/profile` - Lấy profile người dùng hiện tại
-- `POST /auth/logout` - Logout
-
-#### Officers (Cán bộ)
-- `GET /officers` - Danh sách cán bộ (có pagination)
-- `GET /officers/:id` - Chi tiết 1 cán bộ
-- `POST /officers` - Tạo mới (admin only)
-- `PUT /officers/:id` - Cập nhật (admin only)
-- `DELETE /officers/:id` - Xóa (admin only)
-
-#### Work Schedules (Lịch công tác)
-- `GET /work-schedules` - Danh sách lịch công tác
-- `GET /work-schedules/:id` - Chi tiết
-- `POST /work-schedules` - Tạo mới (admin/manager)
-- `PUT /work-schedules/:id` - Cập nhật (admin/manager)
-- `DELETE /work-schedules/:id` - Xóa (admin/manager)
-
-#### Duty Schedules (Lịch trực ban)
-- `GET /duty-schedules` - Danh sách lịch trực ban
-- `GET /duty-schedules/:id` - Chi tiết
-- `POST /duty-schedules` - Tạo mới (admin/manager)
-- `PUT /duty-schedules/:id` - Cập nhật (admin/manager)
-- `DELETE /duty-schedules/:id` - Xóa (admin/manager)
-
-#### Opinions (Ý kiến)
-- `GET /opinions` - Danh sách ý kiến
-- `GET /opinions/:id` - Chi tiết
-- `POST /opinions` - Gửi ý kiến (officers on duty)
-- `PUT /opinions/:id` - Phê duyệt/từ chối (admin only)
-- `DELETE /opinions/:id` - Xóa (admin only)
-
-## 🔑 Test Accounts (DEMO)
-
-Default passwords: **123456**
-
-| Username | Role | Permissions |
-|----------|------|-------------|
-| admin | admin | Full access |
-| quanly | manager | Manage schedules, view officers |
-| canbo | officer | View schedules, submit opinions |
-
-## 🗄️ Database
-
-### Schema
-- **users** - Tài khoản người dùng
-- **officers** - Danh sách cán bộ
-- **work_schedules** - Lịch công tác
-- **duty_schedules** - Lịch trực ban (2 loại: director & officer daily)
-- **opinions** - Ý kiến từ cán bộ
-
-### Import Script
-```bash
-mysql -u root hvktcnan_schedule < database/init.sql
-```
-
-## 🛠️ Development
-
-### Project Structure
+## 5. Cau truc thu muc
 ```
 backend/
-├── config/           - Cấu hình (database, constants)
-├── controllers/      - Business logic
-├── middleware/       - Auth, error handling
-├── routes/           - API routes
-├── database/         - SQL scripts
-├── app.js            - Express app setup
-├── server.js         - Server entry point
-└── .env              - Environment variables
+	app.js
+	server.js
+	config/
+		constants.js
+		database.js
+	controllers/
+	middleware/
+	routes/
+	utils/
+	database/
+		init.sql
 ```
 
-### Add New Route
-1. Create controller in `controllers/`
-2. Create route in `routes/`
-3. Import route in `app.js`
+## 6. Route map
+Tat ca route `/api/*` deu yeu cau token, tru login/logout theo route auth.
 
-## 📦 Dependencies
+### Auth
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/profile` (verifyToken)
+- `POST /api/auth/users` (admin/manager)
 
-- **express** - Web framework
-- **mysql2** - MySQL database driver
-- **bcryptjs** - Password hashing
-- **jsonwebtoken** - JWT generation
-- **joi** - Validation
-- **cors** - Cross-origin support
-- **dotenv** - Environment config
+### Officers
+- `GET /api/officers`
+- `GET /api/officers/:id`
+- `POST /api/officers` (admin)
+- `PUT /api/officers/:id` (admin)
+- `DELETE /api/officers/:id` (admin)
 
-## 🔐 Security Notes
+### Work schedules
+- `GET /api/work-schedules`
+- `GET /api/work-schedules/:id`
+- `POST /api/work-schedules` (admin/manager)
+- `PUT /api/work-schedules/:id` (admin/manager)
+- `DELETE /api/work-schedules/:id` (admin/manager)
 
-1. Change `JWT_SECRET` in .env for production
-2. Hash passwords with bcryptjs before storing
-3. Validate all input server-side
-4. Use HTTPS in production
-5. Implement rate limiting for login endpoint
-6. Add CSRF protection if needed
+### Duty schedules
+- `GET /api/duty-schedules`
+- `GET /api/duty-schedules/:id`
+- `POST /api/duty-schedules` (admin/manager)
+- `PUT /api/duty-schedules/:id` (admin/manager)
+- `DELETE /api/duty-schedules/:id` (admin/manager)
 
-## 🐛 Troubleshooting
+### Opinions
+- `GET /api/opinions`
+- `GET /api/opinions/:id`
+- `POST /api/opinions`
+- `PUT /api/opinions/:id` (admin/manager)
+- `DELETE /api/opinions/:id` (admin)
 
-### Database connection failed
-- Verify XAMPP MySQL is running
-- Check DB_ variables in .env
-- Ensure database `hvktcnan_schedule` exists
+### Notifications
+- `GET /api/notifications`
+- `PATCH /api/notifications/:id/read`
+- `POST /api/notifications/mark-all-read`
 
-### Port already in use
-- Change PORT in .env
-- Or kill process: `lsof -ti :3000 | xargs kill -9`
+### Dashboard
+- `GET /api/dashboard/overview`
 
-### Token expired
-- Client should refresh token before expiry
-- Token expires in 7 days
+### Exports
+- `GET /api/exports/preview`
+- `GET /api/exports/download`
+- `GET /api/exports/history`
 
-## 📝 License
-ISC
+## 7. Notification targeting
+File chinh: `utils/notificationTargeting.js`
+
+He thong ho tro 2 co che target:
+- `targetUserId`: thong bao ca nhan
+- `targetRole`: thong bao theo nhom role
+
+Controllers da dung co che nay:
+- workSchedulesController
+- dutySchedulesController
+- opinionsController
+- notificationsController (chi tra thong bao dung target)
+
+## 8. Dong bo users va officers
+Khi tao user noi bo qua `POST /api/auth/users`:
+- Tao ban ghi `users`.
+- Tu dong tao ban ghi `officers` moi voi ma `CBxxx` tang dan.
+
+## 9. Database
+Script khoi tao: `database/init.sql`
+
+Bang chinh:
+- `users`
+- `officers`
+- `work_schedules`
+- `duty_schedules`
+- `opinions`
+- `notifications`
+- `notification_reads`
+- `activity_logs`
+- `export_logs`
+
+Khoi tao DB:
+```bash
+mysql -u root < database/init.sql
+```
+
+## 10. Luu y van hanh
+- Token sai hoac het han -> API tra 401/403.
+- Neu vua thay doi role/quyen route, can login lai de cap nhat token.
+- Khi doi schema notifications tren DB cu, utility se tu check/bo sung cot target.
+
+## 11. Tai khoan mau
+Mat khau mac dinh: `123456`
+
+- Admin: `admin`, `admin2`
+- Manager: `quanly1` ... `quanly4`
+- Officer: `canbo1` ... `canbo10`

@@ -5,6 +5,7 @@ import Dashboard from './components/Dashboard/Dashboard';
 import QuanLyCanBo from './components/CanBo/QuanLyCanBo';
 import LapLichCongTac from './components/LichCongTac/LapLichCongTac';
 import LapLichTrucBan from './components/LichTrucBan/LapLichTrucBan';
+import LichCuaToi from './components/LichCuaToi/LichCuaToi';
 import TraCuuLich from './components/TraCuu/TraCuuLich';
 import XuatLich from './components/XuatLich/XuatLich';
 import YKienPhanHoi from './components/YKien/YKienPhanHoi';
@@ -92,6 +93,25 @@ const resolveOfficerId = (profile, officers = []) => {
   return String(profile.id || '');
 };
 
+const resolveOfficerProfile = (profile, officers = []) => {
+  if (!profile) return null;
+
+  const email = (profile.email || '').toLowerCase().trim();
+  const fullName = (profile.fullName || '').trim().toLowerCase();
+
+  if (email) {
+    const byEmail = officers.find((o) => (o.email || '').toLowerCase().trim() === email);
+    if (byEmail) return byEmail;
+  }
+
+  if (fullName) {
+    const byName = officers.find((o) => (o.hoTen || '').trim().toLowerCase() === fullName);
+    if (byName) return byName;
+  }
+
+  return null;
+};
+
 const ROLE_PERMISSIONS = {
   'Quản trị viên': [
     { perm: 'Quản lý cán bộ',       granted: true  },
@@ -132,6 +152,9 @@ const TaiKhoan = ({ user, reloadData }) => {
     password: '',
     fullName: '',
     email: '',
+    phone: '',
+    position: '',
+    department: '',
     role: 'officer',
     status: 'active',
   });
@@ -153,10 +176,10 @@ const TaiKhoan = ({ user, reloadData }) => {
     e.preventDefault();
     setCreateResult({ type: '', message: '' });
 
-    if (!createForm.username || !createForm.password || !createForm.fullName) {
+    if (!createForm.username || !createForm.password || !createForm.fullName || !createForm.department) {
       setCreateResult({
         type: 'error',
-        message: 'Vui lòng nhập đầy đủ: tên đăng nhập, mật khẩu, họ tên.',
+        message: 'Vui lòng nhập đầy đủ: tên đăng nhập, mật khẩu, họ tên, đơn vị.',
       });
       return;
     }
@@ -168,6 +191,9 @@ const TaiKhoan = ({ user, reloadData }) => {
         password: createForm.password,
         fullName: createForm.fullName.trim(),
         email: createForm.email.trim() || null,
+        phone: createForm.phone.trim() || null,
+        position: createForm.position.trim() || null,
+        department: createForm.department.trim(),
         role: createForm.role,
         status: createForm.status,
       });
@@ -183,6 +209,9 @@ const TaiKhoan = ({ user, reloadData }) => {
         password: '',
         fullName: '',
         email: '',
+        phone: '',
+        position: '',
+        department: '',
         role: 'officer',
         status: 'active',
       });
@@ -286,6 +315,33 @@ const TaiKhoan = ({ user, reloadData }) => {
                 />
               </div>
               <div>
+                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Số điện thoại</label>
+                <input
+                  className="input-field"
+                  value={createForm.phone}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, phone: e.target.value }))}
+                  placeholder="VD: 0901234567"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Chức vụ</label>
+                <input
+                  className="input-field"
+                  value={createForm.position}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, position: e.target.value }))}
+                  placeholder="VD: Cán bộ phụ trách"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đơn vị <span className="text-red-500">*</span></label>
+                <input
+                  className="input-field"
+                  value={createForm.department}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, department: e.target.value }))}
+                  placeholder="VD: Phòng CNTT"
+                />
+              </div>
+              <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Vai trò</label>
                 <select
                   className="input-field"
@@ -331,6 +387,7 @@ const PAGE_COMPONENTS = {
   canbo: QuanLyCanBo,
   lichcongtac: LapLichCongTac,
   lichtrucan: LapLichTrucBan,
+  lichcuatoi: LichCuaToi,
   tracuu: TraCuuLich,
   xuat: XuatLich,
   ykien: YKienPhanHoi,
@@ -339,9 +396,9 @@ const PAGE_COMPONENTS = {
 };
 
 const PAGE_ACCESS = {
-  'Quản trị viên': ['dashboard', 'canbo', 'lichcongtac', 'lichtrucan', 'tracuu', 'xuat', 'ykien', 'quytrinh', 'taikhoan'],
-  'Quản lý': ['dashboard', 'canbo', 'lichcongtac', 'lichtrucan', 'tracuu', 'xuat', 'ykien', 'quytrinh', 'taikhoan'],
-  'Cán bộ': ['dashboard', 'canbo', 'lichcongtac', 'lichtrucan', 'tracuu', 'xuat', 'ykien', 'quytrinh'],
+  'Quản trị viên': ['dashboard', 'canbo', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ykien', 'quytrinh', 'taikhoan'],
+  'Quản lý': ['dashboard', 'canbo', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ykien', 'quytrinh', 'taikhoan'],
+  'Cán bộ': ['dashboard', 'canbo', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ykien', 'quytrinh'],
 };
 
 function App() {
@@ -485,10 +542,13 @@ function App() {
 
         const loaded = await loadData();
         const officerId = resolveOfficerId(profile, loaded?.mappedOfficers || []);
+        const officerProfile = resolveOfficerProfile(profile, loaded?.mappedOfficers || []);
 
         setUser((prev) => ({
           ...prev,
           id: officerId || prev.id,
+          position: officerProfile?.chucVu || prev.position,
+          department: officerProfile?.donVi || prev.department,
         }));
       } catch (e) {
         apiClient.clearAuthToken();
@@ -512,10 +572,13 @@ function App() {
     setActivePage('dashboard');
     const loaded = await loadData();
     const officerId = resolveOfficerId(userData, loaded?.mappedOfficers || []);
+    const officerProfile = resolveOfficerProfile(userData, loaded?.mappedOfficers || []);
 
     setUser((prev) => ({
       ...prev,
       id: officerId || prev.id,
+      position: officerProfile?.chucVu || prev.position,
+      department: officerProfile?.donVi || prev.department,
     }));
   };
 

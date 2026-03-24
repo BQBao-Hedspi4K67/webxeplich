@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   LayoutDashboard, Users, CalendarDays, ClipboardList,
   Search, Printer, Settings, Shield, ChevronRight,
-  MessageSquareQuote, FileText,
+  MessageSquareQuote, FileText, CalendarCheck,
   LogOut, ChevronLeft
 } from 'lucide-react';
 
@@ -11,6 +11,7 @@ const menuItems = [
   { id: 'canbo', label: 'Quản lý cán bộ', icon: Users, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'lichcongtac', label: 'Lập lịch công tác', icon: CalendarDays, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'lichtrucan', label: 'Lập lịch trực ban', icon: ClipboardList, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
+  { id: 'lichcuatoi', label: 'Lịch của tôi', icon: CalendarCheck, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'tracuu', label: 'Tra cứu lịch', icon: Search, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'xuat', label: 'Xuất / In lịch', icon: Printer, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'ykien', label: 'Ý kiến trực ban', icon: MessageSquareQuote, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },

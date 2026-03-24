@@ -6,6 +6,7 @@ const pageTitles = {
   canbo: 'Quản lý cán bộ',
   lichcongtac: 'Lập lịch công tác tuần',
   lichtrucan: 'Lập lịch trực ban',
+  lichcuatoi: 'Lịch của tôi',
   tracuu: 'Tra cứu lịch',
   xuat: 'Xuất / In lịch',
   ykien: 'Ý kiến trực ban',

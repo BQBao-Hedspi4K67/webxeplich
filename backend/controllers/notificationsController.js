@@ -1,4 +1,5 @@
 import pool from '../config/database.js';
+import { ensureNotificationTargetingSchema } from '../utils/notificationTargeting.js';
 
 const toRelativeTimeVi = (dateValue) => {
   const date = new Date(dateValue);
@@ -16,10 +17,13 @@ export const getNotifications = async (req, res, next) => {
   try {
     const { limit = 20, onlyUnread = '' } = req.query;
     const userId = req.user.id;
+    const userRole = String(req.user.role || 'officer').toLowerCase();
     const lim = Math.max(1, Math.min(parseInt(limit, 10) || 20, 100));
 
     const connection = await pool.getConnection();
     try {
+      await ensureNotificationTargetingSchema(connection);
+
       let unreadClause = '';
       if (String(onlyUnread) === 'true') {
         unreadClause = 'AND nr.notificationId IS NULL';
@@ -30,10 +34,15 @@ export const getNotifications = async (req, res, next) => {
          FROM notifications n
          LEFT JOIN notification_reads nr
            ON n.id = nr.notificationId AND nr.userId = ?
-         WHERE n.isActive = 1 ${unreadClause}
+         WHERE n.isActive = 1
+           AND (
+             n.targetUserId = ?
+             OR n.targetRole = ?
+           )
+           ${unreadClause}
          ORDER BY n.createdAt DESC
          LIMIT ${lim}`,
-        [userId]
+        [userId, userId, userRole]
       );
 
       const data = rows.map((n) => ({
@@ -81,16 +90,23 @@ export const markNotificationAsRead = async (req, res, next) => {
 export const markAllNotificationsAsRead = async (req, res, next) => {
   try {
     const userId = req.user.id;
+    const userRole = String(req.user.role || 'officer').toLowerCase();
 
     const connection = await pool.getConnection();
     try {
+      await ensureNotificationTargetingSchema(connection);
+
       await connection.execute(
         `INSERT INTO notification_reads (notificationId, userId, readAt)
          SELECT n.id, ?, NOW()
          FROM notifications n
          WHERE n.isActive = 1
+           AND (
+             n.targetUserId = ?
+             OR n.targetRole = ?
+           )
          ON DUPLICATE KEY UPDATE readAt = VALUES(readAt)`,
-        [userId]
+        [userId, userId, userRole]
       );
 
       res.json({ success: true, message: 'All notifications marked as read' });

@@ -16,8 +16,8 @@ router.get('/:id', opinionsCtrl.getOpinionById);
 // Create opinion (officers on duty)
 router.post('/', opinionsCtrl.createOpinion);
 
-// Update opinion status (admin only)
-router.put('/:id', requireRole('admin'), opinionsCtrl.updateOpinionStatus);
+// Update opinion status (admin, manager)
+router.put('/:id', requireRole('admin', 'manager'), opinionsCtrl.updateOpinionStatus);
 
 // Delete opinion (admin only)
 router.delete('/:id', requireRole('admin'), opinionsCtrl.deleteOpinion);

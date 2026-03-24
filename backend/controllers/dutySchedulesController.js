@@ -1,6 +1,11 @@
 import pool from '../config/database.js';
 import { DUTY_TYPES, DUTY_STATUS } from '../config/constants.js';
 import { logActivity } from '../utils/activityLogger.js';
+import {
+  ensureNotificationTargetingSchema,
+  createUserNotification,
+  resolveUserIdByOfficerId,
+} from '../utils/notificationTargeting.js';
 
 const getIsoWeekRange = (weekNo, year = new Date().getFullYear()) => {
   const w = Number(weekNo);
@@ -250,6 +255,18 @@ export const createDutySchedule = async (req, res, next) => {
         [newId, officerId, dutyType, date, endDate, weekStartDate, shift, location, status, notes]
       );
 
+      await ensureNotificationTargetingSchema(connection);
+      const targetUserId = await resolveUserIdByOfficerId(connection, officerId);
+      await createUserNotification(connection, {
+        title: 'Ban duoc phan cong lich truc ban',
+        content: `Lich ${newId} vao ngay ${date}`,
+        type: 'info',
+        module: 'lichtrucban',
+        entityType: 'duty_schedule',
+        entityId: newId,
+        targetUserId,
+      });
+
       res.status(201).json({
         success: true,
         data: { id: newId },
@@ -285,7 +302,7 @@ export const updateDutySchedule = async (req, res, next) => {
     try {
       // Check exists
       const [check] = await connection.execute(
-        'SELECT id, dutyType, date FROM duty_schedules WHERE id = ?',
+        'SELECT id, dutyType, date, officerId FROM duty_schedules WHERE id = ?',
         [id]
       );
 
@@ -380,6 +397,19 @@ export const updateDutySchedule = async (req, res, next) => {
         `UPDATE duty_schedules SET ${updateFields.join(', ')} WHERE id = ?`,
         params
       );
+
+      const nextOfficerId = officerId !== undefined ? officerId : current.officerId;
+      const targetUserId = await resolveUserIdByOfficerId(connection, nextOfficerId);
+      await ensureNotificationTargetingSchema(connection);
+      await createUserNotification(connection, {
+        title: 'Lich truc ban cua ban vua duoc cap nhat',
+        content: `Lich ${id} vao ngay ${nextDate}`,
+        type: 'info',
+        module: 'lichtrucban',
+        entityType: 'duty_schedule',
+        entityId: id,
+        targetUserId,
+      });
 
       res.json({
         success: true,

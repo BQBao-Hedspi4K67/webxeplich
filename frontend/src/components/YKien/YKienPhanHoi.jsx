@@ -19,7 +19,7 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], reloadData }
     setDanhSach(yKienData);
   }, [yKienData]);
 
-  const isAdmin = user?.role === 'Quản trị viên';
+  const canReview = ['Quản trị viên', 'Quản lý'].includes(user?.role);
   const isCanBo = user?.role === 'Cán bộ';
 
   const dutyToday = useMemo(() => {
@@ -64,7 +64,7 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], reloadData }
     <div className="max-w-7xl mx-auto space-y-5">
       <div>
         <h2 className="text-xl font-bold text-slate-800">Ý kiến trực ban</h2>
-        <p className="text-sm text-slate-500 mt-0.5">Cán bộ trực có thể gửi ý kiến đột xuất để admin phê duyệt.</p>
+        <p className="text-sm text-slate-500 mt-0.5">Cán bộ trực có thể gửi ý kiến đột xuất để quản lý/admin phê duyệt.</p>
       </div>
 
       {isCanBo && (
@@ -94,7 +94,7 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], reloadData }
       <div className="card-lg p-0 overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <h3 className="text-base font-bold text-slate-800">Danh sách ý kiến</h3>
-          <span className="text-xs text-slate-500">{isAdmin ? danhSach.length : myItems.length} mục</span>
+          <span className="text-xs text-slate-500">{canReview ? danhSach.length : myItems.length} mục</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px]">
@@ -106,7 +106,7 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], reloadData }
               </tr>
             </thead>
             <tbody>
-              {(isAdmin ? danhSach : myItems).map(item => {
+              {(canReview ? danhSach : myItems).map(item => {
                 const ui = statusUI[item.trangThai];
                 const Icon = ui.icon;
                 return (
@@ -122,7 +122,7 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], reloadData }
                       {item.phanHoiAdmin || <span className="text-slate-400">Chưa phản hồi</span>}
                     </td>
                     <td className="table-td">
-                      {isAdmin && item.trangThai === 'pending' && (
+                      {canReview && item.trangThai === 'pending' && (
                         <div className="space-y-2 min-w-[220px]">
                           <textarea
                             rows={2}
@@ -141,7 +141,7 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], reloadData }
                   </tr>
                 );
               })}
-              {(isAdmin ? danhSach : myItems).length === 0 && (
+              {(canReview ? danhSach : myItems).length === 0 && (
                 <tr>
                   <td colSpan={7} className="text-center py-12 text-slate-400">
                     <MessageSquare size={30} className="mx-auto mb-2 opacity-40" />

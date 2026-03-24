@@ -1,6 +1,11 @@
 import pool from '../config/database.js';
 import { WORK_STATUS, WORK_TYPES } from '../config/constants.js';
 import { logActivity } from '../utils/activityLogger.js';
+import {
+  ensureNotificationTargetingSchema,
+  createUserNotification,
+  resolveUserIdsByAssignedTo,
+} from '../utils/notificationTargeting.js';
 
 // Get all work schedules with pagination and filters
 export const getWorkSchedules = async (req, res, next) => {
@@ -169,6 +174,20 @@ export const createWorkSchedule = async (req, res, next) => {
         [newId, title, date, startTime || null, endTime || null, location || '', assignedTo || '', department || '', type, 'upcoming', weekNo || null, notes]
       );
 
+      await ensureNotificationTargetingSchema(connection);
+      const targetUserIds = await resolveUserIdsByAssignedTo(connection, assignedTo);
+      for (const targetUserId of targetUserIds) {
+        await createUserNotification(connection, {
+          title: 'Ban duoc phan cong lich cong tac moi',
+          content: `${title} (${date})`,
+          type: 'info',
+          module: 'lichcongtac',
+          entityType: 'work_schedule',
+          entityId: newId,
+          targetUserId,
+        });
+      }
+
       res.status(201).json({
         success: true,
         data: { id: newId },
@@ -204,7 +223,7 @@ export const updateWorkSchedule = async (req, res, next) => {
     try {
       // Check exists
       const [check] = await connection.execute(
-        'SELECT id FROM work_schedules WHERE id = ?',
+        'SELECT id, title, date, assignedTo FROM work_schedules WHERE id = ?',
         [id]
       );
 
@@ -279,6 +298,24 @@ export const updateWorkSchedule = async (req, res, next) => {
         `UPDATE work_schedules SET ${updateFields.join(', ')} WHERE id = ?`,
         params
       );
+
+      const prev = check[0];
+      const nextAssignedTo = assignedTo !== undefined ? assignedTo : prev.assignedTo;
+      const nextTitle = title !== undefined ? title : prev.title;
+      const nextDate = date !== undefined ? date : prev.date;
+      await ensureNotificationTargetingSchema(connection);
+      const targetUserIds = await resolveUserIdsByAssignedTo(connection, nextAssignedTo);
+      for (const targetUserId of targetUserIds) {
+        await createUserNotification(connection, {
+          title: 'Lich cong tac cua ban vua duoc cap nhat',
+          content: `${nextTitle} (${nextDate})`,
+          type: 'info',
+          module: 'lichcongtac',
+          entityType: 'work_schedule',
+          entityId: id,
+          targetUserId,
+        });
+      }
 
       res.json({
         success: true,

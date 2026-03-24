@@ -1,6 +1,12 @@
 import pool from '../config/database.js';
 import { OPINION_STATUS } from '../config/constants.js';
 import { logActivity } from '../utils/activityLogger.js';
+import {
+  ensureNotificationTargetingSchema,
+  createRoleNotification,
+  createUserNotification,
+  resolveUserIdByOfficerId,
+} from '../utils/notificationTargeting.js';
 
 // Get all opinions
 export const getOpinions = async (req, res, next) => {
@@ -159,15 +165,25 @@ export const createOpinion = async (req, res, next) => {
       const [idRows] = await connection.execute('SELECT LAST_INSERT_ID() as id');
       const opinionId = idRows[0].id;
 
-      await connection.execute(
-        `INSERT INTO notifications (title, content, type, module, entityType, entityId)
-         VALUES (?, ?, 'info', 'ykien', 'opinion', ?)`,
-        [
-          'Co y kien truc ban cho duyet',
-          `Can bo ${officerId} vua gui y kien truc ban moi.`,
-          String(opinionId),
-        ]
-      );
+      await ensureNotificationTargetingSchema(connection);
+      await createRoleNotification(connection, {
+        title: 'Co y kien truc ban cho duyet',
+        content: `Can bo ${officerId} vua gui y kien truc ban moi.`,
+        type: 'info',
+        module: 'ykien',
+        entityType: 'opinion',
+        entityId: String(opinionId),
+        targetRole: 'admin',
+      });
+      await createRoleNotification(connection, {
+        title: 'Co y kien truc ban cho duyet',
+        content: `Can bo ${officerId} vua gui y kien truc ban moi.`,
+        type: 'info',
+        module: 'ykien',
+        entityType: 'opinion',
+        entityId: String(opinionId),
+        targetRole: 'manager',
+      });
 
       res.status(201).json({
         success: true,
@@ -211,7 +227,7 @@ export const updateOpinionStatus = async (req, res, next) => {
     try {
       // Check exists
       const [check] = await connection.execute(
-        'SELECT id FROM opinions WHERE id = ?',
+        'SELECT id, officerId FROM opinions WHERE id = ?',
         [id]
       );
 
@@ -228,18 +244,20 @@ export const updateOpinionStatus = async (req, res, next) => {
         [status, adminFeedback || null, id]
       );
 
-      await connection.execute(
-        `INSERT INTO notifications (title, content, type, module, entityType, entityId)
-         VALUES (?, ?, ?, 'ykien', 'opinion', ?)`,
-        [
-          status === 'approved' ? 'Y kien da duoc duyet' : 'Y kien bi tu choi',
-          status === 'approved'
-            ? `Y kien #${id} da duoc admin phe duyet.`
-            : `Y kien #${id} da bi admin tu choi.`,
-          status === 'approved' ? 'success' : 'warning',
-          String(id),
-        ]
-      );
+      await ensureNotificationTargetingSchema(connection);
+      const submitterOfficerId = check[0]?.officerId;
+      const submitterUserId = await resolveUserIdByOfficerId(connection, submitterOfficerId);
+      await createUserNotification(connection, {
+        title: status === 'approved' ? 'Y kien da duoc duyet' : 'Y kien bi tu choi',
+        content: status === 'approved'
+          ? `Y kien #${id} da duoc quan ly/admin phe duyet.`
+          : `Y kien #${id} da bi quan ly/admin tu choi.`,
+        type: status === 'approved' ? 'success' : 'warning',
+        module: 'ykien',
+        entityType: 'opinion',
+        entityId: String(id),
+        targetUserId: submitterUserId,
+      });
 
       res.json({
         success: true,
