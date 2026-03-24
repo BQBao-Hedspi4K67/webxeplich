@@ -106,7 +106,7 @@ Xác thực:
 
 ## 8. Cấu trúc thư mục dự án
 ```text
-web7cu5/
+webxeplich/
     frontend/
     backend/
     README.md
