@@ -1,17 +1,15 @@
-# Backend - HVKTCNAN Schedule Management
+# Backend - He thong API quan ly lich cong tac va lich truc ban
 
-## 1. Vai tro backend
-Backend cung cap API cho toan bo nghiep vu:
-- Dang nhap/xac thuc JWT
-- Quan ly can bo
-- Quan ly lich cong tac
-- Quan ly lich truc ban
-- Quan ly y kien truc ban
-- Thong bao target theo user/role
-- Tong hop dashboard
-- Xuat du lieu va lich su xuat
+## 1. Muc tieu backend
+Backend la lop nghiep vu trung tam, dam nhan:
+- Xac thuc, phan quyen va kiem soat truy cap.
+- Xu ly CRUD cho can bo, lich cong tac, lich truc ban.
+- Xu ly y kien truc ban va phe duyet.
+- Cap phat thong bao theo doi tuong nhan.
+- Tong hop so lieu dashboard.
+- Cung cap du lieu export va lich su export.
 
-## 2. Cong nghe
+## 2. Cong nghe va thu vien
 - Node.js + Express
 - mysql2/promise
 - jsonwebtoken
@@ -20,7 +18,7 @@ Backend cung cap API cho toan bo nghiep vu:
 - cors
 - dotenv
 
-## 3. Chay backend
+## 3. Khoi dong backend
 ```bash
 npm install
 npm run dev
@@ -28,21 +26,27 @@ npm run dev
 
 Server mac dinh: `http://localhost:3000`
 
-Health check:
-`GET /health`
+Health endpoint:
+- `GET /health`
 
-## 4. Bien moi truong
-Tao `.env` dua tren `.env.example`.
+## 4. Bien moi truong can co
+Tao file `.env` dua tren `.env.example`.
 
-Bien quan trong:
+Danh sach bien quan trong:
 - `PORT`
-- `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
-- `JWT_SECRET`, `JWT_EXPIRES_IN`
+- `DB_HOST`
+- `DB_PORT`
+- `DB_USER`
+- `DB_PASSWORD`
+- `DB_NAME`
+- `JWT_SECRET`
+- `JWT_EXPIRES_IN`
 - `CORS_ORIGIN`
 
-`CORS_ORIGIN` ho tro nhieu origin, tach bang dau phay.
+Luu y:
+- `CORS_ORIGIN` cho phep nhieu origin, tach boi dau phay.
 
-## 5. Cau truc thu muc
+## 5. Cau truc code
 ```
 backend/
 	app.js
@@ -51,85 +55,99 @@ backend/
 		constants.js
 		database.js
 	controllers/
-	middleware/
 	routes/
+	middleware/
 	utils/
 	database/
 		init.sql
 ```
 
-## 6. Route map
-Tat ca route `/api/*` deu yeu cau token, tru login/logout theo route auth.
+## 6. Chuan middleware va bao mat
+1. `verifyToken`
+- Doc JWT tu header Authorization.
+- Gan thong tin user vao request.
 
-### Auth
+2. `requireRole`
+- Kiem tra role duoc phep theo route.
+
+3. Error handling
+- Su dung middleware tong de tra loi loi co cau truc.
+
+## 7. Route map va quyen truy cap
+Tat ca route `/api/*` deu qua xac thuc, tru login/logout theo route auth.
+
+### 7.1. Auth
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
-- `GET /api/auth/profile` (verifyToken)
+- `GET /api/auth/profile` (can token)
 - `POST /api/auth/users` (admin/manager)
 
-### Officers
+### 7.2. Officers
 - `GET /api/officers`
 - `GET /api/officers/:id`
 - `POST /api/officers` (admin)
 - `PUT /api/officers/:id` (admin)
 - `DELETE /api/officers/:id` (admin)
 
-### Work schedules
+### 7.3. Work schedules
 - `GET /api/work-schedules`
 - `GET /api/work-schedules/:id`
 - `POST /api/work-schedules` (admin/manager)
 - `PUT /api/work-schedules/:id` (admin/manager)
 - `DELETE /api/work-schedules/:id` (admin/manager)
 
-### Duty schedules
+### 7.4. Duty schedules
 - `GET /api/duty-schedules`
 - `GET /api/duty-schedules/:id`
 - `POST /api/duty-schedules` (admin/manager)
 - `PUT /api/duty-schedules/:id` (admin/manager)
 - `DELETE /api/duty-schedules/:id` (admin/manager)
 
-### Opinions
+### 7.5. Opinions
 - `GET /api/opinions`
 - `GET /api/opinions/:id`
 - `POST /api/opinions`
 - `PUT /api/opinions/:id` (admin/manager)
 - `DELETE /api/opinions/:id` (admin)
 
-### Notifications
+### 7.6. Notifications
 - `GET /api/notifications`
 - `PATCH /api/notifications/:id/read`
 - `POST /api/notifications/mark-all-read`
 
-### Dashboard
+### 7.7. Dashboard
 - `GET /api/dashboard/overview`
 
-### Exports
+### 7.8. Exports
 - `GET /api/exports/preview`
 - `GET /api/exports/download`
 - `GET /api/exports/history`
 
-## 7. Notification targeting
-File chinh: `utils/notificationTargeting.js`
+## 8. Notification targeting (trong backend)
+File trung tam: `utils/notificationTargeting.js`
 
-He thong ho tro 2 co che target:
-- `targetUserId`: thong bao ca nhan
-- `targetRole`: thong bao theo nhom role
+He thong thong bao ho tro:
+- `targetUserId`: thong bao cho mot user cu the.
+- `targetRole`: thong bao cho nhom role.
 
-Controllers da dung co che nay:
-- workSchedulesController
-- dutySchedulesController
-- opinionsController
-- notificationsController (chi tra thong bao dung target)
+Cac controller da tich hop co che nay:
+- `workSchedulesController.js`
+- `dutySchedulesController.js`
+- `opinionsController.js`
+- `notificationsController.js`
 
-## 8. Dong bo users va officers
-Khi tao user noi bo qua `POST /api/auth/users`:
-- Tao ban ghi `users`.
-- Tu dong tao ban ghi `officers` moi voi ma `CBxxx` tang dan.
+## 9. Dong bo users va officers
+Route `POST /api/auth/users` khong chi tao user dang nhap, ma con:
+- Tao them ban ghi trong bang officers.
+- Sinh ma can bo dang `CBxxx` tang dan.
 
-## 9. Database
-Script khoi tao: `database/init.sql`
+Dieu nay giup du lieu nghiep vu va du lieu tai khoan khop nhau ngay tu dau.
 
-Bang chinh:
+## 10. Database
+Script khoi tao va seed du lieu:
+- `database/init.sql`
+
+Bang du lieu chinh:
 - `users`
 - `officers`
 - `work_schedules`
@@ -140,19 +158,40 @@ Bang chinh:
 - `activity_logs`
 - `export_logs`
 
-Khoi tao DB:
+Lenh khoi tao nhanh:
 ```bash
 mysql -u root < database/init.sql
 ```
 
-## 10. Luu y van hanh
-- Token sai hoac het han -> API tra 401/403.
-- Neu vua thay doi role/quyen route, can login lai de cap nhat token.
-- Khi doi schema notifications tren DB cu, utility se tu check/bo sung cot target.
+## 11. Quy tac nghiep vu quan trong
+1. Officer gui y kien theo luong truc ban.
+2. Admin/manager co the duyet hoac tu choi y kien.
+3. Lich cong tac va lich truc ban khi tao/cap nhat co the sinh thong bao target.
+4. API notifications chi tra thong bao dung nguoi dung dang nhap.
 
-## 11. Tai khoan mau
+## 12. Van hanh va debug
+1. Loi 401:
+- Kiem tra token co gui len header khong.
+- Kiem tra token con han khong.
+
+2. Loi 403:
+- Kiem tra role trong token.
+- Kiem tra route co `requireRole` dung role khong.
+
+3. Khong thay thong bao:
+- Kiem tra du lieu notifications co targetUserId/targetRole dung user hien tai.
+
+4. DB cu thieu cot target thong bao:
+- Utility se tu ensure schema notifications khi xu ly.
+
+## 13. Tai khoan seed de test
 Mat khau mac dinh: `123456`
 
 - Admin: `admin`, `admin2`
-- Manager: `quanly1` ... `quanly4`
-- Officer: `canbo1` ... `canbo10`
+- Manager: `quanly1` den `quanly4`
+- Officer: `canbo1` den `canbo10`
+
+## 14. Khuyen nghi cho phat trien tiep
+- Bo sung test tu dong cho controller va route quan trong.
+- Tach service layer neu can mo rong nghiep vu lon hon.
+- Bo sung rate limit va audit bao mat cho login route.
