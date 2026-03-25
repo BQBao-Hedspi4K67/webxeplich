@@ -1,0 +1,695 @@
+    \documentclass[12pt,a4paper]{report}
+
+    \usepackage[T5]{fontenc}
+    \usepackage[utf8]{inputenc}
+    \usepackage[vietnamese]{babel}
+    \usepackage{geometry}
+    \usepackage{setspace}
+    \usepackage{fancyhdr}
+    \usepackage{titlesec}
+    \usepackage{hyperref}
+    \usepackage{graphicx}
+    \usepackage{float}
+    \usepackage{caption}
+    \usepackage{longtable}
+    \usepackage{tabularx}
+    \usepackage{array}
+    \usepackage{booktabs}
+    \usepackage{enumitem}
+    \usepackage{xcolor}
+
+    \geometry{left=3cm,right=2.5cm,top=2.5cm,bottom=2.5cm}
+    \onehalfspacing
+    \setlength{\parindent}{0.8cm}
+    \setlength{\parskip}{4pt}
+    \setlength{\headheight}{15pt}
+
+    \hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=blue,
+    pdftitle={Báo cáo hệ thống quản lý lịch công tác và lịch trực ban},
+    pdfauthor={Nhóm phát triển}
+    }
+
+    \pagestyle{fancy}
+    \fancyhf{}
+    \fancyhead[L]{Báo cáo dự án phần mềm}
+    \fancyhead[R]{\thepage}
+    \renewcommand{\headrulewidth}{0.4pt}
+
+    \titleformat{\chapter}[hang]
+    {\normalfont\huge\bfseries}
+    {Chương \thechapter:}
+    {0.5em}
+    {}
+
+    \titlespacing*{\chapter}{0pt}{0pt}{1.5ex}
+
+    \newcounter{webimg}
+    \newcommand{\imgplaceholder}[2]{
+    \stepcounter{webimg}
+    \edef\currentwebimg{web\arabic{webimg}.png}
+    \begin{figure}[H]
+        \centering
+        \IfFileExists{\currentwebimg}{%
+            \includegraphics[width=1\textwidth]{\currentwebimg}
+        }{%
+            \fbox{\parbox[c][6cm][c]{1\textwidth}{\centering\textbf{Chèn hình tại đây}}}
+        }
+        \caption{#1}
+        \label{#2}
+    \end{figure}
+    }
+
+    \newcommand{\specinfo}[6]{
+    \begin{table}[H]
+    \centering
+    \caption{Thông tin đặc tả #1}
+    \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.2cm}|X|}
+    \hline
+    \textbf{Tên use case} & #1 \\ \hline
+    \textbf{Actor} & #2 \\ \hline
+    \textbf{Mô tả} & #3 \\ \hline
+    \textbf{Tiền điều kiện} & #4 \\ \hline
+    \textbf{Hậu điều kiện} & #5 \\ \hline
+    \textbf{Ghi chú} & #6 \\ \hline
+    \end{tabularx}
+    \end{table}
+    }
+
+    \newcommand{\mainflowtable}[1]{
+    \begin{table}[H]
+    \centering
+    \caption{Luồng sự kiện chính - #1}
+    \begin{tabularx}{\textwidth}{|c|>{\raggedright\arraybackslash}p{3cm}|X|}
+    \hline
+    \textbf{STT} & \textbf{Thực hiện bởi} & \textbf{Hành động} \\ \hline
+    }
+
+    \newcommand{\altflowtable}[1]{
+    \begin{table}[H]
+    \centering
+    \caption{Luồng sự kiện thay thế - #1}
+    \begin{tabularx}{\textwidth}{|c|>{\raggedright\arraybackslash}p{3cm}|X|}
+    \hline
+    \textbf{STT} & \textbf{Thực hiện bởi} & \textbf{Hành động} \\ \hline
+    }
+
+    \begin{document}
+
+    \begin{titlepage}
+        \centering
+        \vspace*{\fill}
+
+        {\Large HỌC VIỆN KỸ THUẬT VÀ CÔNG NGHỆ AN NINH\par}
+        \vspace{1.2cm}
+
+        {\Large \textbf{HỆ THỐNG QUẢN LÝ LỊCH CÔNG TÁC VÀ LỊCH TRỰC BAN}\par}
+        \vspace{1.8cm}
+
+        {\large \today\par}
+
+        \vspace*{\fill}
+    \end{titlepage}
+
+    \tableofcontents
+    \listoftables
+    \listoffigures
+    \newpage
+
+    \chapter{Giới thiệu dự án}
+    \section{Mục tiêu dự án}
+    Dự án hướng tới số hóa và chuẩn hóa công tác lập lịch, theo dõi và điều phối nhiệm vụ nội bộ. Hệ thống giải quyết các vấn đề quản lý thủ công như khó tra cứu, dễ trùng lặp lịch, thiếu đồng bộ thông tin và khó theo dõi trạng thái nghiệp vụ.
+
+    Các mục tiêu cốt lõi:
+    \begin{itemize}[leftmargin=1.2cm]
+    \item Quản lý tập trung dữ liệu cán bộ, lịch công tác, lịch trực ban, ý kiến và thông báo.
+    \item Phân quyền rõ ràng theo vai trò Admin, Manager, Officer.
+    \item Tối ưu quy trình tạo lịch, cập nhật lịch, gửi ý kiến và phê duyệt.
+    \item Hỗ trợ tra cứu nhanh, xuất dữ liệu và lưu vết lịch sử thao tác.
+    \end{itemize}
+
+    \section{Phạm vi dự án}
+    Phạm vi chức năng bao gồm:
+    \begin{itemize}[leftmargin=1.2cm]
+    \item Xác thực và quản lý phiên đăng nhập bằng JWT.
+    \item Quản lý cán bộ.
+    \item Quản lý lịch công tác và lịch trực ban.
+    \item Chức năng \textit{Lịch của tôi} tổng hợp lịch cá nhân.
+    \item Quản lý ý kiến trực ban và phê duyệt.
+    \item Thông báo theo đối tượng nhận (cá nhân/nhóm vai trò).
+    \item Tra cứu, xem trước và xuất dữ liệu.
+    \end{itemize}
+
+    \section{Ý nghĩa thực tiễn}
+    Hệ thống giúp nâng cao hiệu quả quản trị, rút ngắn thời gian xử lý công việc, tăng tính minh bạch trong phê duyệt và tạo nền tảng dữ liệu để phân tích, ra quyết định quản lý.
+
+    \chapter{Mô tả tổng quan}
+    \section{Các tác nhân}
+    \subsection*{Admin}
+    \begin{itemize}[leftmargin=1.2cm]
+    \item Quản trị toàn bộ hệ thống và dữ liệu.
+    \item Tạo, cập nhật, xóa các lịch nghiệp vụ.
+    \item Duyệt, từ chối ý kiến trực ban.
+    \item Quản trị tài khoản nội bộ.
+    \end{itemize}
+
+    \subsection*{Manager}
+    \begin{itemize}[leftmargin=1.2cm]
+    \item Quản lý lịch công tác và lịch trực ban.
+    \item Duyệt/từ chối ý kiến trực ban.
+    \item Theo dõi dashboard, thông báo và báo cáo.
+    \end{itemize}
+
+    \subsection*{Officer}
+    \begin{itemize}[leftmargin=1.2cm]
+    \item Xem lịch được phân công và lịch cá nhân.
+    \item Gửi ý kiến trực ban.
+    \item Theo dõi thông báo và tra cứu thông tin.
+    \end{itemize}
+
+    \section{Biểu đồ use case tổng quan}
+    Biểu đồ use case tổng quan thể hiện các nhóm chức năng hệ thống và mối liên kết giữa ba actor với hệ thống.
+    \imgplaceholder{Biểu đồ use case tổng quan của hệ thống}{fig:uc_overall}
+
+    \section{Biểu đồ use case phân rã}
+    Hệ thống được phân rã thành các use case nhỏ để mô tả rõ từng luồng nghiệp vụ.
+
+    \subsection{Nhóm use case xác thực và phiên đăng nhập}
+    Mô tả: bao gồm đăng nhập, khôi phục phiên, đăng xuất, xác thực token.
+    \imgplaceholder{Biểu đồ use case phân rã nhóm xác thực}{fig:uc_auth}
+
+    \subsection{Nhóm use case quản lý cán bộ}
+    Mô tả: xem danh sách, thêm mới, cập nhật, xóa cán bộ theo quyền.
+    \imgplaceholder{Biểu đồ use case phân rã nhóm quản lý cán bộ}{fig:uc_officers}
+
+    \subsection{Nhóm use case quản lý lịch công tác}
+    Mô tả: CRUD lịch công tác, lọc dữ liệu, gửi thông báo liên quan.
+    \imgplaceholder{Biểu đồ use case phân rã nhóm lịch công tác}{fig:uc_work}
+
+    \subsection{Nhóm use case quản lý lịch trực ban}
+    Mô tả: CRUD lịch trực ban, phân công cán bộ, cập nhật trạng thái.
+    \imgplaceholder{Biểu đồ use case phân rã nhóm lịch trực ban}{fig:uc_duty}
+
+    \subsection{Nhóm use case lịch của tôi}
+    Mô tả: tổng hợp lịch công tác và trực ban của người dùng đang đăng nhập.
+    \imgplaceholder{Biểu đồ use case phân rã nhóm lịch của tôi}{fig:uc_my_schedule}
+
+    \subsection{Nhóm use case ý kiến trực ban}
+    Mô tả: tiếp nhận ý kiến officer, duyệt/từ chối bởi admin hoặc manager.
+    \imgplaceholder{Biểu đồ use case phân rã nhóm ý kiến trực ban}{fig:uc_opinions}
+
+    \subsection{Nhóm use case thông báo và xuất dữ liệu}
+    Mô tả: hiển thị thông báo đúng đối tượng, đánh dấu đã đọc, xuất báo cáo.
+    \imgplaceholder{Biểu đồ use case phân rã nhóm thông báo và xuất dữ liệu}{fig:uc_notifications_exports}
+
+    \section{Quy trình nghiệp vụ}
+    \subsection{Quy trình đăng nhập}
+    Người dùng nhập thông tin tài khoản, hệ thống xác thực và khởi tạo phiên làm việc.
+    \imgplaceholder{Biểu đồ hoạt động quy trình đăng nhập}{fig:act_login}
+
+    \subsection{Quy trình quản lý cán bộ}
+    Quy trình tìm kiếm, xem, cập nhật, thêm mới hoặc xóa cán bộ theo phân quyền.
+    \imgplaceholder{Biểu đồ hoạt động quy trình quản lý cán bộ}{fig:act_officer}
+
+    \subsection{Quy trình quản lý lịch công tác}
+    Tạo mới hoặc điều chỉnh lịch công tác, cập nhật dữ liệu và thông báo liên quan.
+    \imgplaceholder{Biểu đồ hoạt động quy trình lịch công tác}{fig:act_work}
+
+    \subsection{Quy trình ý kiến trực ban}
+    Officer gửi ý kiến, cấp quản lý xử lý duyệt/từ chối và phản hồi.
+    \imgplaceholder{Biểu đồ hoạt động quy trình ý kiến trực ban}{fig:act_opinion}
+
+    \subsection{Quy trình xuất dữ liệu}
+    Lựa chọn bộ lọc, xem trước kết quả và tải file báo cáo.
+    \imgplaceholder{Biểu đồ hoạt động quy trình xuất dữ liệu}{fig:act_export}
+
+    \chapter{Đặc tả các chức năng}
+
+    \section{UC01 - Đăng nhập}
+    \specinfo
+    {UC01 - Đăng nhập}
+    {Admin, Manager, Officer}
+    {Người dùng truy cập hệ thống bằng tài khoản nội bộ.}
+    {Người dùng có tài khoản hợp lệ trong hệ thống.}
+    {Phiên đăng nhập được tạo và token được cấp.}
+    {Token được lưu trên client để sử dụng cho các API tiếp theo.}
+
+    \mainflowtable{UC01 - Đăng nhập}
+    1 & Người dùng & Mở màn hình đăng nhập. \\ \hline
+    2 & Người dùng & Nhập tên đăng nhập và mật khẩu. \\ \hline
+    3 & Hệ thống & Kiểm tra định dạng dữ liệu đầu vào. \\ \hline
+    4 & Hệ thống & Xác thực thông tin với cơ sở dữ liệu. \\ \hline
+    5 & Hệ thống & Tạo JWT và trả hồ sơ người dùng. \\ \hline
+    6 & Người dùng & Đăng nhập thành công, vào trang chính. \\ \hline
+    \end{tabularx}
+    \end{table}
+
+    \altflowtable{UC01 - Đăng nhập}
+    3a & Hệ thống & Trường dữ liệu trống hoặc sai định dạng, thông báo lỗi. \\ \hline
+    4a & Hệ thống & Sai tên đăng nhập/mật khẩu, yêu cầu nhập lại. \\ \hline
+    5a & Hệ thống & Tài khoản bị khóa hoặc hết hạn quyền, từ chối đăng nhập. \\ \hline
+    \end{tabularx}
+    \end{table}
+
+    \section{UC02 - Quản lý cán bộ}
+    \specinfo
+    {UC02 - Quản lý cán bộ}
+    {Admin, Manager (xem theo quyền), Officer (xem theo quyền)}
+    {Quản lý hồ sơ cán bộ trong hệ thống.}
+    {Người dùng đã đăng nhập, role hợp lệ.}
+    {Dữ liệu cán bộ được cập nhật theo thao tác.}
+    {Mọi thao tác tạo/sửa/xóa đều ghi nhận hoạt động.}
+
+    \mainflowtable{UC02 - Quản lý cán bộ}
+    1 & Người dùng & Mở module quản lý cán bộ. \\ \hline
+    2 & Hệ thống & Tải danh sách cán bộ và bộ lọc tìm kiếm. \\ \hline
+    3 & Người dùng & Tìm kiếm cán bộ theo từ khóa/bộ lọc. \\ \hline
+    4 & Người dùng & Chọn thao tác: xem, thêm, sửa, xóa. \\ \hline
+    5 & Hệ thống & Hiển thị form tương ứng thao tác. \\ \hline
+    6 & Người dùng & Nhập/xác nhận dữ liệu và lưu. \\ \hline
+    7 & Hệ thống & Kiểm tra hợp lệ, cập nhật DB, tải lại danh sách. \\ \hline
+    \end{tabularx}
+    \end{table}
+
+    \altflowtable{UC02 - Quản lý cán bộ}
+    6a & Hệ thống & Dữ liệu nhập không hợp lệ, thông báo lỗi. \\ \hline
+    7a & Hệ thống & Không đủ quyền thực hiện thao tác, trả về 403. \\ \hline
+    7b & Hệ thống & Bản ghi đã tồn tại/trùng mã cán bộ, từ chối lưu. \\ \hline
+    \end{tabularx}
+    \end{table}
+
+    \section{UC03 - Quản lý lịch công tác}
+    \specinfo
+    {UC03 - Quản lý lịch công tác}
+    {Admin, Manager}
+    {Tạo, sửa, xóa và theo dõi lịch công tác.}
+    {Đã đăng nhập và có quyền quản lý lịch công tác.}
+    {Lịch công tác được cập nhật và thông báo liên quan được tạo (nếu có).}
+    {Officer chỉ có quyền xem dữ liệu theo phạm vi được cấp.}
+
+    \mainflowtable{UC03 - Quản lý lịch công tác}
+    1 & Người dùng & Mở module lịch công tác. \\ \hline
+    2 & Hệ thống & Tải dữ liệu lịch công tác hiện có. \\ \hline
+    3 & Người dùng & Chọn thao tác tạo mới/cập nhật/xóa. \\ \hline
+    4 & Hệ thống & Hiển thị form hoặc hộp xác nhận xóa. \\ \hline
+    5 & Người dùng & Nhập nội dung lịch hoặc xác nhận thao tác. \\ \hline
+    6 & Hệ thống & Kiểm tra quyền và tính hợp lệ của dữ liệu. \\ \hline
+    7 & Hệ thống & Lưu thay đổi vào DB. \\ \hline
+    8 & Hệ thống & Tạo thông báo theo targetUserId/targetRole (nếu có). \\ \hline
+    9 & Hệ thống & Trả kết quả, cập nhật danh sách trên giao diện. \\ \hline
+    \end{tabularx}
+    \end{table}
+
+    \altflowtable{UC03 - Quản lý lịch công tác}
+    6a & Hệ thống & Dữ liệu thiếu trường bắt buộc, thông báo lỗi và dừng lưu. \\ \hline
+    6b & Hệ thống & User không đủ quyền thao tác, trả lời 403. \\ \hline
+    8a & Hệ thống & Tạo thông báo thất bại, vẫn lưu lịch và ghi log cảnh báo. \\ \hline
+    \end{tabularx}
+    \end{table}
+
+    \section{UC04 - Quản lý lịch trực ban}
+    \specinfo
+    {UC04 - Quản lý lịch trực ban}
+    {Admin, Manager}
+    {Lập lịch trực ban, điều phối cán bộ trực và cập nhật trạng thái.}
+    {Đã đăng nhập và có quyền quản lý lịch trực ban.}
+    {Lịch trực ban được lưu cập nhật thành công.}
+    {Hệ thống hỗ trợ lọc theo tuần, cán bộ, loại trực.}
+
+    \mainflowtable{UC04 - Quản lý lịch trực ban}
+    1 & Người dùng & Mở module lịch trực ban. \\ \hline
+    2 & Hệ thống & Tải danh sách ca trực hiện có. \\ \hline
+    3 & Người dùng & Chọn thao tác tạo/sửa/xóa lịch trực. \\ \hline
+    4 & Hệ thống & Hiển thị form nhập thông tin ca trực. \\ \hline
+    5 & Người dùng & Chọn cán bộ, thời gian, loại trực, ghi chú. \\ \hline
+    6 & Hệ thống & Kiểm tra xung đột lịch và tính hợp lệ. \\ \hline
+    7 & Hệ thống & Ghi dữ liệu vào DB. \\ \hline
+    8 & Hệ thống & Gửi thông báo cho đối tượng liên quan. \\ \hline
+    9 & Hệ thống & Cập nhật danh sách, hiển thị kết quả. \\ \hline
+    \end{tabularx}
+    \end{table}
+
+    \altflowtable{UC04 - Quản lý lịch trực ban}
+    6a & Hệ thống & Trùng lịch hoặc xung đột thời gian, thông báo điều chỉnh. \\ \hline
+    6b & Hệ thống & Cán bộ không tồn tại/không hoạt động, từ chối lưu. \\ \hline
+    7a & Hệ thống & Lỗi kết nối DB, thông báo thử lại sau. \\ \hline
+    \end{tabularx}
+    \end{table}
+
+    \section{UC05 - Lịch của tôi}
+    \specinfo
+    {UC05 - Lịch của tôi}
+    {Admin, Manager, Officer}
+    {Tổng hợp lịch công tác và lịch trực ban của người dùng hiện tại.}
+    {Người dùng đã đăng nhập hợp lệ.}
+    {Danh sách lịch cá nhân được hiển thị theo bộ lọc.}
+    {Cơ chế đối chiếu ưu tiên officerId, fallback theo thông tin định danh phụ.}
+
+    \mainflowtable{UC05 - Lịch của tôi}
+    1 & Người dùng & Mở module Lịch của tôi. \\ \hline
+    2 & Hệ thống & Tải lịch công tác và lịch trực ban. \\ \hline
+    3 & Hệ thống & Đối chiếu dữ liệu theo người dùng hiện tại. \\ \hline
+    4 & Người dùng & Chọn bộ lọc (tháng, loại, trạng thái). \\ \hline
+    5 & Hệ thống & Áp dụng bộ lọc lên danh sách lịch cá nhân. \\ \hline
+    6 & Hệ thống & Hiển thị thống kê nhanh và danh sách kết quả. \\ \hline
+    \end{tabularx}
+    \end{table}
+
+    \altflowtable{UC05 - Lịch của tôi}
+    3a & Hệ thống & Không tìm thấy bản ghi khớp, hiển thị trạng thái rỗng. \\ \hline
+    5a & Hệ thống & Bộ lọc không có dữ liệu phù hợp, hiện thông báo không có kết quả. \\ \hline
+    \end{tabularx}
+    \end{table}
+
+    \section{UC06 - Ý kiến trực ban}
+    \specinfo
+    {UC06 - Ý kiến trực ban}
+    {Officer (gửi), Admin/Manager (duyệt/từ chối)}
+    {Quản lý vòng đời ý kiến trực ban từ lúc gửi đến khi xử lý.}
+    {Người dùng đăng nhập và có quyền theo vai trò.}
+    {Ý kiến được lưu trạng thái và có lịch sử xử lý.}
+    {Kết quả xử lý được thông báo đến officer liên quan.}
+
+    \mainflowtable{UC06 - Ý kiến trực ban}
+    1 & Officer & Mở module ý kiến trực ban. \\ \hline
+    2 & Officer & Nhập nội dung ý kiến và gửi. \\ \hline
+    3 & Hệ thống & Kiểm tra hợp lệ và lưu ý kiến (pending). \\ \hline
+    4 & Hệ thống & Gửi thông báo đến Admin/Manager. \\ \hline
+    5 & Admin/Manager & Mở danh sách ý kiến cần xử lý. \\ \hline
+    6 & Admin/Manager & Chọn duyệt hoặc từ chối kèm phản hồi. \\ \hline
+    7 & Hệ thống & Cập nhật trạng thái ý kiến. \\ \hline
+    8 & Hệ thống & Gửi thông báo kết quả đến Officer. \\ \hline
+    \end{tabularx}
+    \end{table}
+
+    \altflowtable{UC06 - Ý kiến trực ban}
+    2a & Hệ thống & Nội dung rỗng/không hợp lệ, yêu cầu nhập lại. \\ \hline
+    6a & Hệ thống & User không đủ quyền duyệt, từ chối thao tác. \\ \hline
+    8a & Hệ thống & Gửi thông báo thất bại, ghi log cảnh báo và tiếp tục. \\ \hline
+    \end{tabularx}
+    \end{table}
+
+    \section{UC07 - Thông báo}
+    \specinfo
+    {UC07 - Thông báo}
+    {Admin, Manager, Officer}
+    {Nhận và quản lý thông báo theo đối tượng nhận.}
+    {Người dùng đăng nhập hợp lệ.}
+    {Thông báo được hiển thị và cập nhật trạng thái đã đọc.}
+    {Dữ liệu được lọc theo targetUserId hoặc targetRole.}
+
+    \mainflowtable{UC07 - Thông báo}
+    1 & Người dùng & Mở trung tâm thông báo. \\ \hline
+    2 & Hệ thống & Truy vấn thông báo phù hợp với người dùng hiện tại. \\ \hline
+    3 & Hệ thống & Trả danh sách thông báo. \\ \hline
+    4 & Người dùng & Chọn thông báo và đánh dấu đã đọc. \\ \hline
+    5 & Hệ thống & Cập nhật notification\_reads. \\ \hline
+    6 & Người dùng & Có thể chọn đánh dấu tất cả đã đọc. \\ \hline
+    7 & Hệ thống & Cập nhật toàn bộ trạng thái đã đọc của user. \\ \hline
+    \end{tabularx}
+    \end{table}
+
+    \altflowtable{UC07 - Thông báo}
+    2a & Hệ thống & Không có thông báo phù hợp, trả danh sách rỗng. \\ \hline
+    5a & Hệ thống & Bản ghi đã đọc đã tồn tại, bỏ qua cập nhật trùng lặp. \\ \hline
+    \end{tabularx}
+    \end{table}
+
+    \section{UC08 - Xuất dữ liệu}
+    \specinfo
+    {UC08 - Xuất dữ liệu}
+    {Admin, Manager, Officer}
+    {Xem trước và tải dữ liệu lịch theo bộ lọc tùy chọn.}
+    {Người dùng đã đăng nhập; có dữ liệu trong phạm vi xuất.}
+    {File được tạo và lịch sử xuất được ghi nhận.}
+    {Hỗ trợ định dạng csv/json theo cấu hình hệ thống.}
+
+    \mainflowtable{UC08 - Xuất dữ liệu}
+    1 & Người dùng & Mở module Xuất/In lịch. \\ \hline
+    2 & Người dùng & Chọn điều kiện xuất: loại, phạm vi, định dạng. \\ \hline
+    3 & Hệ thống & Truy vấn dữ liệu và hiển thị xem trước. \\ \hline
+    4 & Người dùng & Xác nhận tải file. \\ \hline
+    5 & Hệ thống & Tạo file xuất và trả dữ liệu blob. \\ \hline
+    6 & Hệ thống & Ghi lịch sử xuất vào export\_logs. \\ \hline
+    7 & Người dùng & Nhận file và lưu trên máy. \\ \hline
+    \end{tabularx}
+    \end{table}
+
+    \altflowtable{UC08 - Xuất dữ liệu}
+    3a & Hệ thống & Không có dữ liệu phù hợp, thông báo không thể xuất. \\ \hline
+    5a & Hệ thống & Lỗi tạo file, thông báo thử lại. \\ \hline
+    \end{tabularx}
+    \end{table}
+
+    \chapter{Thiết kế kiến trúc}
+    \section{Kiến trúc tổng thể}
+    Hệ thống được thiết kế theo mô hình ba lớp:
+    \begin{itemize}[leftmargin=1.2cm]
+    \item \textbf{Frontend}: React + Vite, trách nhiệm giao diện, điều hướng, xử lý tương tác.
+    \item \textbf{Backend}: Node.js + Express, cung cấp REST API, middleware bảo mật, xử lý nghiệp vụ.
+    \item \textbf{Database}: MySQL/MariaDB, lưu trữ dữ liệu nghiệp vụ và lịch sử.
+    \end{itemize}
+    \imgplaceholder{Biểu đồ kiến trúc tổng thể}{fig:arch_overall}
+
+    \section{Thiết kế frontend}
+    Frontend được chia theo module chức năng: Dashboard, Cán bộ, Lịch công tác, Lịch trực ban, Lịch của tôi, Ý kiến, Thông báo, Xuất dữ liệu. API được tập trung trong lớp service để bảo đảm dễ bảo trì.
+    \imgplaceholder{Biểu đồ thành phần frontend}{fig:arch_frontend_components}
+
+    \section{Thiết kế backend}
+    Backend tổ chức thành các lớp route-controller-middleware-utils. Route map theo /api/* và đề cao phân quyền dựa trên token và role.
+    \imgplaceholder{Biểu đồ thành phần backend}{fig:arch_backend_components}
+
+    \section{Biểu đồ trình tự (sequence diagram)}
+    \subsection*{4.4.1 Trình tự use case đăng nhập}
+    \imgplaceholder{Biểu đồ trình tự use case đăng nhập}{fig:seq_login}
+
+    \subsection*{4.4.2 Trình tự use case tạo lịch công tác}
+    \imgplaceholder{Biểu đồ trình tự use case tạo lịch công tác}{fig:seq_create_work_schedule}
+
+    \subsection*{4.4.3 Trình tự use case xử lý ý kiến trực ban}
+    \imgplaceholder{Biểu đồ trình tự use case ý kiến trực ban}{fig:seq_opinion}
+
+    \subsection*{4.4.4 Trình tự use case xuất dữ liệu}
+    \imgplaceholder{Biểu đồ trình tự use case xuất dữ liệu}{fig:seq_export}
+
+    \chapter{Thiết kế cơ sở dữ liệu}
+    \section{Biểu đồ ERD}
+    \imgplaceholder{Biểu đồ ERD hệ thống}{fig:erd_total}
+
+    \section{Mô tả chi tiết các bảng}
+
+    \subsection{Bảng users}
+    \begin{longtable}{|p{3cm}|p{3cm}|p{7cm}|}
+    \hline
+    \textbf{Tên cột} & \textbf{Kiểu dữ liệu} & \textbf{Mô tả} \\ \hline
+    id & INT, PK, AI & Định danh user \\ \hline
+    username & VARCHAR(100), UNIQUE & Tên đăng nhập \\ \hline
+    password & VARCHAR(255) & Mật khẩu đã băm \\ \hline
+    full\_name & VARCHAR(255) & Họ tên \\ \hline
+    email & VARCHAR(255) & Email người dùng \\ \hline
+    role & VARCHAR(20) & Vai trò (admin/manager/officer) \\ \hline
+    status & TINYINT & Trạng thái hoạt động \\ \hline
+    created\_at & DATETIME & Thời điểm tạo \\ \hline
+    updated\_at & DATETIME & Thời điểm cập nhật \\ \hline
+    \end{longtable}
+    Khóa chính: id. Khóa ngoại: không.
+
+    \subsection{Bảng officers}
+    \begin{longtable}{|p{3cm}|p{3cm}|p{7cm}|}
+    \hline
+    \textbf{Tên cột} & \textbf{Kiểu dữ liệu} & \textbf{Mô tả} \\ \hline
+    officer\_id & INT, PK, AI & Định danh cán bộ \\ \hline
+    officer\_code & VARCHAR(50), UNIQUE & Mã cán bộ \\ \hline
+    full\_name & VARCHAR(255) & Họ tên cán bộ \\ \hline
+    rank & VARCHAR(100) & Cấp bậc/chức vụ \\ \hline
+    department & VARCHAR(255) & Đơn vị công tác \\ \hline
+    phone & VARCHAR(20) & Số điện thoại \\ \hline
+    email & VARCHAR(255) & Email cán bộ \\ \hline
+    user\_id & INT, FK & Tham chiếu users.id \\ \hline
+    created\_at & DATETIME & Thời điểm tạo \\ \hline
+    updated\_at & DATETIME & Thời điểm cập nhật \\ \hline
+    \end{longtable}
+    Khóa chính: officer\_id. Khóa ngoại: user\_id -> users(id).
+
+    \subsection{Bảng work\_schedules}
+    \begin{longtable}{|p{3cm}|p{3cm}|p{7cm}|}
+    \hline
+    \textbf{Tên cột} & \textbf{Kiểu dữ liệu} & \textbf{Mô tả} \\ \hline
+    id & INT, PK, AI & Định danh lịch công tác \\ \hline
+    title & VARCHAR(255) & Tiêu đề công việc \\ \hline
+    description & TEXT & Nội dung chi tiết \\ \hline
+    work\_date & DATE & Ngày thực hiện \\ \hline
+    week\_no & INT & Số tuần \\ \hline
+    location & VARCHAR(255) & Địa điểm \\ \hline
+    responsible\_officer\_id & INT, FK & Cán bộ phụ trách \\ \hline
+    status & VARCHAR(50) & Trạng thái \\ \hline
+    created\_by & INT, FK & User tạo \\ \hline
+    created\_at & DATETIME & Thời điểm tạo \\ \hline
+    updated\_at & DATETIME & Thời điểm cập nhật \\ \hline
+    \end{longtable}
+    Khóa chính: id. Khóa ngoại: responsible\_officer\_id -> officers(officer\_id), created\_by -> users(id).
+
+    \subsection{Bảng duty\_schedules}
+    \begin{longtable}{|p{3cm}|p{3cm}|p{7cm}|}
+    \hline
+    \textbf{Tên cột} & \textbf{Kiểu dữ liệu} & \textbf{Mô tả} \\ \hline
+    id & INT, PK, AI & Định danh lịch trực \\ \hline
+    officer\_id & INT, FK & Cán bộ trực \\ \hline
+    duty\_type & VARCHAR(100) & Loại trực \\ \hline
+    start\_time & DATETIME & Bắt đầu \\ \hline
+    end\_time & DATETIME & Kết thúc \\ \hline
+    week\_no & INT & Số tuần \\ \hline
+    status & VARCHAR(50) & Trạng thái \\ \hline
+    note & TEXT & Ghi chú \\ \hline
+    created\_by & INT, FK & User tạo \\ \hline
+    created\_at & DATETIME & Thời điểm tạo \\ \hline
+    updated\_at & DATETIME & Thời điểm cập nhật \\ \hline
+    \end{longtable}
+    Khóa chính: id. Khóa ngoại: officer\_id -> officers(officer\_id), created\_by -> users(id).
+
+    \subsection{Bảng opinions}
+    \begin{longtable}{|p{3cm}|p{3cm}|p{7cm}|}
+    \hline
+    \textbf{Tên cột} & \textbf{Kiểu dữ liệu} & \textbf{Mô tả} \\ \hline
+    id & INT, PK, AI & Định danh ý kiến \\ \hline
+    duty\_schedule\_id & INT, FK & Lịch trực liên quan \\ \hline
+    officer\_id & INT, FK & Người gửi \\ \hline
+    content & TEXT & Nội dung ý kiến \\ \hline
+    status & VARCHAR(50) & pending/approved/rejected \\ \hline
+    admin\_feedback & TEXT & Phản hồi cấp quản lý \\ \hline
+    reviewed\_by & INT, FK & Người duyệt \\ \hline
+    reviewed\_at & DATETIME & Thời điểm duyệt \\ \hline
+    created\_at & DATETIME & Thời điểm tạo \\ \hline
+    \end{longtable}
+    Khóa chính: id. Khóa ngoại: duty\_schedule\_id -> duty\_schedules(id), officer\_id -> officers(officer\_id), reviewed\_by -> users(id).
+
+    \subsection{Bảng notifications}
+    \begin{longtable}{|p{3cm}|p{3cm}|p{7cm}|}
+    \hline
+    \textbf{Tên cột} & \textbf{Kiểu dữ liệu} & \textbf{Mô tả} \\ \hline
+    id & INT, PK, AI & Định danh thông báo \\ \hline
+    title & VARCHAR(255) & Tiêu đề \\ \hline
+    message & TEXT & Nội dung \\ \hline
+    type & VARCHAR(50) & Loại thông báo \\ \hline
+    target\_user\_id & INT, FK, NULL & User đích \\ \hline
+    target\_role & VARCHAR(20), NULL & Role đích \\ \hline
+    created\_by & INT, FK & Người tạo/thao tác tạo \\ \hline
+    created\_at & DATETIME & Thời điểm tạo \\ \hline
+    \end{longtable}
+    Khóa chính: id. Khóa ngoại: target\_user\_id -> users(id), created\_by -> users(id).
+
+    \subsection{Bảng notification\_reads}
+    \begin{longtable}{|p{3cm}|p{3cm}|p{7cm}|}
+    \hline
+    \textbf{Tên cột} & \textbf{Kiểu dữ liệu} & \textbf{Mô tả} \\ \hline
+    id & INT, PK, AI & Định danh bản ghi đã đọc \\ \hline
+    notification\_id & INT, FK & Thông báo \\ \hline
+    user\_id & INT, FK & User đã đọc \\ \hline
+    read\_at & DATETIME & Thời điểm đọc \\ \hline
+    \end{longtable}
+    Khóa chính: id. Khóa ngoại: notification\_id -> notifications(id), user\_id -> users(id).
+
+    \subsection{Bảng activity\_logs}
+    \begin{longtable}{|p{3cm}|p{3cm}|p{7cm}|}
+    \hline
+    \textbf{Tên cột} & \textbf{Kiểu dữ liệu} & \textbf{Mô tả} \\ \hline
+    id & INT, PK, AI & Định danh log \\ \hline
+    user\_id & INT, FK & User thao tác \\ \hline
+    action & VARCHAR(255) & Hành động \\ \hline
+    module & VARCHAR(100) & Phân hệ \\ \hline
+    detail & TEXT & Chi tiết \\ \hline
+    created\_at & DATETIME & Thời điểm ghi log \\ \hline
+    \end{longtable}
+    Khóa chính: id. Khóa ngoại: user\_id -> users(id).
+
+    \subsection{Bảng export\_logs}
+    \begin{longtable}{|p{3cm}|p{3cm}|p{7cm}|}
+    \hline
+    \textbf{Tên cột} & \textbf{Kiểu dữ liệu} & \textbf{Mô tả} \\ \hline
+    id & INT, PK, AI & Định danh lịch sử xuất \\ \hline
+    user\_id & INT, FK & Người xuất \\ \hline
+    export\_type & VARCHAR(50) & Loại dữ liệu xuất \\ \hline
+    scope & VARCHAR(50) & Phạm vi xuất \\ \hline
+    format & VARCHAR(20) & Định dạng file \\ \hline
+    file\_name & VARCHAR(255) & Tên file \\ \hline
+    created\_at & DATETIME & Thời điểm xuất \\ \hline
+    \end{longtable}
+    Khóa chính: id. Khóa ngoại: user\_id -> users(id).
+
+    \chapter{Hướng dẫn cài đặt chương trình}
+    \section{Yêu cầu môi trường}
+    \begin{itemize}[leftmargin=1.2cm]
+    \item Node.js 18 trở lên.
+    \item NPM phù hợp với Node.js.
+    \item MySQL hoặc MariaDB.
+    \item Trình duyệt hiện đại (Chrome/Edge/Firefox).
+    \end{itemize}
+
+    \section{Các bước cài đặt}
+    \subsection*{Bước 1: Clone mã nguồn}
+    \begin{verbatim}
+    git clone 
+    \end{verbatim}
+
+    \subsection*{Bước 2: Cài đặt backend}
+    \begin{verbatim}
+    cd backend
+    npm install
+    \end{verbatim}
+    Tạo file .env với các biến: PORT, DB\_HOST, DB\_PORT, DB\_USER, DB\_PASSWORD, DB\_NAME, JWT\_SECRET, JWT\_EXPIRES\_IN, CORS\_ORIGIN.
+
+    \subsection*{Bước 3: Khởi tạo cơ sở dữ liệu}
+    \begin{verbatim}
+    mysql -u root < database/init.sql
+    \end{verbatim}
+
+    \subsection*{Bước 4: Chạy backend}
+    \begin{verbatim}
+    npm run dev
+    \end{verbatim}
+
+    \subsection*{Bước 5: Cài đặt frontend}
+    \begin{verbatim}
+    cd ../frontend
+    npm install
+    \end{verbatim}
+    Tạo file .env (nếu cần) với biến:
+    \begin{verbatim}
+    VITE_API_URL=http://localhost:3000/api
+    \end{verbatim}
+
+    \subsection*{Bước 6: Chạy frontend}
+    \begin{verbatim}
+    npm run dev
+    \end{verbatim}
+    Truy cập địa chỉ được Vite cấp (thường là http://localhost:5173).
+
+    \section{Kiểm thử nhanh sau cài đặt}
+    \begin{itemize}[leftmargin=1.2cm]
+    \item Đăng nhập bằng tài khoản mẫu.
+    \item Kiểm tra module lịch công tác, lịch trực ban, lịch của tôi.
+    \item Kiểm tra gửi ý kiến và duyệt ý kiến.
+    \item Kiểm tra thông báo và xuất dữ liệu.
+    \end{itemize}
+
+    \chapter{Kết luận}
+    \section{Tổng kết}
+    Dự án đã xây dựng thành công hệ thống quản lý lịch công tác và lịch trực ban với đầy đủ các chức năng trong phạm vi đề tài. Kiến trúc ba lớp và cơ chế phân quyền đã bảo đảm tính rõ ràng, dễ mở rộng và dễ vận hành.
+
+    \section{Hướng phát triển}
+    \begin{itemize}[leftmargin=1.2cm]
+    \item Bổ sung bộ test tự động unit/integration/E2E.
+    \item Nâng cao dashboard thống kê và báo cáo chuyên sâu.
+    \item Bổ sung cơ chế nhật ký bảo mật và cảnh báo bất thường.
+    \item Tích hợp thông báo thời gian thực và nhắc lịch.
+    \item Triển khai hạ tầng production có monitor, backup, cân bằng tải.
+    \end{itemize}
+
+    \vspace{1cm}
+    \begin{center}
+    \textit{--- Hết ---}
+    \end{center}
+
+    \end{document}
