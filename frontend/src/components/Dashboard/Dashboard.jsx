@@ -54,7 +54,15 @@ const Dashboard = ({
   thongKeTheoThang = [],
   hoatDongGanDay = [],
 }) => {
-  const today = new Date().toISOString().slice(0, 10);
+  // Format local date to YYYY-MM-DD (not UTC)
+  const toDateStr = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const d_str = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d_str}`;
+  };
+  
+  const today = toDateStr(new Date());
   const todayEvents = lichCongTacData.filter(l => l.ngay === today);
   const todayDuty = lichTrucBanData.filter(l => {
     if (l.kieuTruc === 'canbo') return l.ngay === today;
@@ -76,6 +84,22 @@ const Dashboard = ({
   const weekRangeText = weekItems.length
     ? `${weekItems.map((x) => x.ngay).sort()[0]} - ${weekItems.map((x) => x.ngay).sort().slice(-1)[0]}`
     : 'Du lieu hien tai';
+
+  // Calculate consistent week dates
+  const getWeekDates = () => {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() + diff);
+    weekStart.setHours(0, 0, 0, 0);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
+      return d;
+    });
+  };
+  const weekDates = getWeekDates();
 
   const actColors = {
     create: 'bg-emerald-100 text-emerald-600',
@@ -303,6 +327,89 @@ const Dashboard = ({
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="card-lg p-0 overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-bold text-slate-800">Bảng thời gian biểu tuần</h3>
+            <p className="text-xs text-slate-400 mt-0.5">Lịch công tác từ {weekRangeText}</p>
+          </div>
+          <button onClick={() => onNavigate('lichcongtac')} className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
+            Mở lịch chi tiết <ArrowUpRight size={12} />
+          </button>
+        </div>
+        {weekItems.length === 0 ? (
+          <div className="py-10 text-center text-slate-400">
+            <CalendarDays size={28} className="mx-auto mb-2 opacity-40" />
+            <p className="text-sm">Không có lịch công tác trong tuần hiện tại</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            {/* Calendar week view */}
+            <div id="calendar-schedule">
+              {/* Day headers */}
+              <div className="grid grid-cols-8 border-b border-slate-100 bg-slate-50">
+                <div className="p-3 border-r border-slate-100" />
+                {weekDates.map((d, i) => {
+                  const isToday = toDateStr(d) === today;
+                  const dayName = ['CN', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'][d.getDay()];
+                  const dayNum = String(d.getDate()).padStart(2, '0');
+                  const dateStr = toDateStr(d);
+                  const dayEvents = weekItems.filter(e => e.ngay === dateStr);
+                  
+                  return (
+                    <div key={i} className={`p-3 text-center border-r border-slate-100 last:border-r-0 ${isToday ? 'bg-blue-50' : 'bg-slate-50'}`}>
+                      <div className={`text-xs font-semibold ${isToday ? 'text-blue-600' : 'text-slate-500'}`}>{dayName}</div>
+                      <div className={`text-lg font-extrabold mt-0.5 ${isToday ? 'text-blue-600' : 'text-slate-800'}`}>{dayNum}</div>
+                      {dayEvents.length > 0 && (
+                        <div className={`text-[10px] mt-0.5 font-medium ${isToday ? 'text-blue-500' : 'text-slate-400'}`}>
+                          {dayEvents.length} lịch
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Time grid */}
+              <div className="overflow-y-auto max-h-[400px]">
+                {['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00'].map((hour, hi) => (
+                  <div key={hi} className="grid grid-cols-8 border-b border-slate-50 min-h-[64px]">
+                    <div className="p-2 text-[11px] text-slate-400 font-medium border-r border-slate-100 flex items-start pt-2 bg-slate-50/50">
+                      {hour}
+                    </div>
+                    {weekDates.map((d, dayIdx) => {
+                      const isToday = toDateStr(d) === today;
+                      const dateStr = toDateStr(d);
+                      const dayEvents = weekItems.filter(e => {
+                        if (e.ngay !== dateStr) return false;
+                        const h = parseInt(e.gioBatDau.split(':')[0]);
+                        return h === parseInt(hour.split(':')[0]);
+                      });
+                      
+                      return (
+                        <div key={dayIdx}
+                          className={`border-r border-slate-100 last:border-r-0 p-1 relative ${isToday ? 'bg-blue-50/30' : 'hover:bg-slate-50'} transition-colors`}>
+                          {dayEvents.map(evt => {
+                            const colorInfo = LOAI_LICH_COLORS[evt.loai] || LOAI_LICH_COLORS.hop;
+                            return (
+                              <div key={evt.id}
+                                className={`${colorInfo.bg} ${colorInfo.text} rounded-lg p-1.5 mb-1 cursor-pointer hover:opacity-80 transition-opacity border border-current border-opacity-20`}>
+                                <div className="text-[10px] font-bold leading-tight line-clamp-1">{evt.tieuDe}</div>
+                                <div className="text-[9px] opacity-70 mt-0.5">{evt.gioBatDau}–{evt.gioKetThuc}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

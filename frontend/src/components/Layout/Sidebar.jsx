@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   LayoutDashboard, Users, CalendarDays, ClipboardList,
-  Search, Printer, Settings, Shield, ChevronRight,
+  Search, Printer, Settings, ChevronRight,
   MessageSquareQuote, FileText, CalendarCheck,
   LogOut, ChevronLeft
 } from 'lucide-react';
@@ -27,9 +27,7 @@ const Sidebar = ({ activePage, onNavigate, user, onLogout }) => {
     <aside className={`relative flex flex-col h-screen bg-gradient-to-b from-[#0d1f3c] to-[#0a1628] border-r border-white/8 transition-all duration-300 ${collapsed ? 'w-[72px]' : 'w-[240px]'} flex-shrink-0`}>
       {/* Logo */}
       <div className={`flex items-center gap-3 px-4 py-5 border-b border-white/8 ${collapsed ? 'justify-center px-0' : ''}`}>
-        <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-900/50">
-          <Shield size={18} className="text-white" />
-        </div>
+        <img src="/src/assets/logo.png" alt="School Logo" className="w-9 h-9 rounded-xl flex-shrink-0 shadow-lg" />
         {!collapsed && (
           <div className="overflow-hidden">
             <div className="text-white font-bold text-[11px] leading-tight whitespace-nowrap">HVKT &amp; CN AN NINH</div>

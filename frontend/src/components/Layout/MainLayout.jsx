@@ -1,7 +1,7 @@
 import React from 'react';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
-import schoolLogo from '../../assets/logo-school.svg';
+import schoolLogo from '../../assets/logo.png';
 
 const MainLayout = ({
   activePage,
