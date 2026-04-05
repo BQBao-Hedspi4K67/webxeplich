@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, ChevronLeft, ChevronRight, X, Edit2, Trash2, UserPlus, ShieldCheck, Users, Star } from 'lucide-react';
-import { TRANG_THAI_TRUC, WEEK_DAYS } from '../../data/uiConstants';
+import { WEEK_DAYS } from '../../data/uiConstants';
 import apiClient from '../../services/api';
 
 const toDateOnly = (value) => {
@@ -40,18 +40,9 @@ const initialForm = {
   tenCanBo: '',
   ngay: toDateOnly(new Date()),
   denNgay: toDateOnly(new Date()),
-  trangThai: 'upcoming',
   viTri: 'Trực ban cổng chính',
   ghiChu: '',
 };
-
-const toBackendDutyStatus = (status) => (
-  status === 'completed' ? 'done' : status
-);
-
-const normalizeDutyStatus = (status) => (
-  status === 'done' ? 'completed' : (status || 'upcoming')
-);
 
 const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData }) => {
   const canEdit = user?.role !== 'Cán bộ';
@@ -62,6 +53,8 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData
   const [form, setForm] = useState(initialForm);
   const [editId, setEditId] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [dutyTypeFilter, setDutyTypeFilter] = useState('all');
+  const [viTriFilter, setViTriFilter] = useState('');
 
   useEffect(() => {
     setData(lichTrucBanData);
@@ -88,15 +81,36 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData
     })
   ), [data, weekDates]);
 
+  const viTriOptions = useMemo(
+    () => Array.from(new Set(['Trực ban cổng chính', 'Trực ban cổng sau', ...data.map((x) => x.viTri).filter(Boolean)])),
+    [data]
+  );
+
+  const filteredCanboWeekData = useMemo(() => (
+    canboWeekData.filter((item) => {
+      const matchType = dutyTypeFilter === 'all' || dutyTypeFilter === 'canbo';
+      const matchViTri = !viTriFilter || item.viTri === viTriFilter;
+      return matchType && matchViTri;
+    })
+  ), [canboWeekData, dutyTypeFilter, viTriFilter]);
+
+  const filteredGiamdocWeek = useMemo(() => (
+    giamdocWeek.filter((item) => {
+      const matchType = dutyTypeFilter === 'all' || dutyTypeFilter === 'giamdoc';
+      const matchViTri = !viTriFilter || item.viTri === viTriFilter;
+      return matchType && matchViTri;
+    })
+  ), [giamdocWeek, dutyTypeFilter, viTriFilter]);
+
   const stats = {
     giamDocWeeks: data.filter((t) => t.kieuTruc === 'giamdoc').length,
     canBoToday: data.filter((t) => t.kieuTruc === 'canbo' && t.ngay === toDateOnly(new Date())).length,
-    pending: data.filter((t) => t.trangThai === 'upcoming').length,
-    done: data.filter((t) => t.trangThai === 'completed').length,
+    canBoTrongTuan: filteredCanboWeekData.length,
+    giamDocTrongTuan: filteredGiamdocWeek.length,
   };
 
   const openAddCanBo = (ngay) => {
-    setForm({ ...initialForm, kieuTruc: 'canbo', ngay, viTri: 'Trực ban cổng chính', trangThai: 'upcoming' });
+    setForm({ ...initialForm, kieuTruc: 'canbo', ngay, viTri: 'Trực ban cổng chính' });
     setEditId(null);
     setShowModal(true);
   };
@@ -108,14 +122,13 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData
       ngay: weekDates[0],
       denNgay: weekDates[6],
       viTri: 'Trực ban Giám đốc',
-      trangThai: 'upcoming',
     });
     setEditId(null);
     setShowModal(true);
   };
 
   const openEdit = (item) => {
-    setForm({ ...item, trangThai: normalizeDutyStatus(item.trangThai) });
+    setForm({ ...item });
     setEditId(item.id);
     setShowModal(true);
   };
@@ -130,7 +143,6 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData
       endDate: form.kieuTruc === 'giamdoc' ? (form.denNgay || form.ngay) : null,
       shift: form.kieuTruc === 'giamdoc' ? 'tuan' : 'nguyenday',
       location: form.viTri || '',
-      status: toBackendDutyStatus(form.trangThai || 'upcoming'),
       notes: form.ghiChu || '',
     };
 
@@ -184,8 +196,8 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData
         {[
           { label: 'Tuần trực giám đốc', value: stats.giamDocWeeks, color: 'text-violet-600', bg: 'bg-violet-50', icon: Star },
           { label: 'Cán bộ trực hôm nay', value: stats.canBoToday, color: 'text-blue-600', bg: 'bg-blue-50', icon: Users },
-          { label: 'Lịch sắp trực', value: stats.pending, color: 'text-amber-600', bg: 'bg-amber-50', icon: ShieldCheck },
-          { label: 'Đã hoàn thành', value: stats.done, color: 'text-slate-600', bg: 'bg-slate-100', icon: ShieldCheck },
+          { label: 'Lịch cán bộ tuần này', value: stats.canBoTrongTuan, color: 'text-amber-600', bg: 'bg-amber-50', icon: ShieldCheck },
+          { label: 'Lịch giám đốc tuần này', value: stats.giamDocTrongTuan, color: 'text-slate-600', bg: 'bg-slate-100', icon: ShieldCheck },
         ].map((s, i) => (
           <div key={i} className="card py-3.5 flex items-center gap-3">
             <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center flex-shrink-0`}>
@@ -205,6 +217,15 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData
           <span className="px-3 text-sm font-semibold text-slate-700 min-w-[170px] text-center">{weekLabel}</span>
           <button onClick={() => setWeekOffset((w) => w + 1)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-all"><ChevronRight size={16} /></button>
         </div>
+        <select className="input-field !w-auto !py-2 text-sm" value={dutyTypeFilter} onChange={(e) => setDutyTypeFilter(e.target.value)}>
+          <option value="all">Tất cả loại</option>
+          <option value="canbo">Trực cán bộ</option>
+          <option value="giamdoc">Trực ban Giám đốc</option>
+        </select>
+        <select className="input-field !w-auto !py-2 text-sm" value={viTriFilter} onChange={(e) => setViTriFilter(e.target.value)}>
+          <option value="">Vị trí: Tất cả</option>
+          {viTriOptions.map((vt) => <option key={vt} value={vt}>{vt}</option>)}
+        </select>
       </div>
 
       {mode === 'canbo' ? (
@@ -216,13 +237,12 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData
                   <th className="table-th">Ngày</th>
                   <th className="table-th">Cán bộ trực (nguyên ngày)</th>
                   <th className="table-th">Vị trí</th>
-                  <th className="table-th">Trạng thái</th>
                   <th className="table-th"></th>
                 </tr>
               </thead>
               <tbody>
                 {weekDates.map((date, i) => {
-                  const dayItems = canboWeekData.filter((x) => x.ngay === date);
+                  const dayItems = filteredCanboWeekData.filter((x) => x.ngay === date);
                   return (
                     <tr key={date} className="hover:bg-slate-50/70">
                       <td className="table-td">
@@ -253,16 +273,6 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData
                         ) : '-'}
                       </td>
                       <td className="table-td">
-                        {dayItems.length > 0 ? (
-                          <div className="space-y-1.5">
-                            {dayItems.map((item) => {
-                              const tt = TRANG_THAI_TRUC[item.trangThai] || TRANG_THAI_TRUC.upcoming;
-                              return <div key={item.id} className="h-12 flex items-center"><span className={`badge ${tt.bg} ${tt.text}`}>{tt.label}</span></div>;
-                            })}
-                          </div>
-                        ) : <span className="badge bg-slate-100 text-slate-500">Trống</span>}
-                      </td>
-                      <td className="table-td">
                         {canEdit && (
                           <div className="space-y-1.5">
                             {dayItems.map((item) => (
@@ -286,21 +296,20 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData
         </div>
       ) : (
         <div className="card">
-          {giamdocWeek.length > 0 ? (
+          {filteredGiamdocWeek.length > 0 ? (
             <div className="space-y-3">
-              {giamdocWeek.map((item) => {
-                const tt = TRANG_THAI_TRUC[item.trangThai] || TRANG_THAI_TRUC.upcoming;
+              {filteredGiamdocWeek.map((item) => {
                 return (
                   <div key={item.id} className="border border-violet-200 bg-violet-50/40 rounded-2xl p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <h3 className="text-base font-bold text-violet-800">Trực ban Giám đốc - {formatDDMM(item.ngay)} đến {formatDDMM(item.denNgay || item.ngay)}</h3>
                         <p className="text-sm text-violet-700 mt-1">{item.tenCanBo} ({item.canBoId})</p>
+                        <p className="text-xs text-slate-500 mt-1">Đơn vị: {item.donVi || '-'}</p>
                         <p className="text-xs text-slate-500 mt-1">{item.ngay} đến {item.denNgay || item.ngay}</p>
                         <p className="text-xs text-slate-500">{item.viTri}</p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className={`badge ${tt.bg} ${tt.text}`}>{tt.label}</span>
                         {canEdit && (
                           <>
                             <button onClick={() => openEdit(item)} className="p-2 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg"><Edit2 size={14} /></button>
@@ -364,16 +373,10 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData
                 )}
               </div>
               <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Trạng thái</label>
-                <select className="input-field" value={form.trangThai || 'upcoming'} onChange={(e) => setForm({ ...form, trangThai: e.target.value })}>
-                  <option value="upcoming">Sắp diễn ra</option>
-                  <option value="active">Đang diễn ra</option>
-                  <option value="completed">Đã diễn ra</option>
-                </select>
-              </div>
-              <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Vị trí</label>
-                <input className="input-field" value={form.viTri} onChange={(e) => setForm({ ...form, viTri: e.target.value })} />
+                <select className="input-field" value={form.viTri} onChange={(e) => setForm({ ...form, viTri: e.target.value })}>
+                  {viTriOptions.map((vt) => <option key={vt} value={vt}>{vt}</option>)}
+                </select>
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Ghi chú</label>

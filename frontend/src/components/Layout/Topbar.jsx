@@ -9,7 +9,9 @@ const pageTitles = {
   lichcuatoi: 'Lịch của tôi',
   tracuu: 'Tra cứu lịch',
   xuat: 'Xuất / In lịch',
-  ykien: 'Ý kiến trực ban',
+  ngayle: 'Quản lý ngày lễ',
+  phongban: 'Quản lý phòng ban',
+  ykien: 'Đơn xin nghỉ',
   quytrinh: 'Quy trình chức năng',
   taikhoan: 'Quản trị tài khoản',
 };
@@ -134,7 +136,7 @@ const Topbar = ({ activePage, user, onLogout, onNavigate, notificationsData = []
           </div>
           <div className="text-left hidden sm:block">
             <div className="text-xs font-semibold text-slate-800 leading-tight max-w-[100px] truncate">{user?.name?.split(' ').slice(-2).join(' ') || 'Admin'}</div>
-            <div className="text-[10px] text-slate-400">{user?.role || 'Quản trị viên'}</div>
+            <div className="text-[10px] text-slate-400">{user?.position || user?.role || 'Cán bộ'}</div>
           </div>
           <ChevronDown size={13} className="text-slate-400" />
         </button>
@@ -143,7 +145,7 @@ const Topbar = ({ activePage, user, onLogout, onNavigate, notificationsData = []
           <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-card-lg border border-slate-100 overflow-hidden z-50 animate-fade-in">
             <div className="px-4 py-3 border-b border-slate-100">
               <div className="text-sm font-bold text-slate-800 truncate">{user?.name || 'Quản trị viên'}</div>
-              <div className="text-xs text-slate-400">{user?.role}</div>
+              <div className="text-xs text-slate-400">{user?.position || user?.role}</div>
             </div>
             <div className="py-1.5">
               {[

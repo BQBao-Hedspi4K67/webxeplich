@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Search, Filter, Edit2, Trash2, Eye, X, UserCheck, Users, Phone, Mail, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
 import apiClient from '../../services/api';
+import { DEPARTMENTS, SCHOOLS } from '../../data/uiConstants';
 
 const ROLES_COLORS = {
   'Lãnh đạo': { bg: 'bg-purple-100', text: 'text-purple-700', dot: 'bg-purple-500' },
@@ -10,7 +11,7 @@ const ROLES_COLORS = {
 
 const AVATAR_COLORS = ['bg-blue-500', 'bg-indigo-500', 'bg-purple-500', 'bg-pink-500', 'bg-emerald-500', 'bg-teal-500', 'bg-amber-500', 'bg-red-500'];
 
-const initialForm = { hoTen: '', chucVu: '', donVi: '', soDienThoai: '', email: '', vaiTro: 'Cán bộ', trangThai: 'active' };
+const initialForm = { hoTen: '', capBac: '', chucVu: '', donVi: '', soDienThoai: '', email: '', vaiTro: 'Cán bộ', trangThai: 'active', denNgayHoc: '' };
 
 const UI_ROLE_TO_BACKEND = {
   'Lãnh đạo': 'leader',
@@ -18,8 +19,13 @@ const UI_ROLE_TO_BACKEND = {
   'Cán bộ': 'officer',
 };
 
-const QuanLyCanBo = ({ user, canBoData = [], reloadData }) => {
+const DEFAULT_UNIT_OPTIONS = ['Ban Giám đốc', ...DEPARTMENTS, ...SCHOOLS];
+
+const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) => {
   const canEdit = user?.role === 'Quản trị viên';
+  const unitOptions = (departmentData || []).length
+    ? departmentData.map((d) => d.name)
+    : DEFAULT_UNIT_OPTIONS;
   const [data, setData] = useState(canBoData);
   const [search, setSearch] = useState('');
   const [filterVaiTro, setFilterVaiTro] = useState('');
@@ -58,13 +64,16 @@ const QuanLyCanBo = ({ user, canBoData = [], reloadData }) => {
     }
 
     const payload = {
-      fullName: form.hoTen,
+      fullName: [form.capBac, form.hoTen].filter(Boolean).join(' ').trim(),
+      officerTitle: form.capBac || '',
+      officerName: form.hoTen,
       position: form.chucVu,
       department: form.donVi,
       phone: form.soDienThoai || null,
       email: form.email || null,
       role: UI_ROLE_TO_BACKEND[form.vaiTro] || 'officer',
       status: form.trangThai,
+      studyUntil: form.trangThai === 'studying' ? (form.denNgayHoc || null) : null,
     };
 
     try {
@@ -208,9 +217,9 @@ const QuanLyCanBo = ({ user, canBoData = [], reloadData }) => {
                       </span>
                     </td>
                     <td className="table-td">
-                      <span className={`badge ${cb.trangThai === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${cb.trangThai === 'active' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                        {cb.trangThai === 'active' ? 'Đang công tác' : 'Tạm nghỉ'}
+                      <span className={`badge ${cb.trangThai === 'active' ? 'bg-emerald-100 text-emerald-700' : cb.trangThai === 'studying' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${cb.trangThai === 'active' ? 'bg-emerald-500' : cb.trangThai === 'studying' ? 'bg-blue-500' : 'bg-slate-400'}`} />
+                        {cb.trangThai === 'active' ? 'Đang công tác' : cb.trangThai === 'studying' ? 'Đang học' : 'Tạm nghỉ'}
                       </span>
                     </td>
                     <td className="table-td">
@@ -287,9 +296,15 @@ const QuanLyCanBo = ({ user, canBoData = [], reloadData }) => {
             </div>
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Họ và tên <span className="text-red-500">*</span></label>
-                  <input className="input-field" placeholder="VD: Đại tá Nguyễn Văn A" value={form.hoTen} onChange={e => setForm({...form, hoTen: e.target.value})} />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Cấp bậc / danh xưng</label>
+                    <input className="input-field" placeholder="VD: Đại tá" value={form.capBac || ''} onChange={e => setForm({...form, capBac: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Họ và tên <span className="text-red-500">*</span></label>
+                    <input className="input-field" placeholder="VD: Nguyễn Văn A" value={form.hoTen} onChange={e => setForm({...form, hoTen: e.target.value})} />
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -298,7 +313,10 @@ const QuanLyCanBo = ({ user, canBoData = [], reloadData }) => {
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đơn vị <span className="text-red-500">*</span></label>
-                    <input className="input-field" placeholder="VD: Phòng CNTT" value={form.donVi} onChange={e => setForm({...form, donVi: e.target.value})} />
+                    <select className="input-field" value={form.donVi} onChange={e => setForm({...form, donVi: e.target.value})}>
+                      <option value="">-- Chọn đơn vị --</option>
+                      {unitOptions.map((x) => <option key={x} value={x}>{x}</option>)}
+                    </select>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -323,9 +341,16 @@ const QuanLyCanBo = ({ user, canBoData = [], reloadData }) => {
                     <select className="input-field" value={form.trangThai} onChange={e => setForm({...form, trangThai: e.target.value})}>
                       <option value="active">Đang công tác</option>
                       <option value="inactive">Tạm nghỉ</option>
+                      <option value="studying">Đang học</option>
                     </select>
                   </div>
                 </div>
+                {form.trangThai === 'studying' && (
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đang học đến ngày</label>
+                    <input type="date" className="input-field" value={form.denNgayHoc || ''} onChange={e => setForm({...form, denNgayHoc: e.target.value})} />
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex gap-3 px-6 pb-6">
@@ -352,8 +377,8 @@ const QuanLyCanBo = ({ user, canBoData = [], reloadData }) => {
                 <div>
                   <h4 className="text-lg font-bold text-slate-800">{viewItem.hoTen}</h4>
                   <p className="text-sm text-slate-500">{viewItem.chucVu}</p>
-                  <span className={`badge mt-1 ${viewItem.trangThai === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                    {viewItem.trangThai === 'active' ? '● Đang công tác' : '● Tạm nghỉ'}
+                  <span className={`badge mt-1 ${viewItem.trangThai === 'active' ? 'bg-emerald-100 text-emerald-700' : viewItem.trangThai === 'studying' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                    {viewItem.trangThai === 'active' ? '● Đang công tác' : viewItem.trangThai === 'studying' ? '● Đang học' : '● Tạm nghỉ'}
                   </span>
                 </div>
               </div>

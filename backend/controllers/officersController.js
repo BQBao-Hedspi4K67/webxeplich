@@ -14,22 +14,46 @@ const buildDefaultPosition = (role) => {
   return 'Cán bộ';
 };
 
+const splitTitleAndName = (fullName = '') => {
+  const parts = String(fullName).trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) {
+    return { officerTitle: '', officerName: String(fullName || '').trim() };
+  }
+  return {
+    officerTitle: parts.slice(0, parts.length - 2).join(' '),
+    officerName: parts.slice(-2).join(' '),
+  };
+};
+
 const buildDefaultDepartment = (role) => {
   if (role === 'leader') return 'Ban Giám đốc';
   return 'Chưa phân công';
 };
 
+const hasOfficersUserIdColumn = async (connection) => {
+  const [rows] = await connection.execute("SHOW COLUMNS FROM officers LIKE 'userId'");
+  return rows.length > 0;
+};
+
 const syncUsersToOfficers = async (connection) => {
+  const hasUserIdColumn = await hasOfficersUserIdColumn(connection);
+
   // Backfill old user accounts that exist in users but not in officers.
-  const [missingUsers] = await connection.execute(
-    `SELECT u.fullName, u.email, u.role, u.status
-     FROM users u
-     LEFT JOIN officers o ON o.email = u.email
-     WHERE u.role IN ('admin', 'manager', 'officer')
-       AND u.email IS NOT NULL
-       AND u.email <> ''
-       AND o.id IS NULL`
-  );
+  const [missingUsers] = hasUserIdColumn
+    ? await connection.execute(
+      `SELECT u.id as userId, u.fullName, u.email, u.role, u.status
+       FROM users u
+       LEFT JOIN officers o ON o.userId = u.id
+       WHERE u.role IN ('admin', 'manager', 'officer')
+         AND o.id IS NULL`
+    )
+    : await connection.execute(
+      `SELECT u.id as userId, u.fullName, u.email, u.role, u.status
+       FROM users u
+       LEFT JOIN officers o ON ((u.email IS NOT NULL AND u.email <> '' AND o.email = u.email) OR o.fullName = u.fullName)
+       WHERE u.role IN ('admin', 'manager', 'officer')
+         AND o.id IS NULL`
+    );
 
   if (!missingUsers.length) return;
 
@@ -41,20 +65,42 @@ const syncUsersToOfficers = async (connection) => {
   for (const u of missingUsers) {
     const officerId = `CB${String(nextNum).padStart(3, '0')}`;
     const officerRole = USER_ROLE_TO_OFFICER_ROLE[u.role] || 'officer';
-    await connection.execute(
-      `INSERT INTO officers (id, fullName, position, department, phone, email, role, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        officerId,
-        u.fullName,
-        buildDefaultPosition(officerRole),
-        buildDefaultDepartment(officerRole),
-        null,
-        u.email,
-        officerRole,
-        u.status || 'active',
-      ]
-    );
+    if (hasUserIdColumn) {
+      await connection.execute(
+        `INSERT INTO officers (id, userId, fullName, officerTitle, officerName, position, department, phone, email, role, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          officerId,
+          u.userId,
+          u.fullName,
+          splitTitleAndName(u.fullName).officerTitle,
+          splitTitleAndName(u.fullName).officerName,
+          buildDefaultPosition(officerRole),
+          buildDefaultDepartment(officerRole),
+          null,
+          u.email,
+          officerRole,
+          u.status || 'active',
+        ]
+      );
+    } else {
+      await connection.execute(
+        `INSERT INTO officers (id, fullName, officerTitle, officerName, position, department, phone, email, role, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          officerId,
+          u.fullName,
+          splitTitleAndName(u.fullName).officerTitle,
+          splitTitleAndName(u.fullName).officerName,
+          buildDefaultPosition(officerRole),
+          buildDefaultDepartment(officerRole),
+          null,
+          u.email,
+          officerRole,
+          u.status || 'active',
+        ]
+      );
+    }
     nextNum += 1;
   }
 };
@@ -167,7 +213,18 @@ export const getOfficerById = async (req, res, next) => {
 // Create new officer (admin only)
 export const createOfficer = async (req, res, next) => {
   try {
-    const { fullName, position, department, phone, email, role = 'officer', status = 'active' } = req.body;
+    const {
+      fullName,
+      officerTitle,
+      officerName,
+      position,
+      department,
+      phone,
+      email,
+      role = 'officer',
+      status = 'active',
+      studyUntil = null,
+    } = req.body;
 
     // Validation
     if (!fullName || !position || !department) {
@@ -197,9 +254,15 @@ export const createOfficer = async (req, res, next) => {
       const newId = `CB${String(nextNum).padStart(3, '0')}`;
 
       // Insert
+      const split = splitTitleAndName(fullName);
+      const resolvedTitle = officerTitle !== undefined ? officerTitle : split.officerTitle;
+      const resolvedName = officerName !== undefined ? officerName : split.officerName;
+
       await connection.execute(
-        'INSERT INTO officers (id, fullName, position, department, phone, email, role, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [newId, fullName, position, department, phone || null, email || null, role, status]
+        `INSERT INTO officers
+         (id, fullName, officerTitle, officerName, position, department, phone, email, role, status, studyUntil)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [newId, fullName, resolvedTitle, resolvedName, position, department, phone || null, email || null, role, status, status === 'studying' ? studyUntil : null]
       );
 
       res.status(201).json({
@@ -213,6 +276,9 @@ export const createOfficer = async (req, res, next) => {
           email: email || null,
           role,
           status,
+          officerTitle: resolvedTitle,
+          officerName: resolvedName,
+          studyUntil: status === 'studying' ? studyUntil : null,
         },
         message: 'Officer created successfully',
       });
@@ -239,9 +305,9 @@ export const createOfficer = async (req, res, next) => {
 export const updateOfficer = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { fullName, position, department, phone, email, role, status } = req.body;
+    const { fullName, officerTitle, officerName, position, department, phone, email, role, status, studyUntil } = req.body;
 
-    if (!fullName && !position && !department && !role && !status && !phone && !email) {
+    if (!fullName && !officerTitle && !officerName && !position && !department && !role && !status && !phone && !email && studyUntil === undefined) {
       return res.status(400).json({
         success: false,
         error: 'No fields to update',
@@ -297,6 +363,28 @@ export const updateOfficer = async (req, res, next) => {
       if (status !== undefined) {
         updateFields.push('status = ?');
         params.push(status);
+      }
+      if (studyUntil !== undefined) {
+        updateFields.push('studyUntil = ?');
+        params.push(studyUntil || null);
+      }
+
+      if (officerTitle !== undefined) {
+        updateFields.push('officerTitle = ?');
+        params.push(officerTitle);
+      }
+
+      if (officerName !== undefined) {
+        updateFields.push('officerName = ?');
+        params.push(officerName);
+      }
+
+      if (fullName !== undefined && officerTitle === undefined && officerName === undefined) {
+        const split = splitTitleAndName(fullName);
+        updateFields.push('officerTitle = ?');
+        params.push(split.officerTitle);
+        updateFields.push('officerName = ?');
+        params.push(split.officerName);
       }
 
       params.push(id);

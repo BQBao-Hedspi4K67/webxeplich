@@ -20,7 +20,8 @@ const server = app.listen(PORT, () => {
 ║     - GET    /api/officers                                ║
 ║     - GET    /api/work-schedules                          ║
 ║     - GET    /api/duty-schedules                          ║
-║     - GET    /api/opinions                                ║
+║     - GET    /api/leave-requests                          ║
+║     - GET    /api/opinions (legacy alias)                 ║
 ║                                                            ║
 ╚════════════════════════════════════════════════════════════╝
   `);

@@ -198,6 +198,8 @@ const apiClient = {
 
     create: (data) => apiClient.post('/work-schedules', data),
 
+    approve: (id, status = 'approved') => apiClient.put(`/work-schedules/${id}/approve`, { status }),
+
     update: (id, data) => apiClient.put(`/work-schedules/${id}`, data),
 
     delete: (id) => apiClient.delete(`/work-schedules/${id}`),
@@ -237,26 +239,40 @@ const apiClient = {
       apiClient.get('/duty-schedules', { dutyType }),
   },
 
-  // ========== Opinions / Ý kiến ==========
-  opinions: {
+  // ========== Leave Requests / Xin nghỉ ==========
+  leaveRequests: {
     list: (page = 1, limit = 20, filters = {}) =>
-      apiClient.get('/opinions', { page, limit, ...filters }),
+      apiClient.get('/leave-requests', { page, limit, ...filters }),
 
-    get: (id) => apiClient.get(`/opinions/${id}`),
+    get: (id) => apiClient.get(`/leave-requests/${id}`),
 
-    submit: (data) => apiClient.post('/opinions', data),
+    submit: (data) => apiClient.post('/leave-requests', data),
 
     approve: (id, feedback = '') =>
-      apiClient.put(`/opinions/${id}`, { status: 'approved', adminFeedback: feedback }),
+      apiClient.put(`/leave-requests/${id}`, { status: 'approved', adminFeedback: feedback }),
 
     reject: (id, feedback = '') =>
-      apiClient.put(`/opinions/${id}`, { status: 'rejected', adminFeedback: feedback }),
+      apiClient.put(`/leave-requests/${id}`, { status: 'rejected', adminFeedback: feedback }),
 
-    delete: (id) => apiClient.delete(`/opinions/${id}`),
+    delete: (id) => apiClient.delete(`/leave-requests/${id}`),
 
-    // Filters
     byStatus: (status) =>
-      apiClient.get('/opinions', { status }),
+      apiClient.get('/leave-requests', { status }),
+  },
+
+  // Backward compatibility alias
+  opinions: {
+    list: (page = 1, limit = 20, filters = {}) =>
+      apiClient.get('/leave-requests', { page, limit, ...filters }),
+    get: (id) => apiClient.get(`/leave-requests/${id}`),
+    submit: (data) => apiClient.post('/leave-requests', data),
+    approve: (id, feedback = '') =>
+      apiClient.put(`/leave-requests/${id}`, { status: 'approved', adminFeedback: feedback }),
+    reject: (id, feedback = '') =>
+      apiClient.put(`/leave-requests/${id}`, { status: 'rejected', adminFeedback: feedback }),
+    delete: (id) => apiClient.delete(`/leave-requests/${id}`),
+    byStatus: (status) =>
+      apiClient.get('/leave-requests', { status }),
   },
 
   notifications: {
@@ -270,6 +286,20 @@ const apiClient = {
 
   dashboard: {
     getOverview: () => apiClient.get('/dashboard/overview'),
+  },
+
+  holidays: {
+    list: (filters = {}) => apiClient.get('/holidays', filters),
+    create: (data) => apiClient.post('/holidays', data),
+    update: (id, data) => apiClient.put(`/holidays/${id}`, data),
+    delete: (id) => apiClient.delete(`/holidays/${id}`),
+  },
+
+  departments: {
+    list: (filters = {}) => apiClient.get('/departments', filters),
+    create: (data) => apiClient.post('/departments', data),
+    update: (id, data) => apiClient.put(`/departments/${id}`, data),
+    delete: (id) => apiClient.delete(`/departments/${id}`),
   },
 
   exports: {

@@ -50,10 +50,15 @@ const Dashboard = ({
   canBoData = [],
   lichCongTacData = [],
   lichTrucBanData = [],
+  holidayData = [],
   thongBaoData = [],
   thongKeTheoThang = [],
   hoatDongGanDay = [],
 }) => {
+  const HOLIDAYS = holidayData.reduce((acc, h) => {
+    if (h?.ngay) acc[h.ngay] = h.ten;
+    return acc;
+  }, {});
   // Format local date to YYYY-MM-DD (not UTC)
   const toDateStr = (d) => {
     const y = d.getFullYear();
@@ -68,7 +73,6 @@ const Dashboard = ({
     if (l.kieuTruc === 'canbo') return l.ngay === today;
     return l.kieuTruc === 'giamdoc' && l.ngay <= today && (l.denNgay || l.ngay) >= today;
   });
-  const needUpdate = lichCongTacData.filter(l => l.trangThai === 'upcoming').length;
   const activeCanBo = canBoData.filter(c => c.trangThai === 'active').length;
   const quickCanBo = canBoData.slice(0, 6);
 
@@ -100,6 +104,15 @@ const Dashboard = ({
     });
   };
   const weekDates = getWeekDates();
+  const monthNow = new Date();
+  const monthStart = new Date(monthNow.getFullYear(), monthNow.getMonth(), 1);
+  const monthEnd = new Date(monthNow.getFullYear(), monthNow.getMonth() + 1, 0);
+  const monthStartWeekDay = monthStart.getDay() === 0 ? 7 : monthStart.getDay();
+  const monthDays = [];
+  for (let i = 1; i < monthStartWeekDay; i += 1) monthDays.push(null);
+  for (let d = 1; d <= monthEnd.getDate(); d += 1) {
+    monthDays.push(new Date(monthNow.getFullYear(), monthNow.getMonth(), d));
+  }
 
   const actColors = {
     create: 'bg-emerald-100 text-emerald-600',
@@ -139,8 +152,8 @@ const Dashboard = ({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger">
         <StatCard icon={Users} title="Tổng số cán bộ" value={activeCanBo} sub={`${canBoData.length} tổng · ${canBoData.length - activeCanBo} tạm nghỉ`} color="bg-blue-600" />
         <StatCard icon={CalendarDays} title="Lịch công tác tuần" value={weekItems.length} sub={`Tuần ${currentWeekNo} · ${weekRangeText}`} color="bg-indigo-500" />
-        <StatCard icon={ClipboardList} title="Trực ban hôm nay" value={todayDuty.length} sub={`${todayDuty.filter(d => d.trangThai === 'active').length} đang trực`} color="bg-cyan-500" />
-        <StatCard icon={AlertCircle} title="Lịch cần xử lý" value={needUpdate} sub="Lịch upcoming cần theo dõi" color="bg-amber-500" />
+        <StatCard icon={ClipboardList} title="Trực ban hôm nay" value={todayDuty.length} sub="Theo phân công trong ngày" color="bg-cyan-500" />
+        <StatCard icon={AlertCircle} title="Lịch công tác tháng" value={lichCongTacData.length} sub="Tổng lịch hiện có" color="bg-amber-500" />
       </div>
 
       {/* Main content grid */}
@@ -332,84 +345,52 @@ const Dashboard = ({
       <div className="card-lg p-0 overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <h3 className="text-base font-bold text-slate-800">Bảng thời gian biểu tuần</h3>
-            <p className="text-xs text-slate-400 mt-0.5">Lịch công tác từ {weekRangeText}</p>
+            <h3 className="text-base font-bold text-slate-800">Lịch tháng</h3>
+            <p className="text-xs text-slate-400 mt-0.5">Mặc định thứ 2: Chào cờ, kèm lịch nghỉ lễ</p>
           </div>
           <button onClick={() => onNavigate('lichcongtac')} className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
             Mở lịch chi tiết <ArrowUpRight size={12} />
           </button>
         </div>
-        {weekItems.length === 0 ? (
-          <div className="py-10 text-center text-slate-400">
-            <CalendarDays size={28} className="mx-auto mb-2 opacity-40" />
-            <p className="text-sm">Không có lịch công tác trong tuần hiện tại</p>
+        <div className="p-4">
+          <div className="grid grid-cols-7 gap-2 text-xs font-semibold text-slate-500 mb-2">
+            {['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'].map((x) => (
+              <div key={x} className="px-2">{x}</div>
+            ))}
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            {/* Calendar week view */}
-            <div id="calendar-schedule">
-              {/* Day headers */}
-              <div className="grid grid-cols-8 border-b border-slate-100 bg-slate-50">
-                <div className="p-3 border-r border-slate-100" />
-                {weekDates.map((d, i) => {
-                  const isToday = toDateStr(d) === today;
-                  const dayName = ['CN', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'][d.getDay()];
-                  const dayNum = String(d.getDate()).padStart(2, '0');
-                  const dateStr = toDateStr(d);
-                  const dayEvents = weekItems.filter(e => e.ngay === dateStr);
-                  
-                  return (
-                    <div key={i} className={`p-3 text-center border-r border-slate-100 last:border-r-0 ${isToday ? 'bg-blue-50' : 'bg-slate-50'}`}>
-                      <div className={`text-xs font-semibold ${isToday ? 'text-blue-600' : 'text-slate-500'}`}>{dayName}</div>
-                      <div className={`text-lg font-extrabold mt-0.5 ${isToday ? 'text-blue-600' : 'text-slate-800'}`}>{dayNum}</div>
-                      {dayEvents.length > 0 && (
-                        <div className={`text-[10px] mt-0.5 font-medium ${isToday ? 'text-blue-500' : 'text-slate-400'}`}>
-                          {dayEvents.length} lịch
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Time grid */}
-              <div className="overflow-y-auto max-h-[400px]">
-                {['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00'].map((hour, hi) => (
-                  <div key={hi} className="grid grid-cols-8 border-b border-slate-50 min-h-[64px]">
-                    <div className="p-2 text-[11px] text-slate-400 font-medium border-r border-slate-100 flex items-start pt-2 bg-slate-50/50">
-                      {hour}
-                    </div>
-                    {weekDates.map((d, dayIdx) => {
-                      const isToday = toDateStr(d) === today;
-                      const dateStr = toDateStr(d);
-                      const dayEvents = weekItems.filter(e => {
-                        if (e.ngay !== dateStr) return false;
-                        const h = parseInt(e.gioBatDau.split(':')[0]);
-                        return h === parseInt(hour.split(':')[0]);
-                      });
-                      
+          <div className="grid grid-cols-7 gap-2">
+            {monthDays.map((d, idx) => {
+              if (!d) return <div key={`empty-${idx}`} className="h-28 rounded-xl bg-slate-50" />;
+              const dateStr = toDateStr(d);
+              const isToday = dateStr === today;
+              const isMonday = d.getDay() === 1;
+              const holiday = HOLIDAYS[dateStr];
+              const dayEvents = lichCongTacData.filter((x) => x.ngay === dateStr);
+              return (
+                <div key={dateStr} className={`h-28 rounded-xl border p-2 overflow-hidden ${isToday ? 'border-blue-500 bg-blue-50/50' : 'border-slate-200 bg-white'}`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`text-xs font-bold ${isToday ? 'text-blue-600' : 'text-slate-700'}`}>{d.getDate()}</span>
+                    {isMonday && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">Chào cờ</span>}
+                  </div>
+                  {holiday && <div className="text-[10px] text-red-600 font-medium line-clamp-1">{holiday}</div>}
+                  <div className="space-y-1 mt-1">
+                    {dayEvents.slice(0, 2).map((evt) => {
+                      const colorInfo = LOAI_LICH_COLORS[evt.loai] || LOAI_LICH_COLORS.hop;
+                      const timeDisplay = evt.gioBatDau ? `${evt.gioBatDau}` + (evt.gioKetThuc ? `-${evt.gioKetThuc}` : '') : '';
                       return (
-                        <div key={dayIdx}
-                          className={`border-r border-slate-100 last:border-r-0 p-1 relative ${isToday ? 'bg-blue-50/30' : 'hover:bg-slate-50'} transition-colors`}>
-                          {dayEvents.map(evt => {
-                            const colorInfo = LOAI_LICH_COLORS[evt.loai] || LOAI_LICH_COLORS.hop;
-                            return (
-                              <div key={evt.id}
-                                className={`${colorInfo.bg} ${colorInfo.text} rounded-lg p-1.5 mb-1 cursor-pointer hover:opacity-80 transition-opacity border border-current border-opacity-20`}>
-                                <div className="text-[10px] font-bold leading-tight line-clamp-1">{evt.tieuDe}</div>
-                                <div className="text-[9px] opacity-70 mt-0.5">{evt.gioBatDau}–{evt.gioKetThuc}</div>
-                              </div>
-                            );
-                          })}
+                        <div key={evt.id} className={`text-[10px] px-1.5 py-0.5 rounded ${colorInfo.bg} ${colorInfo.text} line-clamp-1`}>
+                          {timeDisplay && <span className="font-medium">{timeDisplay} </span>}
+                          {evt.tieuDe}
                         </div>
                       );
                     })}
+                    {dayEvents.length > 2 && <div className="text-[10px] text-slate-400">+{dayEvents.length - 2} lịch</div>}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
+              );
+            })}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

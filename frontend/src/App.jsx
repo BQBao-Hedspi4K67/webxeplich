@@ -8,8 +8,11 @@ import LapLichTrucBan from './components/LichTrucBan/LapLichTrucBan';
 import LichCuaToi from './components/LichCuaToi/LichCuaToi';
 import TraCuuLich from './components/TraCuu/TraCuuLich';
 import XuatLich from './components/XuatLich/XuatLich';
+import QuanLyNgayLe from './components/NgayLe/QuanLyNgayLe';
+import QuanLyPhongBan from './components/PhongBan/QuanLyPhongBan';
 import YKienPhanHoi from './components/YKien/YKienPhanHoi';
 import BangQuyTrinh from './components/QuyTrinh/BangQuyTrinh';
+import { DEPARTMENTS, SCHOOLS } from './data/uiConstants';
 import apiClient from './services/api';
 
 const BACKEND_TO_UI_ROLE = {
@@ -29,6 +32,8 @@ const OFFICER_UI_ROLE_ORDER = {
   'Quản lý': 2,
   'Cán bộ': 3,
 };
+
+const UNIT_OPTIONS = ['Ban Giám đốc', ...DEPARTMENTS, ...SCHOOLS];
 
 const WORK_TYPE_FALLBACK_LABEL = {
   hop: 'Họp',
@@ -86,7 +91,9 @@ const resolveOfficerId = (profile, officers = []) => {
   }
 
   if (fullName) {
-    const byName = officers.find((o) => (o.hoTen || '').trim().toLowerCase() === fullName);
+    const byName = officers.find((o) =>
+      (o.hoTenDayDu || o.hoTen || '').trim().toLowerCase() === fullName
+    );
     if (byName?.id) return byName.id;
   }
 
@@ -105,7 +112,9 @@ const resolveOfficerProfile = (profile, officers = []) => {
   }
 
   if (fullName) {
-    const byName = officers.find((o) => (o.hoTen || '').trim().toLowerCase() === fullName);
+    const byName = officers.find((o) =>
+      (o.hoTenDayDu || o.hoTen || '').trim().toLowerCase() === fullName
+    );
     if (byName) return byName;
   }
 
@@ -145,8 +154,11 @@ const ROLE_BADGE = {
   'Cán bộ':        'bg-emerald-100 text-emerald-700',
 };
 
-const TaiKhoan = ({ user, reloadData }) => {
+const TaiKhoan = ({ user, reloadData, departmentData = [] }) => {
   const canProvisionUser = ['Quản trị viên', 'Quản lý'].includes(user?.role);
+  const accountDepartmentOptions = (departmentData || []).length
+    ? departmentData.map((d) => d.name)
+    : UNIT_OPTIONS;
   const [createForm, setCreateForm] = useState({
     username: '',
     password: '',
@@ -193,7 +205,7 @@ const TaiKhoan = ({ user, reloadData }) => {
         email: createForm.email.trim() || null,
         phone: createForm.phone.trim() || null,
         position: createForm.position.trim() || null,
-        department: createForm.department.trim(),
+        department: createForm.department,
         role: createForm.role,
         status: createForm.status,
       });
@@ -334,12 +346,16 @@ const TaiKhoan = ({ user, reloadData }) => {
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đơn vị <span className="text-red-500">*</span></label>
-                <input
+                <select
                   className="input-field"
                   value={createForm.department}
                   onChange={(e) => setCreateForm((prev) => ({ ...prev, department: e.target.value }))}
-                  placeholder="VD: Phòng CNTT"
-                />
+                >
+                  <option value="">-- Chọn đơn vị --</option>
+                  {accountDepartmentOptions.map((unit) => (
+                    <option key={unit} value={unit}>{unit}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Vai trò</label>
@@ -390,14 +406,16 @@ const PAGE_COMPONENTS = {
   lichcuatoi: LichCuaToi,
   tracuu: TraCuuLich,
   xuat: XuatLich,
+  ngayle: QuanLyNgayLe,
+  phongban: QuanLyPhongBan,
   ykien: YKienPhanHoi,
   quytrinh: BangQuyTrinh,
   taikhoan: TaiKhoan,
 };
 
 const PAGE_ACCESS = {
-  'Quản trị viên': ['dashboard', 'canbo', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ykien', 'quytrinh', 'taikhoan'],
-  'Quản lý': ['dashboard', 'canbo', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ykien', 'quytrinh', 'taikhoan'],
+  'Quản trị viên': ['dashboard', 'canbo', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ngayle', 'phongban', 'ykien', 'quytrinh', 'taikhoan'],
+  'Quản lý': ['dashboard', 'canbo', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ngayle', 'ykien', 'quytrinh', 'taikhoan'],
   'Cán bộ': ['dashboard', 'canbo', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ykien', 'quytrinh'],
 };
 
@@ -410,6 +428,8 @@ function App() {
   const [lichTrucBanData, setLichTrucBanData] = useState([]);
   const [yKienData, setYKienData] = useState([]);
   const [thongBaoData, setThongBaoData] = useState([]);
+  const [departmentData, setDepartmentData] = useState([]);
+  const [holidayData, setHolidayData] = useState([]);
   const [thongKeTheoThang, setThongKeTheoThang] = useState([]);
   const [hoatDongGanDay, setHoatDongGanDay] = useState([]);
   const [xuatLichHistory, setXuatLichHistory] = useState([]);
@@ -417,26 +437,31 @@ function App() {
   const loadData = useCallback(async () => {
     try {
       setLoadingData(true);
-      const [officersRes, workRes, dutyRes, opinionsRes, notificationsRes, dashboardRes, exportHistoryRes] = await Promise.all([
+      const [officersRes, workRes, dutyRes, leaveRes, notificationsRes, dashboardRes, exportHistoryRes, holidaysRes, departmentsRes] = await Promise.all([
         apiClient.officers.list(1, 200),
         apiClient.workSchedules.list(1, 500),
         apiClient.dutySchedules.list(1, 500),
-        apiClient.opinions.list(1, 500),
+        apiClient.leaveRequests.list(1, 500),
         apiClient.notifications.list(30),
         apiClient.dashboard.getOverview(),
         apiClient.exports.history(20),
+        apiClient.holidays.list(),
+        apiClient.departments.list(),
       ]);
 
       const mappedOfficers = (officersRes?.data || [])
         .map((o) => ({
           id: o.id,
-          hoTen: o.fullName,
+          hoTen: o.officerName || o.fullName,
+          capBac: o.officerTitle || '',
+          hoTenDayDu: o.fullName,
           chucVu: o.position || '',
           donVi: o.department || '',
           soDienThoai: o.phone || '',
           email: o.email || '',
           vaiTro: OFFICER_ROLE_TO_UI[o.role] || 'Cán bộ',
           trangThai: o.status || 'active',
+          denNgayHoc: o.studyUntil || '',
           avatar: (o.fullName || '')
             .split(' ')
             .filter(Boolean)
@@ -458,11 +483,31 @@ function App() {
         gioBatDau: toTimeOnly(w.startTime),
         gioKetThuc: toTimeOnly(w.endTime),
         diaDiem: w.location || '',
-        nguoiPhuTrach: w.assignedTo || '',
+        nguoiPhuTrach: w.responsibleOfficerName || '',
+        nguoiPhuTrachId: w.responsibleOfficerId || '',
+        canBo1: w.officer1Name || '',
+        canBo1Id: w.officer1Id || '',
+        canBo2: w.officer2Name || '',
+        canBo2Id: w.officer2Id || '',
+        canBoTrucChiHuy: w.commanderOfficerName || '',
+        canBoTrucChiHuyId: w.commanderOfficerId || '',
         donVi: w.department || '',
+        trangThaiDuyet: w.approvalStatus || 'approved',
+        nguoiDuyet: w.approvedByName || '',
+        duyetLuc: w.approvedAt || '',
+        participants: (() => {
+          if (!w.participants) return { units: [], boardMembers: [] };
+          if (typeof w.participants === 'string') {
+            try {
+              return JSON.parse(w.participants);
+            } catch {
+              return { units: [], boardMembers: [] };
+            }
+          }
+          return w.participants;
+        })(),
         loai: w.type || 'hop',
         loaiLabel: WORK_TYPE_FALLBACK_LABEL[w.type] || w.type,
-        trangThai: normalizeScheduleStatus(w.status),
         tuanSo: w.weekNo,
         ghiChu: w.notes || '',
       }));
@@ -478,17 +523,18 @@ function App() {
         gioBatDau: toTimeOnly(d.startTime),
         gioKetThuc: toTimeOnly(d.endTime),
         viTri: d.location || '',
-        trangThai: normalizeScheduleStatus(d.status),
+        donVi: d.department || '',
         ghiChu: d.notes || '',
       }));
 
-      const mappedOpinions = (opinionsRes?.data || []).map((o) => ({
+      const mappedOpinions = (leaveRes?.data || []).map((o) => ({
         id: `YK${String(o.id).padStart(3, '0')}`,
         opinionId: o.id,
         canBoId: o.officerId,
+        dutyScheduleId: o.dutyScheduleId || '',
         tenCanBo: o.officerName || o.officerId,
-        ngayTruc: toDateOnly(o.dutyDate),
-        noiDung: o.content,
+        ngayNghi: toDateOnly(o.leaveDate),
+        noiDung: o.reason,
         trangThai: o.status,
         phanHoiAdmin: o.adminFeedback || '',
         createdAt: toTimeOnly(o.createdAt),
@@ -498,12 +544,25 @@ function App() {
       const recentActivities = dashboardRes?.data?.recentActivities || [];
       const notifications = notificationsRes?.data || [];
       const exportHistory = exportHistoryRes?.data || [];
+      const mappedHolidays = (holidaysRes?.data || []).map((h) => ({
+        id: h.id,
+        ngay: toDateOnly(h.holidayDate),
+        ten: h.holidayName,
+        loai: h.holidayType,
+      }));
+      const mappedDepartments = (departmentsRes?.data || []).map((d) => ({
+        id: d.id,
+        name: d.name,
+        departmentType: d.departmentType,
+      }));
 
       setCanBoData(mappedOfficers);
       setLichCongTacData(mappedWork);
       setLichTrucBanData(mappedDuty);
       setYKienData(mappedOpinions);
       setThongBaoData(notifications);
+      setDepartmentData(mappedDepartments);
+      setHolidayData(mappedHolidays);
       setThongKeTheoThang(monthlyStats);
       setHoatDongGanDay(recentActivities);
       setXuatLichHistory(exportHistory);
@@ -530,7 +589,7 @@ function App() {
         if (!profile) return;
 
         setUser({
-          id: String(profile.id),
+          id: String(profile.officerId || profile.id),
           userId: profile.id,
           username: profile.username,
           name: profile.fullName,
@@ -538,6 +597,8 @@ function App() {
           role: BACKEND_TO_UI_ROLE[profile.role] || 'Cán bộ',
           backendRole: profile.role,
           avatar: profile.avatar,
+          position: profile.position || '',
+          department: profile.department || '',
         });
 
         const loaded = await loadData();
@@ -560,7 +621,7 @@ function App() {
 
   const handleLogin = async (userData) => {
     setUser({
-      id: String(userData.id),
+      id: String(userData.officerId || userData.id),
       userId: userData.id,
       username: userData.username,
       name: userData.fullName,
@@ -568,6 +629,8 @@ function App() {
       role: BACKEND_TO_UI_ROLE[userData.role] || 'Cán bộ',
       backendRole: userData.role,
       avatar: userData.avatar,
+      position: userData.position || '',
+      department: userData.department || '',
     });
     setActivePage('dashboard');
     const loaded = await loadData();
@@ -604,10 +667,12 @@ function App() {
     user,
     onNavigate: navigateSafe,
     canBoData,
+    departmentData,
     lichCongTacData,
     lichTrucBanData,
     yKienData,
     thongBaoData,
+    holidayData,
     thongKeTheoThang,
     hoatDongGanDay,
     xuatLichHistory,

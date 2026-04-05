@@ -25,3 +25,34 @@ export const TRANG_THAI_TRUC = {
 };
 
 export const WEEK_DAYS = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'];
+
+export const EXECUTIVE_BOARD_MEMBERS = [
+  'Thiếu tướng Lê Minh Thảo',
+  'Đại tá Nguyễn Văn Căn',
+  'Đại tá Nguyễn Mạnh Cường',
+  'Đại tá Phạm Thị Thúy Hằng',
+];
+
+export const DEPARTMENTS = [
+  'Phòng hành chính tổng hợp',
+  'Phòng chính trị',
+  'Phòng quản lý đào tạo và BDNC',
+  'Phòng ĐBCL đào tạo',
+  'Phòng quản lý nghiên cứu khoa học',
+  'Phòng quản lý học viên',
+  'Phòng hậu cần',
+];
+
+export const SCHOOLS = [
+  'Khoa Lý luận chính trị và KHXHNV',
+  'Khoa Luật',
+  'Khoa nghiệp vụ cơ bản',
+  'Khoa khoa học cơ bản và ngoại ngữ',
+  'Khoa quân sự, võ thuật, TDTT',
+  'Khoa mật mã',
+  'Khoa Công nghệ và ATTT',
+  'Khoa Điện tử viễn thông và kỹ thuật nghiệp vụ',
+  'Khoa Hồ sơ - Lưu trữ',
+  'Khoa Hậu cần',
+  'Khoa Y Dược',
+];

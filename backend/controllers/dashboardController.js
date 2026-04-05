@@ -30,20 +30,18 @@ export const getOverview = async (req, res, next) => {
 
       const [workRows] = await connection.execute(
         `SELECT
-          COUNT(*) AS total,
-          SUM(CASE WHEN status = 'upcoming' THEN 1 ELSE 0 END) AS upcoming
+          COUNT(*) AS total
          FROM work_schedules`
       );
 
       const [dutyRows] = await connection.execute(
         `SELECT
-          COUNT(*) AS total,
-          SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active
+          COUNT(*) AS total
          FROM duty_schedules`
       );
 
-      const [pendingOpinionsRows] = await connection.execute(
-        `SELECT COUNT(*) AS pending FROM opinions WHERE status = 'pending'`
+      const [pendingLeaveRows] = await connection.execute(
+        `SELECT COUNT(*) AS pending FROM leave_requests WHERE status = 'pending'`
       );
 
       const [monthlyWork] = await connection.execute(
@@ -106,10 +104,8 @@ export const getOverview = async (req, res, next) => {
             totalOfficers: Number(officersRows[0].total || 0),
             activeOfficers: Number(officersRows[0].active || 0),
             totalWorkSchedules: Number(workRows[0].total || 0),
-            upcomingWorkSchedules: Number(workRows[0].upcoming || 0),
             totalDutySchedules: Number(dutyRows[0].total || 0),
-            activeDutySchedules: Number(dutyRows[0].active || 0),
-            pendingOpinions: Number(pendingOpinionsRows[0].pending || 0),
+            pendingLeaveRequests: Number(pendingLeaveRows[0].pending || 0),
           },
           monthlyStats,
           recentActivities: activityData,

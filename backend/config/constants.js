@@ -23,10 +23,11 @@ export const DUTY_STATUS = {
   UPCOMING: 'upcoming',
 };
 
-export const WORK_STATUS = {
-  COMPLETED: 'completed',
-  ACTIVE: 'active',
-  UPCOMING: 'upcoming',
+export const WORK_APPROVAL_STATUS = {
+  PENDING: 'pending',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+  AUTO_APPROVED: 'auto_approved',
 };
 
 export const WORK_TYPES = [
@@ -40,7 +41,7 @@ export const WORK_TYPES = [
   'khaiGiang',
 ];
 
-export const OPINION_STATUS = {
+export const LEAVE_REQUEST_STATUS = {
   PENDING: 'pending',
   APPROVED: 'approved',
   REJECTED: 'rejected',
@@ -49,4 +50,5 @@ export const OPINION_STATUS = {
 export const USER_STATUS = {
   ACTIVE: 'active',
   INACTIVE: 'inactive',
+  STUDYING: 'studying',
 };

@@ -44,11 +44,11 @@ const tabRules = [
     canbo: 'Xem / Xuất',
   },
   {
-    tab: 'Ý kiến trực ban',
-    chucNang: 'Cán bộ đang trực ngày đó gửi ý kiến đột xuất để admin duyệt.',
+    tab: 'Đơn xin nghỉ',
+    chucNang: 'Cán bộ có thể gửi đơn xin nghỉ cho bất kỳ ngày nào kèm lý do, quản lý/Ban giám đốc duyệt.',
     admin: 'Duyệt / Từ chối / Phản hồi',
-    quanly: 'Xem',
-    canbo: 'Gửi ý kiến khi có ca trực',
+    quanly: 'Duyệt / Từ chối / Phản hồi',
+    canbo: 'Gửi đơn xin nghỉ',
   },
   {
     tab: 'Quản trị tài khoản',

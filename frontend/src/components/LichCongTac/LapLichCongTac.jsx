@@ -48,20 +48,25 @@ const formatDisplayTime = (timeValue) => {
 
 const initialForm = {
   tieuDe: '', ngay: toDateOnly(new Date()), gioBatDau: '08:00', gioKetThuc: '10:00',
-  diaDiem: '', nguoiPhuTrach: '', donVi: '', loai: 'hop', ghiChu: '', trangThai: 'upcoming'
+  diaDiem: '', canBo1Id: '', canBo2Id: '', canBoTrucChiHuyId: '',
+  thanhPhanThamGia: [], bgdMemberIds: [], loai: 'hop', ghiChu: ''
 };
 
-const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], reloadData }) => {
+const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], holidayData = [], reloadData }) => {
   const canEdit = user?.role !== 'Cán bộ';
+  const canReview = user?.backendRole === 'admin';
   const [data, setData] = useState(lichCongTacData);
-  const [viewMode, setViewMode] = useState('week'); // 'week' | 'list'
+  const [viewMode, setViewMode] = useState('month'); // 'week' | 'month'
   const [weekOffset, setWeekOffset] = useState(0);
+  const [monthOffset, setMonthOffset] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [editId, setEditId] = useState(null);
   const [selectedDay, setSelectedDay] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [filterLoai, setFilterLoai] = useState('');
+  const [filterDonVi, setFilterDonVi] = useState('');
+  const [showBgdPicker, setShowBgdPicker] = useState(false);
 
   useEffect(() => {
     setData(lichCongTacData);
@@ -77,12 +82,62 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], reloadData
     ? `Tuần này (${formatDDMM(weekDates[0])} - ${formatDDMM(weekDates[6])})`
     : `Tuần ${toDateOnly(weekDates[0])} - ${toDateOnly(weekDates[6])}`;
 
-  const currentWeek = data.find((x) => x.ngay >= toDateOnly(weekDates[0]) && x.ngay <= toDateOnly(weekDates[6]))?.tuanSo || null;
+  // Month calculation
+  const monthNow = new Date();
+  monthNow.setMonth(monthNow.getMonth() + monthOffset);
+  const monthStart = new Date(monthNow.getFullYear(), monthNow.getMonth(), 1);
+  const monthEnd = new Date(monthNow.getFullYear(), monthNow.getMonth() + 1, 0);
+  const monthStartWeekDay = monthStart.getDay() === 0 ? 7 : monthStart.getDay();
+  const monthDays = [];
+  for (let i = 1; i < monthStartWeekDay; i += 1) monthDays.push(null);
+  for (let d = 1; d <= monthEnd.getDate(); d += 1) {
+    monthDays.push(new Date(monthNow.getFullYear(), monthNow.getMonth(), d));
+  }
+  const monthLabel = monthNow.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' });
+
+  const toDateStr = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const d_str = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d_str}`;
+  };
+
+  const donViOptions = Array.from(new Set(
+    data
+      .map((l) => l.donVi)
+      .filter(Boolean)
+      .flatMap((dv) => String(dv).split(',').map((x) => x.trim()).filter(Boolean))
+  ));
 
   const weekData = data.filter((l) => {
     const inRange = l.ngay >= toDateOnly(weekDates[0]) && l.ngay <= toDateOnly(weekDates[6]);
-    return inRange && (!filterLoai || l.loai === filterLoai);
+    const matchLoai = !filterLoai || l.loai === filterLoai;
+    const matchDonVi = !filterDonVi || String(l.donVi || '').split(',').map((x) => x.trim()).includes(filterDonVi);
+    return inRange && matchLoai && matchDonVi;
   });
+
+  const monthData = data.filter((l) => {
+    const lDate = new Date(`${l.ngay}T00:00:00`);
+    const matchLoai = !filterLoai || l.loai === filterLoai;
+    const matchDonVi = !filterDonVi || String(l.donVi || '').split(',').map((x) => x.trim()).includes(filterDonVi);
+    return lDate >= monthStart && lDate <= monthEnd && matchLoai && matchDonVi;
+  });
+
+  const HOLIDAYS = (holidayData || []).reduce((acc, h) => {
+    if (h?.ngay) acc[h.ngay] = h.ten;
+    return acc;
+  }, {});
+
+  const participantUnits = Array.from(new Set(
+    canBoData
+      .map((cb) => cb.donVi)
+      .filter(Boolean)
+      .filter((dv) => /^Phòng\s|^Khoa\s/i.test(dv) || dv === 'Ban Giám đốc')
+  ));
+
+  const banGiamDocMembers = canBoData
+    .filter((cb) => cb.vaiTro === 'Lãnh đạo' || cb.donVi === 'Ban Giám đốc')
+    .slice(0, 4);
 
   const getDayEvents = (dateStr) => weekData.filter(l => {
     const d = new Date(l.ngay).getDay();
@@ -97,19 +152,32 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], reloadData
   };
 
   const openAdd = (day) => {
-    setForm({ ...initialForm, ngay: toDateOnly(weekDates[day] || new Date()), trangThai: 'upcoming' });
+    setForm({ ...initialForm, ngay: toDateOnly(weekDates[day] || new Date()) });
     setEditId(null);
     setShowModal(true);
   };
 
   const openEdit = (item) => {
-    setForm({ ...item });
+    const participants = item.participants || {};
+    setForm({
+      ...item,
+      thanhPhanThamGia: Array.isArray(participants.units) ? participants.units : [],
+      bgdMemberIds: Array.isArray(participants.boardMembers) ? participants.boardMembers : [],
+    });
     setEditId(item.id);
     setShowModal(true);
   };
 
   const handleSave = async () => {
     if (!form.tieuDe || !form.ngay) return;
+    if (!form.canBo1Id || !form.canBo2Id || !form.canBoTrucChiHuyId) {
+      alert('Vui lòng chọn đầy đủ: Cán bộ 1, Cán bộ 2 và Cán bộ chỉ huy.');
+      return;
+    }
+    if (!form.thanhPhanThamGia?.length) {
+      alert('Vui lòng chọn ít nhất một thành phần tham gia.');
+      return;
+    }
 
     const payload = {
       title: form.tieuDe,
@@ -117,12 +185,17 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], reloadData
       startTime: form.gioBatDau || null,
       endTime: form.gioKetThuc || null,
       location: form.diaDiem || '',
-      assignedTo: form.nguoiPhuTrach || '',
-      department: form.donVi || '',
+      officer1Id: form.canBo1Id || null,
+      officer2Id: form.canBo2Id || null,
+      commanderOfficerId: form.canBoTrucChiHuyId || null,
+      department: (form.thanhPhanThamGia || []).join(', '),
+      participants: {
+        units: form.thanhPhanThamGia || [],
+        boardMembers: form.bgdMemberIds || [],
+      },
       type: form.loai,
       weekNo: getIsoWeekNo(form.ngay),
       notes: form.ghiChu || '',
-      status: form.trangThai,
     };
 
     try {
@@ -139,25 +212,41 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], reloadData
     }
   };
 
-  const trangThaiColor = { completed: 'bg-emerald-100 text-emerald-700', active: 'bg-blue-100 text-blue-700', upcoming: 'bg-slate-100 text-slate-600' };
-  const trangThaiLabel = { completed: 'Đã diễn ra', active: 'Đang diễn ra', upcoming: 'Sắp diễn ra' };
+  const handleApprove = async (scheduleId) => {
+    try {
+      await apiClient.workSchedules.approve(scheduleId, 'approved');
+      if (reloadData) await reloadData();
+    } catch (err) {
+      alert(err?.message || 'Không thể duyệt lịch công tác.');
+    }
+  };
+
+  const getApprovalBadge = (status) => {
+    if (status === 'pending') {
+      return { label: 'Chờ duyệt', cls: 'bg-amber-100 text-amber-700 border-amber-200' };
+    }
+    if (status === 'rejected') {
+      return { label: 'Từ chối', cls: 'bg-red-100 text-red-700 border-red-200' };
+    }
+    return { label: 'Đã duyệt', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-5">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-800">Lập lịch công tác tuần</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Quản lý và lập lịch công tác theo tuần</p>
+          <h2 className="text-xl font-bold text-slate-800">Lịch công tác</h2>
+          <p className="text-sm text-slate-500 mt-0.5">Quản lý lịch công tác theo tuần và tháng</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setViewMode('week')}
             className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'week' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
             <CalendarDays size={14} className="inline mr-1.5" />Lịch tuần
           </button>
-          <button onClick={() => setViewMode('list')}
-            className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'list' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-            ≡ Danh sách
+          <button onClick={() => setViewMode('month')}
+            className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'month' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+            <CalendarDays size={14} className="inline mr-1.5" />Lịch tháng
           </button>
           {canEdit && (
             <button onClick={() => openAdd(3)} className="btn-primary">
@@ -167,29 +256,40 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], reloadData
         </div>
       </div>
 
-      {/* Week navigation + filter */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1">
-          <button onClick={() => setWeekOffset(w => w - 1)}
-            className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-all">
-            <ChevronLeft size={16} />
-          </button>
-          <span className="px-3 text-sm font-semibold text-slate-700 min-w-[200px] text-center">{weekLabel}</span>
-          <button onClick={() => setWeekOffset(w => w + 1)}
-            className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-all">
-            <ChevronRight size={16} />
-          </button>
+      {/* Week/Month navigation + filter */}
+      {(viewMode === 'week' || viewMode === 'month') && (
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1">
+            <button onClick={() => viewMode === 'week' ? setWeekOffset(w => w - 1) : setMonthOffset(m => m - 1)}
+              className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-all">
+              <ChevronLeft size={16} />
+            </button>
+            <span className="px-3 text-sm font-semibold text-slate-700 min-w-[200px] text-center">
+              {viewMode === 'week' ? weekLabel : monthLabel}
+            </span>
+            <button onClick={() => viewMode === 'week' ? setWeekOffset(w => w + 1) : setMonthOffset(m => m + 1)}
+              className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-all">
+              <ChevronRight size={16} />
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter size={14} className="text-slate-400" />
+            <select value={filterLoai} onChange={e => setFilterLoai(e.target.value)}
+              className="input-field !w-auto !py-2 text-sm">
+              <option value="">Tất cả loại</option>
+              {Object.entries(LOAI_LICH_COLORS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+            <select value={filterDonVi} onChange={e => setFilterDonVi(e.target.value)}
+              className="input-field !w-auto !py-2 text-sm">
+              <option value="">Đơn vị: Tất cả</option>
+              {donViOptions.map((dv) => <option key={dv} value={dv}>{dv}</option>)}
+            </select>
+          </div>
+          <span className="text-xs text-slate-400">
+            {viewMode === 'week' ? `${weekData.length} lịch trong tuần` : `${monthData.length} lịch trong tháng`}
+          </span>
         </div>
-        <div className="flex items-center gap-2">
-          <Filter size={14} className="text-slate-400" />
-          <select value={filterLoai} onChange={e => setFilterLoai(e.target.value)}
-            className="input-field !w-auto !py-2 text-sm">
-            <option value="">Tất cả loại</option>
-            {Object.entries(LOAI_LICH_COLORS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </select>
-        </div>
-        <span className="text-xs text-slate-400">{weekData.length} lịch trong tuần</span>
-      </div>
+      )}
 
       {viewMode === 'week' ? (
         /* Weekly calendar view */
@@ -200,12 +300,14 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], reloadData
             {WEEK_DAYS.map((day, i) => {
               const isToday = toDateOnly(weekDates[i]) === toDateOnly(new Date());
               const events = getEventsForDate(i);
+              const holiday = HOLIDAYS[toDateOnly(weekDates[i])];
               return (
                 <div key={i} className={`p-3 text-center border-r border-slate-100 last:border-r-0 ${isToday ? 'bg-blue-50' : 'bg-slate-50'}`}>
                   <div className={`text-xs font-semibold ${isToday ? 'text-blue-600' : 'text-slate-500'}`}>{day}</div>
                   <div className={`text-lg font-extrabold mt-0.5 ${isToday ? 'text-blue-600' : 'text-slate-800'}`}>
                     {String(weekDates[i].getDate()).padStart(2, '0')}
                   </div>
+                  {holiday && <div className="text-[10px] text-red-600 font-semibold line-clamp-1">{holiday}</div>}
                   {events.length > 0 && (
                     <div className={`text-[10px] mt-0.5 font-medium ${isToday ? 'text-blue-500' : 'text-slate-400'}`}>
                       {events.length} lịch
@@ -235,12 +337,27 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], reloadData
                       onClick={() => canEdit && !events.length && openAdd(dayIdx)}>
                       {events.map(evt => {
                         const colorInfo = LOAI_LICH_COLORS[evt.loai] || LOAI_LICH_COLORS.hop;
+                        const approval = getApprovalBadge(evt.trangThaiDuyet);
                         return (
                           <div key={evt.id}
                             onClick={canEdit ? (e => { e.stopPropagation(); openEdit(evt); }) : undefined}
                             className={`${colorInfo.bg} ${colorInfo.text} rounded-lg p-1.5 mb-1 cursor-pointer hover:opacity-80 transition-opacity group/evt border border-current border-opacity-20`}>
-                            <div className="text-[10px] font-bold leading-tight line-clamp-1">{evt.tieuDe}</div>
+                            <div className="flex items-start justify-between gap-1 mb-0.5">
+                              <div className="text-[10px] font-bold leading-tight line-clamp-1 flex-1">{evt.tieuDe}</div>
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full border font-semibold whitespace-nowrap ${approval.cls}`}>
+                                {approval.label}
+                              </span>
+                            </div>
                             <div className="text-[9px] opacity-70 mt-0.5">{formatDisplayTime(evt.gioBatDau)}–{formatDisplayTime(evt.gioKetThuc)}</div>
+                            {canReview && evt.trangThaiDuyet === 'pending' && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleApprove(evt.id); }}
+                                className="mt-1 inline-flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700"
+                              >
+                                Duyệt
+                              </button>
+                            )}
                           </div>
                         );
                       })}
@@ -258,78 +375,113 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], reloadData
             ))}
           </div>
         </div>
-      ) : (
-        /* List view */
+      ) : viewMode === 'month' ? (
+        /* Monthly calendar view */
         <div className="card-lg p-0 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr>
-                  {['Nội dung công tác', 'Ngày', 'Thời gian', 'Địa điểm', 'Người phụ trách', 'Loại', 'Trạng thái', ''].map(h => (
-                    <th key={h} className="table-th">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {weekData.length === 0 ? (
-                  <tr><td colSpan={8} className="text-center py-12 text-slate-400">
-                    <CalendarDays size={32} className="mx-auto mb-2 opacity-30" /><p className="text-sm">Chưa có lịch trong tuần này</p>
-                  </td></tr>
-                ) : weekData.map(evt => {
-                  const colorInfo = LOAI_LICH_COLORS[evt.loai] || LOAI_LICH_COLORS.hop;
-                  return (
-                    <tr key={evt.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="table-td">
-                        <div className="font-semibold text-slate-800 text-sm">{evt.tieuDe}</div>
-                        {evt.ghiChu && <div className="text-xs text-slate-400 mt-0.5 line-clamp-1">{evt.ghiChu}</div>}
-                      </td>
-                      <td className="table-td">
-                        <span className="text-sm text-slate-700 font-medium">
-                          {new Date(evt.ngay).toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit' })}
+          <div className="p-5">
+            <div className="grid grid-cols-7 gap-3 mb-4">
+              {['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'].map((x, i) => (
+                <div key={x} className={`py-3 text-center font-bold text-sm rounded-lg ${i === 5 ? 'bg-amber-50 text-amber-700' : i === 6 ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
+                  {x}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-3 auto-rows-fr">
+              {monthDays.map((d, idx) => {
+                if (!d) return <div key={`empty-${idx}`} className="min-h-32 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100/50" />;
+                const dateStr = toDateStr(d);
+                const isToday = dateStr === toDateStr(new Date());
+                const isMonday = d.getDay() === 1;
+                const isWeekend = d.getDay() === 6 || d.getDay() === 0;
+                const holiday = HOLIDAYS[dateStr];
+                const dayEvents = monthData.filter((x) => x.ngay === dateStr);
+                return (
+                  <div key={dateStr} 
+                    className={`min-h-32 rounded-lg p-3 transition-all duration-200 cursor-pointer group relative overflow-hidden ${
+                      isToday 
+                        ? 'border-2 border-blue-500 bg-gradient-to-br from-blue-50 to-blue-50/30 shadow-lg' 
+                        : isWeekend
+                        ? 'border border-slate-200 bg-gradient-to-br from-slate-50 to-white hover:shadow-md hover:border-slate-300'
+                        : 'border border-slate-200 bg-white hover:shadow-md hover:border-slate-300'
+                    }`}
+                    onClick={() => {
+                      if (canEdit) {
+                        setForm({ ...initialForm, ngay: dateStr });
+                        setEditId(null);
+                        setShowModal(true);
+                      }
+                    }}>
+                    {/* Background accent */}
+                    <div className="absolute top-0 right-0 w-12 h-12 bg-blue-500/5 rounded-bl-lg group-hover:bg-blue-500/10 transition-colors" />
+                    
+                    {/* Day number */}
+                    <div className="flex items-start justify-between mb-2 relative z-10">
+                      <span className={`text-base font-extrabold ${isToday ? 'text-blue-700' : isWeekend ? 'text-slate-400' : 'text-slate-800'}`}>
+                        {d.getDate()}
+                      </span>
+                      {isMonday && (
+                        <span className="text-[9px] px-2 py-1 rounded-full font-bold bg-gradient-to-r from-emerald-100 to-emerald-50 text-emerald-700 border border-emerald-200">
+                          Chào cờ
                         </span>
-                      </td>
-                      <td className="table-td">
-                        <div className="flex items-center gap-1.5 text-sm text-slate-600">
-                          <Clock size={12} className="text-slate-400" />
-                          {formatDisplayTime(evt.gioBatDau)} – {formatDisplayTime(evt.gioKetThuc)}
-                        </div>
-                      </td>
-                      <td className="table-td">
-                        <div className="flex items-center gap-1.5 text-sm text-slate-600 max-w-[160px]">
-                          <MapPin size={12} className="text-slate-400 flex-shrink-0" />
-                          <span className="line-clamp-1">{evt.diaDiem}</span>
-                        </div>
-                      </td>
-                      <td className="table-td">
-                        <div className="flex items-center gap-1.5 text-sm text-slate-600">
-                          <User size={12} className="text-slate-400" />
-                          <span className="line-clamp-1">{evt.nguoiPhuTrach.split(' ').slice(-2).join(' ')}</span>
-                        </div>
-                      </td>
-                      <td className="table-td">
-                        <span className={`badge ${colorInfo.bg} ${colorInfo.text}`}>{colorInfo.label}</span>
-                      </td>
-                      <td className="table-td">
-                        <span className={`badge ${trangThaiColor[evt.trangThai]}`}>{trangThaiLabel[evt.trangThai]}</span>
-                      </td>
-                      <td className="table-td">
-                        <div className="flex gap-1">
-                          {canEdit && (
-                            <>
-                              <button onClick={() => openEdit(evt)} className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"><Edit2 size={13} /></button>
-                              <button onClick={() => setDeleteConfirm(evt)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><Trash2 size={13} /></button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      )}
+                    </div>
+                    {holiday && <div className="text-[10px] text-red-600 font-semibold line-clamp-1 mb-1">{holiday}</div>}
+
+                    {/* Events container */}
+                    <div className="space-y-1.5 relative z-10 max-h-20 overflow-y-auto scrollbar-hide">
+                      {dayEvents.slice(0, 3).map((evt, eIdx) => {
+                        const colorInfo = LOAI_LICH_COLORS[evt.loai] || LOAI_LICH_COLORS.hop;
+                        const timeDisplay = evt.gioBatDau ? `${evt.gioBatDau.slice(0, 5)}` : '';
+                        const approval = getApprovalBadge(evt.trangThaiDuyet);
+                        return (
+                          <div 
+                            key={evt.id}
+                            className={`text-[11px] px-2 py-1.5 rounded-md transition-all duration-150 cursor-pointer hover:shadow-sm hover:scale-105 transform origin-left border border-current border-opacity-30 group/evt ${colorInfo.bg} ${colorInfo.text}`}
+                            onClick={(e) => { e.stopPropagation(); openEdit(evt); }}
+                            title={evt.tieuDe}>
+                            <div className="flex items-start gap-1 justify-between">
+                              {timeDisplay && (
+                                <span className="font-bold whitespace-nowrap text-opacity-80 flex-shrink-0">{timeDisplay}</span>
+                              )}
+                              <span className="font-medium line-clamp-1 flex-1 group-hover/evt:underline">{evt.tieuDe}</span>
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full border font-semibold whitespace-nowrap ${approval.cls}`}>
+                                {approval.label}
+                              </span>
+                            </div>
+                            {canReview && evt.trangThaiDuyet === 'pending' && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleApprove(evt.id); }}
+                                className="mt-1 inline-flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700"
+                              >
+                                Duyệt
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* More indicator */}
+                    {dayEvents.length > 3 && (
+                      <div className="mt-1.5 text-[10px] font-bold text-slate-400 pl-2 relative z-10">
+                        +{dayEvents.length - 3} lịch
+                      </div>
+                    )}
+
+                    {/* Add button indicator */}
+                    {canEdit && dayEvents.length === 0 && (
+                      <div className="mt-1 text-center">
+                        <div className="text-[10px] text-slate-300 group-hover:text-blue-400 transition-colors">Nhấn để thêm</div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Legend */}
       <div className="flex flex-wrap gap-2 px-1">
@@ -369,31 +521,70 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], reloadData
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Địa điểm</label>
                 <input className="input-field" placeholder="VD: Phòng họp A - Tầng 2" value={form.diaDiem} onChange={e => setForm({...form, diaDiem: e.target.value})} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Loại lịch</label>
+                <select className="input-field" value={form.loai} onChange={e => setForm({...form, loai: e.target.value})}>
+                  {Object.entries(LOAI_LICH_COLORS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Người phụ trách</label>
-                  <select className="input-field" value={form.nguoiPhuTrach} onChange={e => setForm({...form, nguoiPhuTrach: e.target.value})}>
-                    <option value="">-- Chọn cán bộ --</option>
-                    {canBoData.map(cb => <option key={cb.id} value={cb.hoTen}>{cb.hoTen}</option>)}
+                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Cán bộ 1 <span className="text-red-500">*</span></label>
+                  <select className="input-field" value={form.canBo1Id || ''} onChange={e => setForm({...form, canBo1Id: e.target.value})}>
+                    <option value="">-- Chọn --</option>
+                    {canBoData.map(cb => <option key={cb.id} value={cb.id}>{[cb.capBac, cb.hoTen].filter(Boolean).join(' ')}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Loại lịch</label>
-                  <select className="input-field" value={form.loai} onChange={e => setForm({...form, loai: e.target.value})}>
-                    {Object.entries(LOAI_LICH_COLORS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Cán bộ 2 <span className="text-red-500">*</span></label>
+                  <select className="input-field" value={form.canBo2Id || ''} onChange={e => setForm({...form, canBo2Id: e.target.value})}>
+                    <option value="">-- Chọn --</option>
+                    {canBoData.map(cb => <option key={cb.id} value={cb.id}>{[cb.capBac, cb.hoTen].filter(Boolean).join(' ')}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Cán bộ chỉ huy <span className="text-red-500">*</span></label>
+                  <select className="input-field" value={form.canBoTrucChiHuyId || ''} onChange={e => setForm({...form, canBoTrucChiHuyId: e.target.value})}>
+                    <option value="">-- Chọn --</option>
+                    {canBoData.map(cb => <option key={cb.id} value={cb.id}>{[cb.capBac, cb.hoTen].filter(Boolean).join(' ')}</option>)}
                   </select>
                 </div>
               </div>
-              {canEdit && (
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Trạng thái</label>
-                  <select className="input-field" value={form.trangThai || 'upcoming'} onChange={e => setForm({...form, trangThai: e.target.value})}>
-                    <option value="upcoming">Sắp diễn ra</option>
-                    <option value="active">Đang diễn ra</option>
-                    <option value="completed">Đã diễn ra</option>
-                  </select>
+              <div>
+                <label className="text-xs font-semibold text-slate-600 mb-2 block">Thành phần tham gia <span className="text-red-500">*</span></label>
+                <div className="border border-slate-200 rounded-xl p-3 space-y-2 max-h-44 overflow-y-auto bg-slate-50/40">
+                  {participantUnits.map((unit) => {
+                    const checked = (form.thanhPhanThamGia || []).includes(unit);
+                    return (
+                      <label key={unit} className="flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            const next = e.target.checked
+                              ? [...(form.thanhPhanThamGia || []), unit]
+                              : (form.thanhPhanThamGia || []).filter((x) => x !== unit);
+                            setForm({ ...form, thanhPhanThamGia: next, bgdMemberIds: unit === 'Ban Giám đốc' && !e.target.checked ? [] : form.bgdMemberIds });
+                            if (unit === 'Ban Giám đốc' && e.target.checked) {
+                              setShowBgdPicker(true);
+                            }
+                          }}
+                        />
+                        <span>{unit}</span>
+                      </label>
+                    );
+                  })}
                 </div>
-              )}
+                {(form.thanhPhanThamGia || []).includes('Ban Giám đốc') && (
+                  <button
+                    type="button"
+                    onClick={() => setShowBgdPicker(true)}
+                    className="mt-2 px-3 py-1.5 text-xs rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200"
+                  >
+                    Chọn thành viên Ban Giám đốc ({(form.bgdMemberIds || []).length}/4)
+                  </button>
+                )}
+              </div>
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Ghi chú</label>
                 <textarea rows={2} className="input-field resize-none" placeholder="Ghi chú thêm..." value={form.ghiChu} onChange={e => setForm({...form, ghiChu: e.target.value})} />
@@ -402,6 +593,42 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], reloadData
             <div className="flex gap-3 px-6 pb-6">
               <button onClick={() => setShowModal(false)} className="btn-secondary flex-1 justify-center">Hủy</button>
               <button onClick={handleSave} className="btn-primary flex-1 justify-center">{editId ? 'Lưu' : 'Thêm lịch'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBgdPicker && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-slate-800">Thành viên Ban Giám đốc</h3>
+              <button onClick={() => setShowBgdPicker(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+            </div>
+            <p className="text-xs text-slate-500 mb-3">Chọn các thành viên tham gia (4 ô tên Ban Giám đốc).</p>
+            <div className="space-y-2">
+              {banGiamDocMembers.map((cb) => {
+                const checked = (form.bgdMemberIds || []).includes(cb.id);
+                return (
+                  <label key={cb.id} className="flex items-center gap-2 text-sm text-slate-700 border border-slate-200 rounded-lg px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => {
+                        const current = form.bgdMemberIds || [];
+                        const next = e.target.checked
+                          ? [...current, cb.id]
+                          : current.filter((id) => id !== cb.id);
+                        setForm({ ...form, bgdMemberIds: next });
+                      }}
+                    />
+                    <span>{[cb.capBac, cb.hoTen].filter(Boolean).join(' ')}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setShowBgdPicker(false)} className="btn-secondary">Đóng</button>
             </div>
           </div>
         </div>

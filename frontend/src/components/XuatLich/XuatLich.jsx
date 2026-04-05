@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileDown, Printer, FileText, Eye, Download, ChevronRight, Check, Shield, CalendarDays } from 'lucide-react';
+import { FileText, Eye, Download, Check, Shield, CalendarDays } from 'lucide-react';
 import apiClient from '../../services/api';
 
 const XuatLich = ({ xuatLichHistory = [], reloadData }) => {
@@ -11,7 +11,6 @@ const XuatLich = ({ xuatLichHistory = [], reloadData }) => {
     return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
   };
   const [exportType, setExportType] = useState('congtac');
-  const [exportFormat, setExportFormat] = useState('csv');
   const [exportScope, setExportScope] = useState('week');
   const [weekNo, setWeekNo] = useState(getIsoWeekNo());
   const [monthValue, setMonthValue] = useState(currentMonth);
@@ -40,13 +39,12 @@ const XuatLich = ({ xuatLichHistory = [], reloadData }) => {
 
   const handleExport = async () => {
     try {
-      const format = exportFormat === 'print' ? 'csv' : exportFormat;
       const res = await apiClient.exports.download({
         type: exportType,
         scope: exportScope,
         weekNo,
         month: monthValue,
-        format,
+        format: 'pdf',
       });
 
       const url = window.URL.createObjectURL(res.blob);
@@ -58,10 +56,6 @@ const XuatLich = ({ xuatLichHistory = [], reloadData }) => {
       a.remove();
       window.URL.revokeObjectURL(url);
 
-      if (exportFormat === 'print') {
-        window.print();
-      }
-
       setExported(true);
       setTimeout(() => setExported(false), 3000);
       if (reloadData) await reloadData();
@@ -70,13 +64,24 @@ const XuatLich = ({ xuatLichHistory = [], reloadData }) => {
     }
   };
 
+  const buildWorkResponsible = (x) => {
+    const entries = [
+      ['Người PT', x.responsibleOfficerName],
+      ['Cán bộ 1', x.officer1Name],
+      ['Cán bộ 2', x.officer2Name],
+      ['Trực CH', x.commanderOfficerName],
+    ].filter(([, value]) => Boolean(value));
+
+    return entries.map(([label, value]) => `${label}: ${value}`).join(' | ');
+  };
+
   const previewRows = [
     ...(previewData.workSchedules || []).map((x) => ({
       loai: 'Công tác',
       ngay: x.date,
       noiDung: x.title,
       thoiGian: `${String(x.startTime || '').slice(0, 5)}–${String(x.endTime || '').slice(0, 5)}`,
-      phuTrach: x.assignedTo || '',
+      phuTrach: x.responsibleSummary || buildWorkResponsible(x),
     })),
     ...(previewData.dutySchedules || []).map((x) => ({
       loai: 'Trực ban',
@@ -146,13 +151,8 @@ const XuatLich = ({ xuatLichHistory = [], reloadData }) => {
 
               <div>
                 <label className="text-xs font-semibold text-slate-500 mb-2 block">Định dạng xuất</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[{ v: 'csv', l: 'CSV', color: 'text-emerald-600' }, { v: 'json', l: 'JSON', color: 'text-blue-600' }, { v: 'print', l: 'In', color: 'text-slate-600' }].map(f => (
-                    <button key={f.v} onClick={() => setExportFormat(f.v)}
-                      className={`py-2 rounded-xl text-sm font-semibold transition-all border-2 ${exportFormat === f.v ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
-                      {f.l}
-                    </button>
-                  ))}
+                <div className="py-2 px-3 rounded-xl border-2 border-blue-200 bg-blue-50 text-sm font-semibold text-blue-700 text-center">
+                  PDF
                 </div>
               </div>
 
@@ -162,7 +162,7 @@ const XuatLich = ({ xuatLichHistory = [], reloadData }) => {
                 </button>
                 <button onClick={handleExport}
                   className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm transition-all ${exported ? 'bg-emerald-500 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'}`}>
-                  {exported ? <><Check size={15} /> Đã xuất!</> : exportFormat === 'print' ? <><Printer size={15} /> In ngay</> : <><Download size={15} /> Tải xuống {exportFormat.toUpperCase()}</>}
+                  {exported ? <><Check size={15} /> Đã xuất!</> : <><Download size={15} /> Tải xuống PDF</>}
                 </button>
               </div>
             </div>
@@ -238,7 +238,7 @@ const XuatLich = ({ xuatLichHistory = [], reloadData }) => {
         <div className="space-y-2">
           {xuatLichHistory.map((file, i) => (
             <div key={i} className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
-              <div className={`w-9 h-9 rounded-xl ${file.exportFormat === 'json' ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50'} flex items-center justify-center flex-shrink-0`}>
+              <div className="w-9 h-9 rounded-xl text-red-600 bg-red-50 flex items-center justify-center flex-shrink-0">
                 <FileText size={16} />
               </div>
               <div className="flex-1 min-w-0">

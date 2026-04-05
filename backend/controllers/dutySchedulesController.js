@@ -1,5 +1,5 @@
 import pool from '../config/database.js';
-import { DUTY_TYPES, DUTY_STATUS } from '../config/constants.js';
+import { DUTY_TYPES } from '../config/constants.js';
 import { logActivity } from '../utils/activityLogger.js';
 import {
   ensureNotificationTargetingSchema,
@@ -45,12 +45,12 @@ export const getDutySchedules = async (req, res, next) => {
       page = 1, 
       limit = 20, 
       dutyType = '', 
-      status = '', 
       weekNo = '',
       year = new Date().getFullYear(),
       startDate = '',
       endDate = '',
-      officerId = ''
+      officerId = '',
+      location = '',
     } = req.query;
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -61,13 +61,8 @@ export const getDutySchedules = async (req, res, next) => {
       let params = [];
 
       if (dutyType) {
-        whereConditions.push("dutyType = ?");
+        whereConditions.push('ds.dutyType = ?');
         params.push(dutyType);
-      }
-
-      if (status) {
-        whereConditions.push("status = ?");
-        params.push(status);
       }
 
       if (weekNo) {
@@ -79,25 +74,33 @@ export const getDutySchedules = async (req, res, next) => {
       }
 
       if (startDate) {
-        whereConditions.push("date >= ?");
+        whereConditions.push('ds.date >= ?');
         params.push(startDate);
       }
 
       if (endDate) {
-        whereConditions.push("date <= ?");
+        whereConditions.push('ds.date <= ?');
         params.push(endDate);
       }
 
       if (officerId) {
-        whereConditions.push("officerId = ?");
+        whereConditions.push('ds.officerId = ?');
         params.push(officerId);
+      }
+
+      if (location) {
+        whereConditions.push('ds.location = ?');
+        params.push(location);
       }
 
       const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
 
       // Count
       const [countRows] = await connection.execute(
-        `SELECT COUNT(*) as total FROM duty_schedules ${whereClause}`,
+        `SELECT COUNT(*) as total
+         FROM duty_schedules ds
+         LEFT JOIN officers o ON ds.officerId = o.id
+         ${whereClause}`,
         params
       );
       const total = countRows[0].total;
@@ -176,7 +179,6 @@ export const createDutySchedule = async (req, res, next) => {
       endDate = null,
       shift,
       location = '',
-      status = DUTY_STATUS.UPCOMING,
       notes = ''
     } = req.body;
 
@@ -194,14 +196,6 @@ export const createDutySchedule = async (req, res, next) => {
         success: false,
         error: `Invalid dutyType. Must be one of: ${Object.values(DUTY_TYPES).join(', ')}`,
         code: 'INVALID_DUTY_TYPE',
-      });
-    }
-
-    if (status && !Object.values(DUTY_STATUS).includes(status)) {
-      return res.status(400).json({
-        success: false,
-        error: `Invalid status. Must be one of: ${Object.values(DUTY_STATUS).join(', ')}`,
-        code: 'INVALID_STATUS',
       });
     }
 
@@ -250,9 +244,9 @@ export const createDutySchedule = async (req, res, next) => {
 
       await connection.execute(
         `INSERT INTO duty_schedules 
-         (id, officerId, dutyType, date, endDate, weekStartDate, shift, startTime, endTime, location, status, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, '00:00', '23:59', ?, ?, ?)`,
-        [newId, officerId, dutyType, date, endDate, weekStartDate, shift, location, status, notes]
+         (id, officerId, dutyType, date, endDate, weekStartDate, shift, startTime, endTime, location, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, '00:00', '23:59', ?, ?)`,
+        [newId, officerId, dutyType, date, endDate, weekStartDate, shift, location, notes]
       );
 
       await ensureNotificationTargetingSchema(connection);
@@ -295,7 +289,7 @@ export const createDutySchedule = async (req, res, next) => {
 export const updateDutySchedule = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { officerId, dutyType, date, endDate, shift, location, status, notes } = req.body;
+    const { officerId, dutyType, date, endDate, shift, location, notes } = req.body;
 
     const connection = await pool.getConnection();
 
@@ -363,17 +357,6 @@ export const updateDutySchedule = async (req, res, next) => {
       if (location !== undefined) {
         updateFields.push('location = ?');
         params.push(location);
-      }
-      if (status !== undefined) {
-        if (!Object.values(DUTY_STATUS).includes(status)) {
-          return res.status(400).json({
-            success: false,
-            error: `Invalid status. Must be one of: ${Object.values(DUTY_STATUS).join(', ')}`,
-            code: 'INVALID_STATUS',
-          });
-        }
-        updateFields.push('status = ?');
-        params.push(status);
       }
       if (notes !== undefined) {
         updateFields.push('notes = ?');

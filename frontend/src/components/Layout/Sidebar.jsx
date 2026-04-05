@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import {
-  LayoutDashboard, Users, CalendarDays, ClipboardList,
+  LayoutDashboard, Users, CalendarDays, ClipboardList, Building2,
   Search, Printer, Settings, ChevronRight,
   MessageSquareQuote, FileText, CalendarCheck,
-  LogOut, ChevronLeft
+  CalendarRange, LogOut, ChevronLeft
 } from 'lucide-react';
 
 const menuItems = [
@@ -14,7 +14,9 @@ const menuItems = [
   { id: 'lichcuatoi', label: 'Lịch của tôi', icon: CalendarCheck, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'tracuu', label: 'Tra cứu lịch', icon: Search, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'xuat', label: 'Xuất / In lịch', icon: Printer, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
-  { id: 'ykien', label: 'Ý kiến trực ban', icon: MessageSquareQuote, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
+  { id: 'ngayle', label: 'Quản lý ngày lễ', icon: CalendarRange, badge: null, roles: ['Quản trị viên', 'Quản lý'] },
+  { id: 'phongban', label: 'Quản lý phòng ban', icon: Building2, badge: null, roles: ['Quản trị viên'] },
+  { id: 'ykien', label: 'Đơn xin nghỉ', icon: MessageSquareQuote, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'quytrinh', label: 'Quy trình chức năng', icon: FileText, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'taikhoan', label: 'Quản trị tài khoản', icon: Settings, badge: null, roles: ['Quản trị viên', 'Quản lý'] },
 ];
@@ -93,7 +95,7 @@ const Sidebar = ({ activePage, onNavigate, user, onLogout }) => {
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-white text-xs font-semibold truncate">{user?.name || 'Quản trị viên'}</div>
-              <div className="text-blue-300/60 text-[10px] truncate">{user?.role || 'Admin'}</div>
+              <div className="text-blue-300/60 text-[10px] truncate">{user?.position || user?.role || 'Cán bộ'}</div>
             </div>
             <button onClick={onLogout} title="Đăng xuất"
               className="text-slate-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">

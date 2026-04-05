@@ -20,12 +20,6 @@ const toTimeRange = (start, end) => {
   return `${s} - ${e}`;
 };
 
-const getStatusMeta = (status) => {
-  if (status === 'active') return { label: 'Đang diễn ra', className: 'bg-blue-100 text-blue-700' };
-  if (status === 'completed' || status === 'done') return { label: 'Đã diễn ra', className: 'bg-emerald-100 text-emerald-700' };
-  return { label: 'Sắp diễn ra', className: 'bg-slate-100 text-slate-600' };
-};
-
 const buildMyIdentity = (user, canBoData = []) => {
   const normalizedUserName = simplify(user?.name);
   const normalizedEmail = simplify(user?.email);
@@ -52,7 +46,6 @@ const getAssigneeTokens = (assignedTo) => {
 
 const LichCuaToi = ({ user, canBoData = [], lichCongTacData = [], lichTrucBanData = [] }) => {
   const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7));
-  const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
 
   const myIdentity = useMemo(() => buildMyIdentity(user, canBoData), [user, canBoData]);
@@ -84,7 +77,6 @@ const LichCuaToi = ({ user, canBoData = [], lichCongTacData = [], lichTrucBanDat
       endDate: '',
       time: toTimeRange(item.gioBatDau, item.gioKetThuc),
       place: item.diaDiem || '-',
-      status: item.trangThai,
       unit: item.donVi || '-',
       extra: LOAI_LICH_COLORS[item.loai]?.label || item.loaiLabel || 'Công tác',
     }));
@@ -98,7 +90,6 @@ const LichCuaToi = ({ user, canBoData = [], lichCongTacData = [], lichTrucBanDat
       endDate: item.denNgay || '',
       time: item.kieuTruc === 'giamdoc' ? 'Cả tuần' : toTimeRange(item.gioBatDau, item.gioKetThuc),
       place: item.viTri || '-',
-      status: item.trangThai,
       unit: '-',
       extra: CA_TRUC_COLORS[item.ca]?.label || 'Trực ban',
     }));
@@ -106,12 +97,11 @@ const LichCuaToi = ({ user, canBoData = [], lichCongTacData = [], lichTrucBanDat
     return [...workRows, ...dutyRows]
       .filter((item) => {
         const matchMonth = !monthFilter || String(item.date || '').startsWith(monthFilter);
-        const matchStatus = !statusFilter || item.status === statusFilter;
         const matchType = typeFilter === 'all' || item.type === typeFilter;
-        return matchMonth && matchStatus && matchType;
+        return matchMonth && matchType;
       })
       .sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  }, [myWorkSchedules, myDutySchedules, monthFilter, statusFilter, typeFilter]);
+  }, [myWorkSchedules, myDutySchedules, monthFilter, typeFilter]);
 
   const stats = {
     work: myWorkSchedules.length,
@@ -179,15 +169,6 @@ const LichCuaToi = ({ user, canBoData = [], lichCongTacData = [], lichTrucBanDat
               <option value="trucban">Lịch trực ban</option>
             </select>
           </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Trạng thái</label>
-            <select className="input-field" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-              <option value="">Tất cả</option>
-              <option value="upcoming">Sắp diễn ra</option>
-              <option value="active">Đang diễn ra</option>
-              <option value="completed">Đã diễn ra</option>
-            </select>
-          </div>
         </div>
       </div>
 
@@ -207,12 +188,10 @@ const LichCuaToi = ({ user, canBoData = [], lichCongTacData = [], lichTrucBanDat
                   <th className="table-th">Ngày</th>
                   <th className="table-th">Thời gian</th>
                   <th className="table-th">Địa điểm / Vị trí</th>
-                  <th className="table-th">Trạng thái</th>
                 </tr>
               </thead>
               <tbody>
                 {mergedRows.map((row) => {
-                  const statusMeta = getStatusMeta(row.status);
                   const dateDisplay = row.endDate
                     ? `${toDateLabel(row.date)} - ${toDateLabel(row.endDate)}`
                     : toDateLabel(row.date);
@@ -231,9 +210,6 @@ const LichCuaToi = ({ user, canBoData = [], lichCongTacData = [], lichTrucBanDat
                       <td className="table-td whitespace-nowrap text-sm text-slate-700">{dateDisplay}</td>
                       <td className="table-td whitespace-nowrap text-sm text-slate-700">{row.time}</td>
                       <td className="table-td text-sm text-slate-700">{row.place}</td>
-                      <td className="table-td whitespace-nowrap">
-                        <span className={`badge ${statusMeta.className}`}>{statusMeta.label}</span>
-                      </td>
                     </tr>
                   );
                 })}

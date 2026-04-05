@@ -37,7 +37,6 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
   const [keyword, setKeyword] = useState('');
   const [filterLoai, setFilterLoai] = useState('all'); // 'all' | 'congtac' | 'trucban'
   const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [filterStatus, setFilterStatus] = useState('');
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'calendar'
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -84,8 +83,7 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
     const matchKeyword = !q || item.tieuDe.toLowerCase().includes(q) || (item.nguoiPhuTrach || '').toLowerCase().includes(q) || (item.diaDiem || '').toLowerCase().includes(q);
     const matchLoai = filterLoai === 'all' || item.type === filterLoai;
     const matchMonth = !filterMonth || item.ngay.startsWith(filterMonth);
-    const matchStatus = !filterStatus || item.trangThai === filterStatus;
-    return matchKeyword && matchLoai && matchMonth && matchStatus;
+    return matchKeyword && matchLoai && matchMonth;
   }).sort((a, b) => b.ngay > a.ngay ? 1 : -1);
 
   const totalPages = Math.ceil(filtered.length / perPage);
@@ -101,8 +99,6 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
 
   const typeColors = { congtac: 'bg-blue-100 text-blue-700', trucban: 'bg-indigo-100 text-indigo-700' };
   const typeLabels = { congtac: '📅 Lịch công tác', trucban: '🛡 Lịch trực ban' };
-  const statusColors = { completed: 'bg-emerald-100 text-emerald-700', active: 'bg-blue-100 text-blue-700', upcoming: 'bg-slate-100 text-slate-600' };
-  const statusLabels = { completed: 'Đã diễn ra', active: 'Đang diễn ra', upcoming: 'Sắp diễn ra' };
 
   return (
     <div className="max-w-7xl mx-auto space-y-5">
@@ -161,21 +157,10 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
             <input type="month" value={filterMonth} onChange={e => { setFilterMonth(e.target.value); setCurrentPage(1); }} className="input-field" />
           </div>
 
-          {/* Status filter */}
-          <div className="min-w-[160px]">
-            <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Trạng thái</label>
-            <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }} className="input-field">
-              <option value="">Tất cả</option>
-              <option value="upcoming">Sắp tới</option>
-              <option value="active">Đang diễn ra</option>
-              <option value="completed">Đã diễn ra</option>
-            </select>
-          </div>
-
           {/* Clear */}
-          {(keyword || filterLoai !== 'all' || filterStatus) && (
+          {(keyword || filterLoai !== 'all') && (
             <button
-              onClick={() => { setKeyword(''); setFilterLoai('all'); setFilterStatus(''); setCurrentPage(1); }}
+              onClick={() => { setKeyword(''); setFilterLoai('all'); setCurrentPage(1); }}
               className="btn-secondary !py-2.5">
               <X size={14} /> Xóa bộ lọc
             </button>
@@ -217,15 +202,13 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
                 <table className="w-full">
                   <thead>
                     <tr>
-                      {['Loại', 'Tên lịch', 'Ngày', 'Thời gian', 'Địa điểm / Vị trí', 'Người phụ trách', 'Trạng thái', ''].map(h => (
+                      {['Loại', 'Tên lịch', 'Ngày', 'Thời gian', 'Địa điểm / Vị trí', 'Người phụ trách', ''].map(h => (
                         <th key={h} className="table-th">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {paged.map(item => {
-                      const stColor = statusColors[item.trangThai] || statusColors.upcoming;
-                      const stLabel = statusLabels[item.trangThai] || 'Sắp tới';
                       return (
                         <tr key={item.id} className="hover:bg-slate-50/70 transition-colors cursor-pointer group" onClick={() => setSelectedItem(item)}>
                           <td className="table-td">
@@ -259,9 +242,6 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
                               <User size={11} className="text-slate-400 flex-shrink-0" />
                               <span className="truncate max-w-[120px]">{item.nguoiPhuTrach || '—'}</span>
                             </div>
-                          </td>
-                          <td className="table-td">
-                            <span className={`badge ${stColor} whitespace-nowrap`}>{stLabel}</span>
                           </td>
                           <td className="table-td">
                             <button onClick={e => { e.stopPropagation(); setSelectedItem(item); }}
@@ -331,7 +311,6 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
                 </div>
                 <div className="space-y-2">
                   {items.map(item => {
-                    const stColor = statusColors[item.trangThai] || statusColors.upcoming;
                     return (
                       <div key={item.id}
                         onClick={() => setSelectedItem(item)}
@@ -340,7 +319,6 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start gap-2 flex-wrap">
                             <span className={`badge text-[10px] ${typeColors[item.type]}`}>{typeLabels[item.type]}</span>
-                            <span className={`badge ${stColor} text-[10px] whitespace-nowrap`}>{statusLabels[item.trangThai]}</span>
                           </div>
                           <p className="text-sm font-semibold text-slate-800 mt-1 group-hover:text-blue-600 transition-colors line-clamp-1">{item.tieuDe}</p>
                           <div className="flex items-center gap-3 mt-1 flex-wrap">
