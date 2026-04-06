@@ -105,6 +105,8 @@ const QuanLyPhongBan = ({ user, departmentData = [], reloadData }) => {
               <tr>
                 <th className="table-th">Tên đơn vị</th>
                 <th className="table-th">Loại</th>
+                <th className="table-th">Trưởng phòng</th>
+                <th className="table-th">Nhân sự</th>
                 <th className="table-th"></th>
               </tr>
             </thead>
@@ -114,6 +116,15 @@ const QuanLyPhongBan = ({ user, departmentData = [], reloadData }) => {
                   <td className="table-td font-semibold text-slate-800">{item.name}</td>
                   <td className="table-td">
                     <span className="badge bg-blue-100 text-blue-700">{TYPE_LABEL[item.departmentType] || item.departmentType}</span>
+                  </td>
+                  <td className="table-td text-sm text-slate-600">{item.headOfficerName || 'Chưa gán'}</td>
+                  <td className="table-td">
+                    <div className="text-sm text-slate-600">
+                      TP: {item.managerCount || 0} · Cán bộ: {item.officerCount || 0}
+                    </div>
+                    {item.departmentType === 'phong' && ((item.managerCount || 0) < 1 || (item.officerCount || 0) < 2) && (
+                      <div className="text-xs text-amber-600 mt-1">Cần tối thiểu 1 trưởng phòng + 2 cán bộ</div>
+                    )}
                   </td>
                   <td className="table-td">
                     {canEdit && (
@@ -131,7 +142,7 @@ const QuanLyPhongBan = ({ user, departmentData = [], reloadData }) => {
               ))}
               {!filtered.length && (
                 <tr>
-                  <td colSpan={3} className="text-center py-10 text-slate-400">
+                  <td colSpan={5} className="text-center py-10 text-slate-400">
                     <Building2 size={26} className="mx-auto mb-2 opacity-40" />
                     Chưa có phòng ban nào.
                   </td>

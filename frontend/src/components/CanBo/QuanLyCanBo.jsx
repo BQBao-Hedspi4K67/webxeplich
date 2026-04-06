@@ -11,7 +11,7 @@ const ROLES_COLORS = {
 
 const AVATAR_COLORS = ['bg-blue-500', 'bg-indigo-500', 'bg-purple-500', 'bg-pink-500', 'bg-emerald-500', 'bg-teal-500', 'bg-amber-500', 'bg-red-500'];
 
-const initialForm = { hoTen: '', capBac: '', chucVu: '', donVi: '', soDienThoai: '', email: '', vaiTro: 'Cán bộ', trangThai: 'active', denNgayHoc: '' };
+const initialForm = { hoTen: '', capBac: '', chucVu: '', donVi: '', donViId: '', soDienThoai: '', email: '', vaiTro: 'Cán bộ', trangThai: 'active', denNgayHoc: '' };
 
 const UI_ROLE_TO_BACKEND = {
   'Lãnh đạo': 'leader',
@@ -19,17 +19,25 @@ const UI_ROLE_TO_BACKEND = {
   'Cán bộ': 'officer',
 };
 
+const TITLE_OPTIONS = ['Thiếu tướng', 'Đại tá', 'Thượng tá', 'Trung tá', 'Thiếu tá', 'Đại úy', 'Thượng úy', 'Trung úy'];
+const POSITION_OPTIONS = ['Giám đốc Học viện', 'Phó Giám đốc', 'Trưởng phòng', 'Phó trưởng phòng', 'Giảng viên', 'Cán bộ'];
+
 const DEFAULT_UNIT_OPTIONS = ['Ban Giám đốc', ...DEPARTMENTS, ...SCHOOLS];
 
 const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) => {
-  const canEdit = user?.role === 'Quản trị viên';
+  const isAdmin = user?.role === 'Quản trị viên';
+  const isManager = user?.role === 'Quản lý';
+  const canEdit = ['Quản trị viên', 'Quản lý'].includes(user?.role);
   const unitOptions = (departmentData || []).length
-    ? departmentData.map((d) => d.name)
-    : DEFAULT_UNIT_OPTIONS;
+    ? departmentData.map((d) => ({ id: d.id, name: d.name }))
+    : DEFAULT_UNIT_OPTIONS.map((name, idx) => ({ id: idx + 1, name }));
+  const departmentNameOptions = unitOptions.map((x) => x.name);
   const [data, setData] = useState(canBoData);
+  const [selectedDepartment, setSelectedDepartment] = useState('');
   const [search, setSearch] = useState('');
   const [filterVaiTro, setFilterVaiTro] = useState('');
   const [filterTrangThai, setFilterTrangThai] = useState('');
+  const [filterDonVi, setFilterDonVi] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [viewItem, setViewItem] = useState(null);
@@ -42,18 +50,45 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
     setData(canBoData);
   }, [canBoData]);
 
-  const filtered = data.filter(cb => {
+  useEffect(() => {
+    if (isManager) {
+      setSelectedDepartment(user?.department || '');
+      return;
+    }
+
+    if (isAdmin && departmentNameOptions.length > 0 && !selectedDepartment) {
+      setSelectedDepartment(departmentNameOptions[0]);
+    }
+  }, [isAdmin, isManager, user?.department, departmentNameOptions, selectedDepartment]);
+
+  const departmentScopedData = data.filter((cb) => {
+    if (isManager) {
+      return !user?.department || cb.donVi === user.department;
+    }
+    if (isAdmin) {
+      return selectedDepartment ? cb.donVi === selectedDepartment : false;
+    }
+    return true;
+  });
+
+  const filtered = departmentScopedData.filter(cb => {
     const q = search.toLowerCase();
     const matchSearch = !q || cb.hoTen.toLowerCase().includes(q) || cb.id.toLowerCase().includes(q) || cb.donVi.toLowerCase().includes(q);
     const matchVaiTro = !filterVaiTro || cb.vaiTro === filterVaiTro;
     const matchTT = !filterTrangThai || cb.trangThai === filterTrangThai;
-    return matchSearch && matchVaiTro && matchTT;
+    const matchDonVi = !filterDonVi || cb.donVi === filterDonVi;
+    return matchSearch && matchVaiTro && matchTT && matchDonVi;
   });
 
   const totalPages = Math.ceil(filtered.length / perPage);
   const paged = filtered.slice((currentPage - 1) * perPage, currentPage * perPage);
 
-  const openEdit = (cb) => { setForm({ ...cb }); setEditItem(cb.id); setShowModal(true); };
+  const openEdit = (cb) => {
+    const unit = unitOptions.find((x) => x.name === cb.donVi);
+    setForm({ ...cb, donViId: cb.donViId || unit?.id || '' });
+    setEditItem(cb.id);
+    setShowModal(true);
+  };
 
   const handleSave = async () => {
     if (!form.hoTen || !form.chucVu || !form.donVi) return;
@@ -68,6 +103,7 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
       officerTitle: form.capBac || '',
       officerName: form.hoTen,
       position: form.chucVu,
+      departmentId: form.donViId ? Number(form.donViId) : undefined,
       department: form.donVi,
       phone: form.soDienThoai || null,
       email: form.email || null,
@@ -97,10 +133,10 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
   };
 
   const stats = {
-    total: data.length,
-    active: data.filter(c => c.trangThai === 'active').length,
-    lanhdao: data.filter(c => c.vaiTro === 'Lãnh đạo').length,
-    quanly: data.filter(c => c.vaiTro === 'Quản lý').length,
+    total: departmentScopedData.length,
+    active: departmentScopedData.filter(c => c.trangThai === 'active').length,
+    lanhdao: departmentScopedData.filter(c => c.vaiTro === 'Lãnh đạo').length,
+    quanly: departmentScopedData.filter(c => c.vaiTro === 'Quản lý').length,
   };
 
   return (
@@ -109,9 +145,37 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Quản lý cán bộ</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Quản lý thông tin cán bộ. Tạo cán bộ mới thực hiện tại mục Quản trị tài khoản.</p>
+          <p className="text-sm text-slate-500 mt-0.5">
+            {isAdmin
+              ? 'Chọn phòng ban để xem danh sách cán bộ theo từng phòng.'
+              : isManager
+                ? 'Chỉ hiển thị cán bộ thuộc phòng của trưởng phòng.'
+                : 'Quản lý thông tin cán bộ.'}
+          </p>
         </div>
       </div>
+
+      {(isAdmin || isManager) && (
+        <div className="card p-3">
+          <div className="flex flex-wrap gap-2">
+            {(isManager ? [user?.department].filter(Boolean) : departmentNameOptions).map((dept) => {
+              const active = selectedDepartment === dept;
+              return (
+                <button
+                  key={dept}
+                  type="button"
+                  onClick={() => setSelectedDepartment(dept)}
+                  className={`px-3 py-1.5 rounded-full text-sm border transition-all ${active
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:text-blue-700'}`}
+                >
+                  {dept}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Stat row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -160,6 +224,13 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
               <option value="active">Đang công tác</option>
               <option value="inactive">Tạm nghỉ</option>
             </select>
+            {!isManager && !isAdmin && (
+              <select value={filterDonVi} onChange={e => { setFilterDonVi(e.target.value); setCurrentPage(1); }}
+                className="input-field !w-auto !py-2 text-sm">
+                <option value="">Tất cả phòng/đơn vị</option>
+                {unitOptions.map((x) => <option key={x.id} value={x.name}>{x.name}</option>)}
+              </select>
+            )}
           </div>
           <span className="text-xs text-slate-400 ml-auto">{filtered.length} kết quả</span>
         </div>
@@ -299,7 +370,10 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Cấp bậc / danh xưng</label>
-                    <input className="input-field" placeholder="VD: Đại tá" value={form.capBac || ''} onChange={e => setForm({...form, capBac: e.target.value})} />
+                    <select className="input-field" value={form.capBac || ''} onChange={e => setForm({...form, capBac: e.target.value})}>
+                      <option value="">-- Chọn cấp bậc --</option>
+                      {TITLE_OPTIONS.map((x) => <option key={x} value={x}>{x}</option>)}
+                    </select>
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Họ và tên <span className="text-red-500">*</span></label>
@@ -309,13 +383,24 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Chức vụ <span className="text-red-500">*</span></label>
-                    <input className="input-field" placeholder="VD: Trưởng phòng" value={form.chucVu} onChange={e => setForm({...form, chucVu: e.target.value})} />
+                    <select className="input-field" value={form.chucVu} onChange={e => setForm({...form, chucVu: e.target.value})}>
+                      <option value="">-- Chọn chức vụ --</option>
+                      {POSITION_OPTIONS.map((x) => <option key={x} value={x}>{x}</option>)}
+                    </select>
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đơn vị <span className="text-red-500">*</span></label>
-                    <select className="input-field" value={form.donVi} onChange={e => setForm({...form, donVi: e.target.value})}>
+                    <select
+                      className="input-field"
+                      value={form.donViId || ''}
+                      onChange={e => {
+                        const selected = unitOptions.find((x) => String(x.id) === e.target.value);
+                        setForm({ ...form, donViId: e.target.value, donVi: selected?.name || '' });
+                      }}
+                      disabled={user?.role === 'Quản lý'}
+                    >
                       <option value="">-- Chọn đơn vị --</option>
-                      {unitOptions.map((x) => <option key={x} value={x}>{x}</option>)}
+                      {unitOptions.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
                     </select>
                   </div>
                 </div>

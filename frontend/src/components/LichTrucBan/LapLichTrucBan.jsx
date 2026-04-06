@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, ChevronLeft, ChevronRight, X, Edit2, Trash2, UserPlus, ShieldCheck, Users, Star } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, X, Edit2, Trash2, UserPlus, ShieldCheck, Users, Star, Shuffle } from 'lucide-react';
 import { WEEK_DAYS } from '../../data/uiConstants';
 import apiClient from '../../services/api';
+
+const DAILY_LOCATIONS = ['Nhà hiệu bộ', 'Nhà xe', 'Trạm xá'];
 
 const toDateOnly = (value) => {
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -40,12 +42,18 @@ const initialForm = {
   tenCanBo: '',
   ngay: toDateOnly(new Date()),
   denNgay: toDateOnly(new Date()),
-  viTri: 'Trực ban cổng chính',
+  viTri: 'Nhà hiệu bộ',
+  assignments: {
+    'Nhà hiệu bộ': '',
+    'Nhà xe': '',
+    'Trạm xá': '',
+  },
   ghiChu: '',
 };
 
 const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData }) => {
-  const canEdit = user?.role !== 'Cán bộ';
+  // Director account can come from backend role or UI-mapped role label.
+  const canEdit = user?.backendRole === 'admin' || user?.role === 'admin' || user?.role === 'Quản trị viên';
   const [data, setData] = useState(lichTrucBanData);
   const [weekOffset, setWeekOffset] = useState(0);
   const [mode, setMode] = useState('canbo');
@@ -55,6 +63,7 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [dutyTypeFilter, setDutyTypeFilter] = useState('all');
   const [viTriFilter, setViTriFilter] = useState('');
+  const [isAutoAssigning, setIsAutoAssigning] = useState(false);
 
   useEffect(() => {
     setData(lichTrucBanData);
@@ -82,7 +91,7 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData
   ), [data, weekDates]);
 
   const viTriOptions = useMemo(
-    () => Array.from(new Set(['Trực ban cổng chính', 'Trực ban cổng sau', ...data.map((x) => x.viTri).filter(Boolean)])),
+    () => ['Nhà hiệu bộ', 'Nhà xe', 'Trạm xá', 'Trực ban Giám đốc'],
     [data]
   );
 
@@ -110,7 +119,13 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData
   };
 
   const openAddCanBo = (ngay) => {
-    setForm({ ...initialForm, kieuTruc: 'canbo', ngay, viTri: 'Trực ban cổng chính' });
+    const dayItems = data.filter((x) => x.kieuTruc === 'canbo' && x.ngay === ngay);
+    const assignments = {
+      'Nhà hiệu bộ': dayItems.find((x) => x.viTri === 'Nhà hiệu bộ')?.canBoId || '',
+      'Nhà xe': dayItems.find((x) => x.viTri === 'Nhà xe')?.canBoId || '',
+      'Trạm xá': dayItems.find((x) => x.viTri === 'Trạm xá')?.canBoId || '',
+    };
+    setForm({ ...initialForm, kieuTruc: 'canbo', ngay, viTri: 'Nhà hiệu bộ', assignments });
     setEditId(null);
     setShowModal(true);
   };
@@ -134,7 +149,36 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData
   };
 
   const handleSave = async () => {
-    if (!form.canBoId || !form.ngay) return;
+    if (!form.ngay) return;
+
+    if (form.kieuTruc === 'canbo' && !editId) {
+      const bulkAssignments = DAILY_LOCATIONS.map((location) => ({
+        location,
+        officerId: form.assignments?.[location] || '',
+      }));
+
+      if (bulkAssignments.some((x) => !x.officerId)) {
+        alert('Vui lòng chọn đủ cán bộ cho 3 vị trí trực trong ngày.');
+        return;
+      }
+
+      try {
+        await apiClient.dutySchedules.create({
+          dutyType: 'officer_daily',
+          date: form.ngay,
+          shift: 'nguyenday',
+          notes: form.ghiChu || '',
+          bulkAssignments,
+        });
+        if (reloadData) await reloadData();
+        setShowModal(false);
+      } catch (err) {
+        alert(err?.message || 'Không thể lưu lịch trực ban.');
+      }
+      return;
+    }
+
+    if (!form.canBoId) return;
 
     const payload = {
       officerId: form.canBoId,
@@ -169,8 +213,32 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData
     }
   };
 
+  const handleAutoAssignWeek = async () => {
+    if (!canEdit) return;
+    const confirmed = window.confirm(
+      `Tự động xếp trực cán bộ theo lượt cho tuần ${formatDDMM(weekDates[0])}-${formatDDMM(weekDates[6])}?\nHệ thống sẽ ưu tiên người có ít lượt hơn trong tháng và random trong nhóm cùng lượt.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setIsAutoAssigning(true);
+      const res = await apiClient.dutySchedules.autoAssignWeek(weekDates[0]);
+      if (reloadData) await reloadData();
+      alert(res?.message || 'Đã tự động xếp lịch trực ban tuần này.');
+    } catch (err) {
+      alert(err?.message || 'Không thể tự động xếp lịch trực ban.');
+    } finally {
+      setIsAutoAssigning(false);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-5">
+      {!canEdit && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <p className="text-sm text-amber-800 font-medium">⚠️ Chỉ Giám đốc mới có quyền phân công lịch trực ban.</p>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Lập lịch trực ban</h2>
@@ -184,7 +252,16 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData
             Trực ban Giám đốc
           </button>
           {canEdit && mode === 'canbo' && (
-            <button onClick={() => openAddCanBo(toDateOnly(new Date()))} className="btn-primary"><Plus size={16} /> Gán trực cán bộ</button>
+            <>
+              <button
+                onClick={handleAutoAssignWeek}
+                disabled={isAutoAssigning}
+                className="btn-secondary"
+              >
+                <Shuffle size={16} /> {isAutoAssigning ? 'Đang xếp...' : 'Tự động xếp tuần này'}
+              </button>
+              <button onClick={() => openAddCanBo(toDateOnly(new Date()))} className="btn-primary"><Plus size={16} /> Gán trực cán bộ</button>
+            </>
           )}
           {canEdit && mode === 'giamdoc' && (
             <button onClick={openAddGiamDoc} className="btn-primary"><Plus size={16} /> Gán trực giám đốc</button>
@@ -226,6 +303,15 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData
           <option value="">Vị trí: Tất cả</option>
           {viTriOptions.map((vt) => <option key={vt} value={vt}>{vt}</option>)}
         </select>
+        {canEdit && mode === 'canbo' && (
+          <button
+            onClick={handleAutoAssignWeek}
+            disabled={isAutoAssigning}
+            className="btn-secondary"
+          >
+            <Shuffle size={16} /> {isAutoAssigning ? 'Đang xếp...' : 'Tự động xếp tuần này'}
+          </button>
+        )}
       </div>
 
       {mode === 'canbo' ? (
@@ -235,8 +321,9 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData
               <thead>
                 <tr>
                   <th className="table-th">Ngày</th>
-                  <th className="table-th">Cán bộ trực (nguyên ngày)</th>
-                  <th className="table-th">Vị trí</th>
+                  <th className="table-th">Nhà hiệu bộ</th>
+                  <th className="table-th">Nhà xe</th>
+                  <th className="table-th">Trạm xá</th>
                   <th className="table-th"></th>
                 </tr>
               </thead>
@@ -250,39 +337,43 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData
                         <div className="text-xs text-slate-400">{formatDDMM(date)}</div>
                       </td>
                       <td className="table-td">
-                        {dayItems.length > 0 ? (
-                          <div className="space-y-2">
-                            {dayItems.map((item) => (
-                              <div key={item.id} className="h-12 p-2 rounded-lg bg-slate-50 border border-slate-200">
-                                <div className="text-sm font-semibold text-slate-800 line-clamp-1">{item.tenCanBo}</div>
-                                <div className="text-xs text-slate-400 font-mono">{item.canBoId}</div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 text-sm">Chưa phân công</span>
-                        )}
+                        {(() => {
+                          const slot = dayItems.find((x) => x.viTri === 'Nhà hiệu bộ');
+                          return slot ? (
+                            <button onClick={() => openEdit(slot)} className="text-left w-full h-12 p-2 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100">
+                              <div className="text-sm font-semibold text-slate-800 line-clamp-1">{slot.tenCanBo}</div>
+                              <div className="text-xs text-slate-400 font-mono">{slot.canBoId}</div>
+                            </button>
+                          ) : <span className="text-slate-400 text-sm">Chưa phân công</span>;
+                        })()}
                       </td>
                       <td className="table-td text-sm text-slate-600">
-                        {dayItems.length > 0 ? (
-                          <div className="space-y-1.5">
-                            {dayItems.map((item) => (
-                              <div key={item.id} className="h-12 flex items-center">{item.viTri || '-'}</div>
-                            ))}
-                          </div>
-                        ) : '-'}
+                        {(() => {
+                          const slot = dayItems.find((x) => x.viTri === 'Nhà xe');
+                          return slot ? (
+                            <button onClick={() => openEdit(slot)} className="text-left w-full h-12 p-2 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100">
+                              <div className="text-sm font-semibold text-slate-800 line-clamp-1">{slot.tenCanBo}</div>
+                              <div className="text-xs text-slate-400 font-mono">{slot.canBoId}</div>
+                            </button>
+                          ) : <span className="text-slate-400 text-sm">Chưa phân công</span>;
+                        })()}
+                      </td>
+                      <td className="table-td text-sm text-slate-600">
+                        {(() => {
+                          const slot = dayItems.find((x) => x.viTri === 'Trạm xá');
+                          return slot ? (
+                            <button onClick={() => openEdit(slot)} className="text-left w-full h-12 p-2 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100">
+                              <div className="text-sm font-semibold text-slate-800 line-clamp-1">{slot.tenCanBo}</div>
+                              <div className="text-xs text-slate-400 font-mono">{slot.canBoId}</div>
+                            </button>
+                          ) : <span className="text-slate-400 text-sm">Chưa phân công</span>;
+                        })()}
                       </td>
                       <td className="table-td">
                         {canEdit && (
                           <div className="space-y-1.5">
-                            {dayItems.map((item) => (
-                              <div key={item.id} className="h-12 flex items-center gap-1">
-                                <button onClick={() => openEdit(item)} className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"><Edit2 size={13} /></button>
-                                <button onClick={() => setDeleteConfirm(item)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><Trash2 size={13} /></button>
-                              </div>
-                            ))}
                             <button onClick={() => openAddCanBo(date)} className="text-xs text-blue-600 hover:text-blue-700 font-semibold inline-flex items-center gap-1">
-                              <UserPlus size={12} /> Thêm cán bộ
+                              <UserPlus size={12} /> Thiết lập 3 vị trí
                             </button>
                           </div>
                         )}
@@ -348,12 +439,38 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Cán bộ trực</label>
-                <select className="input-field" value={form.canBoId} onChange={(e) => setForm({ ...form, canBoId: e.target.value })}>
-                  <option value="">-- Chọn cán bộ --</option>
-                  {canBoData.filter((c) => c.trangThai === 'active').map((cb) => (
-                    <option key={cb.id} value={cb.id}>{cb.hoTen} - {cb.donVi}</option>
-                  ))}
-                </select>
+                {form.kieuTruc === 'canbo' && !editId ? (
+                  <div className="space-y-2">
+                    {DAILY_LOCATIONS.map((location) => (
+                      <div key={location}>
+                        <label className="text-xs font-semibold text-slate-600 mb-1 block">{location}</label>
+                        <select
+                          className="input-field"
+                          value={form.assignments?.[location] || ''}
+                          onChange={(e) => setForm((prev) => ({
+                            ...prev,
+                            assignments: {
+                              ...(prev.assignments || {}),
+                              [location]: e.target.value,
+                            },
+                          }))}
+                        >
+                          <option value="">-- Chọn cán bộ --</option>
+                          {canBoData.filter((c) => c.trangThai === 'active').map((cb) => (
+                            <option key={cb.id} value={cb.id}>{cb.hoTen} - {cb.donVi}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <select className="input-field" value={form.canBoId} onChange={(e) => setForm({ ...form, canBoId: e.target.value })}>
+                    <option value="">-- Chọn cán bộ --</option>
+                    {canBoData.filter((c) => c.trangThai === 'active').map((cb) => (
+                      <option key={cb.id} value={cb.id}>{cb.hoTen} - {cb.donVi}</option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -371,12 +488,6 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], reloadData
                     <input type="date" className="input-field" value={form.ngay} disabled />
                   </div>
                 )}
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Vị trí</label>
-                <select className="input-field" value={form.viTri} onChange={(e) => setForm({ ...form, viTri: e.target.value })}>
-                  {viTriOptions.map((vt) => <option key={vt} value={vt}>{vt}</option>)}
-                </select>
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Ghi chú</label>

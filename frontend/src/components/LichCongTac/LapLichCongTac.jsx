@@ -48,14 +48,16 @@ const formatDisplayTime = (timeValue) => {
 
 const initialForm = {
   tieuDe: '', ngay: toDateOnly(new Date()), gioBatDau: '08:00', gioKetThuc: '10:00',
-  diaDiem: '', canBo1Id: '', canBo2Id: '', canBoTrucChiHuyId: '',
+  diaDiem: '', nguoiPhuTrachId: '',
   thanhPhanThamGia: [], bgdMemberIds: [], loai: 'hop', ghiChu: ''
 };
 
-const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], holidayData = [], reloadData }) => {
-  const canEdit = user?.role !== 'Cán bộ';
+const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], departmentData = [], holidayData = [], reloadData }) => {
+  const canCreate = Boolean(user?.role);
+  const canEdit = ['Quản trị viên', 'Quản lý'].includes(user?.role);
   const canReview = user?.backendRole === 'admin';
   const [data, setData] = useState(lichCongTacData);
+  const [officerOptions, setOfficerOptions] = useState(canBoData || []);
   const [viewMode, setViewMode] = useState('month'); // 'week' | 'month'
   const [weekOffset, setWeekOffset] = useState(0);
   const [monthOffset, setMonthOffset] = useState(0);
@@ -71,6 +73,30 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], holidayDat
   useEffect(() => {
     setData(lichCongTacData);
   }, [lichCongTacData]);
+
+  useEffect(() => {
+    setOfficerOptions(canBoData || []);
+  }, [canBoData]);
+
+  useEffect(() => {
+    const loadOfficerOptions = async () => {
+      try {
+        const res = await apiClient.officers.list(1, 500, { status: 'active', accessScope: 'system' });
+        const mapped = (res?.data || []).map((o) => ({
+          id: o.id,
+          hoTen: o.officerName || o.fullName || o.id,
+          capBac: o.officerTitle || '',
+          donVi: o.department || '',
+          vaiTro: o.role === 'leader' ? 'Lãnh đạo' : o.role === 'manager' ? 'Quản lý' : 'Cán bộ',
+        }));
+        if (mapped.length) setOfficerOptions(mapped);
+      } catch {
+        // Fallback to canBoData when fetching full system officers fails.
+      }
+    };
+
+    loadOfficerOptions();
+  }, []);
 
   const weekStart = getWeekStart(weekOffset);
   const weekDates = Array.from({ length: 7 }, (_, i) => {
@@ -128,14 +154,11 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], holidayDat
     return acc;
   }, {});
 
-  const participantUnits = Array.from(new Set(
-    canBoData
-      .map((cb) => cb.donVi)
-      .filter(Boolean)
-      .filter((dv) => /^Phòng\s|^Khoa\s/i.test(dv) || dv === 'Ban Giám đốc')
-  ));
+  const participantUnits = (departmentData || []).length
+    ? Array.from(new Set((departmentData || []).map((d) => d.name).filter(Boolean)))
+    : Array.from(new Set((officerOptions || []).map((cb) => cb.donVi).filter(Boolean)));
 
-  const banGiamDocMembers = canBoData
+  const banGiamDocMembers = officerOptions
     .filter((cb) => cb.vaiTro === 'Lãnh đạo' || cb.donVi === 'Ban Giám đốc')
     .slice(0, 4);
 
@@ -161,6 +184,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], holidayDat
     const participants = item.participants || {};
     setForm({
       ...item,
+      nguoiPhuTrachId: item.nguoiPhuTrachId || item.canBoTrucChiHuyId || '',
       thanhPhanThamGia: Array.isArray(participants.units) ? participants.units : [],
       bgdMemberIds: Array.isArray(participants.boardMembers) ? participants.boardMembers : [],
     });
@@ -170,8 +194,8 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], holidayDat
 
   const handleSave = async () => {
     if (!form.tieuDe || !form.ngay) return;
-    if (!form.canBo1Id || !form.canBo2Id || !form.canBoTrucChiHuyId) {
-      alert('Vui lòng chọn đầy đủ: Cán bộ 1, Cán bộ 2 và Cán bộ chỉ huy.');
+    if (!form.nguoiPhuTrachId) {
+      alert('Vui lòng chọn người phụ trách.');
       return;
     }
     if (!form.thanhPhanThamGia?.length) {
@@ -185,9 +209,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], holidayDat
       startTime: form.gioBatDau || null,
       endTime: form.gioKetThuc || null,
       location: form.diaDiem || '',
-      officer1Id: form.canBo1Id || null,
-      officer2Id: form.canBo2Id || null,
-      commanderOfficerId: form.canBoTrucChiHuyId || null,
+      responsibleOfficerId: form.nguoiPhuTrachId || null,
       department: (form.thanhPhanThamGia || []).join(', '),
       participants: {
         units: form.thanhPhanThamGia || [],
@@ -221,6 +243,18 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], holidayDat
     }
   };
 
+  const handleReject = async (scheduleId) => {
+    const confirmed = window.confirm('Không duyệt lịch này? Lịch sẽ bị xóa khỏi hệ thống.');
+    if (!confirmed) return;
+
+    try {
+      await apiClient.workSchedules.approve(scheduleId, 'rejected');
+      if (reloadData) await reloadData();
+    } catch (err) {
+      alert(err?.message || 'Không thể từ chối lịch công tác.');
+    }
+  };
+
   const getApprovalBadge = (status) => {
     if (status === 'pending') {
       return { label: 'Chờ duyệt', cls: 'bg-amber-100 text-amber-700 border-amber-200' };
@@ -248,7 +282,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], holidayDat
             className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'month' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
             <CalendarDays size={14} className="inline mr-1.5" />Lịch tháng
           </button>
-          {canEdit && (
+          {canCreate && (
             <button onClick={() => openAdd(3)} className="btn-primary">
               <Plus size={16} /> Thêm lịch
             </button>
@@ -334,7 +368,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], holidayDat
                   return (
                     <div key={dayIdx}
                       className={`border-r border-slate-100 last:border-r-0 p-1 relative group cursor-pointer ${isToday ? 'bg-blue-50/30' : 'hover:bg-slate-50'} transition-colors`}
-                      onClick={() => canEdit && !events.length && openAdd(dayIdx)}>
+                      onClick={() => canCreate && !events.length && openAdd(dayIdx)}>
                       {events.map(evt => {
                         const colorInfo = LOAI_LICH_COLORS[evt.loai] || LOAI_LICH_COLORS.hop;
                         const approval = getApprovalBadge(evt.trangThaiDuyet);
@@ -350,13 +384,22 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], holidayDat
                             </div>
                             <div className="text-[9px] opacity-70 mt-0.5">{formatDisplayTime(evt.gioBatDau)}–{formatDisplayTime(evt.gioKetThuc)}</div>
                             {canReview && evt.trangThaiDuyet === 'pending' && (
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); handleApprove(evt.id); }}
-                                className="mt-1 inline-flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700"
-                              >
-                                Duyệt
-                              </button>
+                              <div className="mt-1 flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handleApprove(evt.id); }}
+                                  className="inline-flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700"
+                                >
+                                  Duyệt
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handleReject(evt.id); }}
+                                  className="inline-flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded-md bg-rose-600 text-white hover:bg-rose-700"
+                                >
+                                  Không duyệt
+                                </button>
+                              </div>
                             )}
                           </div>
                         );
@@ -405,7 +448,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], holidayDat
                         : 'border border-slate-200 bg-white hover:shadow-md hover:border-slate-300'
                     }`}
                     onClick={() => {
-                      if (canEdit) {
+                      if (canCreate) {
                         setForm({ ...initialForm, ngay: dateStr });
                         setEditId(null);
                         setShowModal(true);
@@ -449,13 +492,22 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], holidayDat
                               </span>
                             </div>
                             {canReview && evt.trangThaiDuyet === 'pending' && (
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); handleApprove(evt.id); }}
-                                className="mt-1 inline-flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700"
-                              >
-                                Duyệt
-                              </button>
+                              <div className="mt-1 flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handleApprove(evt.id); }}
+                                  className="inline-flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700"
+                                >
+                                  Duyệt
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handleReject(evt.id); }}
+                                  className="inline-flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded-md bg-rose-600 text-white hover:bg-rose-700"
+                                >
+                                  Không duyệt
+                                </button>
+                              </div>
                             )}
                           </div>
                         );
@@ -470,7 +522,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], holidayDat
                     )}
 
                     {/* Add button indicator */}
-                    {canEdit && dayEvents.length === 0 && (
+                    {canCreate && dayEvents.length === 0 && (
                       <div className="mt-1 text-center">
                         <div className="text-[10px] text-slate-300 group-hover:text-blue-400 transition-colors">Nhấn để thêm</div>
                       </div>
@@ -527,26 +579,12 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], holidayDat
                   {Object.entries(LOAI_LICH_COLORS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Cán bộ 1 <span className="text-red-500">*</span></label>
-                  <select className="input-field" value={form.canBo1Id || ''} onChange={e => setForm({...form, canBo1Id: e.target.value})}>
+                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Người phụ trách <span className="text-red-500">*</span></label>
+                  <select className="input-field" value={form.nguoiPhuTrachId || ''} onChange={e => setForm({...form, nguoiPhuTrachId: e.target.value})}>
                     <option value="">-- Chọn --</option>
-                    {canBoData.map(cb => <option key={cb.id} value={cb.id}>{[cb.capBac, cb.hoTen].filter(Boolean).join(' ')}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Cán bộ 2 <span className="text-red-500">*</span></label>
-                  <select className="input-field" value={form.canBo2Id || ''} onChange={e => setForm({...form, canBo2Id: e.target.value})}>
-                    <option value="">-- Chọn --</option>
-                    {canBoData.map(cb => <option key={cb.id} value={cb.id}>{[cb.capBac, cb.hoTen].filter(Boolean).join(' ')}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Cán bộ chỉ huy <span className="text-red-500">*</span></label>
-                  <select className="input-field" value={form.canBoTrucChiHuyId || ''} onChange={e => setForm({...form, canBoTrucChiHuyId: e.target.value})}>
-                    <option value="">-- Chọn --</option>
-                    {canBoData.map(cb => <option key={cb.id} value={cb.id}>{[cb.capBac, cb.hoTen].filter(Boolean).join(' ')}</option>)}
+                    {officerOptions.map(cb => <option key={cb.id} value={cb.id}>{[cb.capBac, cb.hoTen].filter(Boolean).join(' ')}</option>)}
                   </select>
                 </div>
               </div>

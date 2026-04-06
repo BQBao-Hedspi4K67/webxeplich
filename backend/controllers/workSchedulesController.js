@@ -30,7 +30,30 @@ const ensureWorkScheduleApprovalSchema = async (connection) => {
     await connection.execute('ALTER TABLE work_schedules ADD COLUMN approvedAt TIMESTAMP NULL AFTER approvedByUserId');
   }
 
+  if (!colNames.has('departmentId')) {
+    await connection.execute('ALTER TABLE work_schedules ADD COLUMN departmentId INT NULL AFTER department');
+    await connection.execute('CREATE INDEX idx_department_id ON work_schedules (departmentId)');
+  }
+
   workScheduleApprovalSchemaEnsured = true;
+};
+
+const resolveDepartmentRef = async (connection, { departmentId, department }) => {
+  if (departmentId) {
+    const [rows] = await connection.execute(
+      'SELECT id, name FROM departments WHERE id = ? LIMIT 1',
+      [departmentId]
+    );
+    return rows[0] || null;
+  }
+
+  if (!department) return null;
+
+  const [rows] = await connection.execute(
+    'SELECT id, name FROM departments WHERE name = ? LIMIT 1',
+    [department]
+  );
+  return rows[0] || null;
 };
 
 const buildQuery = (filters = {}, options = {}) => {
@@ -47,9 +70,7 @@ const buildQuery = (filters = {}, options = {}) => {
   const where = [];
   const params = [];
 
-  if (role !== 'admin' && role !== 'manager') {
-    where.push("ws.approvalStatus = 'approved'");
-  }
+  void role;
 
   if (search) {
     const q = `%${search}%`;
@@ -91,12 +112,14 @@ const buildQuery = (filters = {}, options = {}) => {
 const scheduleSelect = `
   SELECT
     ws.*,
+    d.name AS departmentName,
     approver.fullName AS approvedByName,
     ro.fullName AS responsibleOfficerName,
     o1.fullName AS officer1Name,
     o2.fullName AS officer2Name,
     cmd.fullName AS commanderOfficerName
   FROM work_schedules ws
+  LEFT JOIN departments d ON d.id = ws.departmentId
   LEFT JOIN users approver ON approver.id = ws.approvedByUserId
   LEFT JOIN officers ro ON ro.id = ws.responsibleOfficerId
   LEFT JOIN officers o1 ON o1.id = ws.officer1Id
@@ -209,12 +232,12 @@ export const createWorkSchedule = async (req, res, next) => {
       startTime,
       endTime,
       location,
+      departmentId = null,
       department,
       type,
       weekNo,
       notes = '',
-      officer1Id = null,
-      officer2Id = null,
+      responsibleOfficerId = null,
       commanderOfficerId = null,
       participants = null,
     } = req.body;
@@ -235,10 +258,12 @@ export const createWorkSchedule = async (req, res, next) => {
       });
     }
 
-    if (!officer1Id || !officer2Id || !commanderOfficerId) {
+    const resolvedResponsibleOfficerId = responsibleOfficerId || commanderOfficerId || null;
+
+    if (!resolvedResponsibleOfficerId) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required officers: officer1Id, officer2Id, commanderOfficerId',
+        error: 'Missing required field: responsibleOfficerId',
         code: 'VALIDATION_ERROR',
       });
     }
@@ -255,16 +280,19 @@ export const createWorkSchedule = async (req, res, next) => {
       );
       const nextNum = (maxIdRows[0].maxNum || 0) + 1;
       const newId = `LCT${String(nextNum).padStart(3, '0')}`;
-      const approvalStatus = req.user?.role === 'admin' ? 'approved' : 'pending';
-      const approvedByUserId = approvalStatus === 'approved' ? req.user?.id || null : null;
-      const approvedAt = approvalStatus === 'approved' ? new Date() : null;
+      const approvalStatus = 'pending';
+      const approvedByUserId = null;
+      const approvedAt = null;
+      const departmentRef = departmentId
+        ? await resolveDepartmentRef(connection, { departmentId, department })
+        : null;
 
       await connection.execute(
         `INSERT INTO work_schedules (
-          id, title, date, startTime, endTime, location, department, type, weekNo, notes,
+          id, title, date, startTime, endTime, location, department, departmentId, type, weekNo, notes,
           responsibleOfficerId, officer1Id, officer2Id, commanderOfficerId,
           participants, approvalStatus, approvedByUserId, approvedAt, createdByUserId
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )`,
         [
           newId,
           title,
@@ -272,14 +300,15 @@ export const createWorkSchedule = async (req, res, next) => {
           startTime || null,
           endTime || null,
           location || '',
-          department || '',
+          departmentRef?.name || department || '',
+          departmentRef?.id || null,
           type,
           weekNo || null,
           notes,
-          commanderOfficerId || null,
-          officer1Id || null,
-          officer2Id || null,
-          commanderOfficerId || null,
+          resolvedResponsibleOfficerId,
+          null,
+          null,
+          null,
           participantsJson,
           approvalStatus,
           approvedByUserId,
@@ -301,20 +330,16 @@ export const createWorkSchedule = async (req, res, next) => {
           targetRole: 'admin',
         });
       } else {
-        const targetOfficerIds = [officer1Id, officer2Id, commanderOfficerId].filter(Boolean);
-
-        for (const officerId of targetOfficerIds) {
-          const targetUserId = await resolveUserIdByOfficerId(connection, officerId);
-          await createUserNotification(connection, {
-            title: 'Ban duoc phan cong lich cong tac moi',
-            content: `${title} (${date})`,
-            type: 'info',
-            module: 'lichcongtac',
-            entityType: 'work_schedule',
-            entityId: newId,
-            targetUserId,
-          });
-        }
+        const targetUserId = await resolveUserIdByOfficerId(connection, resolvedResponsibleOfficerId);
+        await createUserNotification(connection, {
+          title: 'Ban duoc phan cong lich cong tac moi',
+          content: `${title} (${date})`,
+          type: 'info',
+          module: 'lichcongtac',
+          entityType: 'work_schedule',
+          entityId: newId,
+          targetUserId,
+        });
       }
 
       await logActivity({
@@ -373,15 +398,19 @@ export const approveWorkSchedule = async (req, res, next) => {
 
       const schedule = rows[0];
       const approvalStatus = status;
-      const approvedByUserId = status === 'approved' ? req.user?.id || null : null;
-      const approvedAt = status === 'approved' ? new Date() : null;
 
-      await connection.execute(
-        `UPDATE work_schedules
-         SET approvalStatus = ?, approvedByUserId = ?, approvedAt = ?
-         WHERE id = ?`,
-        [approvalStatus, approvedByUserId, approvedAt, id]
-      );
+      if (approvalStatus === 'approved') {
+        const approvedByUserId = req.user?.id || null;
+        const approvedAt = new Date();
+        await connection.execute(
+          `UPDATE work_schedules
+           SET approvalStatus = ?, approvedByUserId = ?, approvedAt = ?
+           WHERE id = ?`,
+          [approvalStatus, approvedByUserId, approvedAt, id]
+        );
+      } else {
+        await connection.execute('DELETE FROM work_schedules WHERE id = ?', [id]);
+      }
 
       await ensureNotificationTargetingSchema(connection);
 
@@ -403,7 +432,7 @@ export const approveWorkSchedule = async (req, res, next) => {
 
       for (const targetUserId of notifiedUserIds) {
         await createUserNotification(connection, {
-          title: approvalStatus === 'approved' ? 'Lich cong tac da duoc duyet' : 'Lich cong tac bi tu choi',
+          title: approvalStatus === 'approved' ? 'Lich cong tac da duoc duyet' : 'Lich cong tac khong duoc duyet va da bi xoa',
           content: `${schedule.title} (${schedule.date})`,
           type: approvalStatus === 'approved' ? 'success' : 'warning',
           module: 'lichcongtac',
@@ -426,7 +455,7 @@ export const approveWorkSchedule = async (req, res, next) => {
 
       res.json({
         success: true,
-        message: approvalStatus === 'approved' ? 'Work schedule approved successfully' : 'Work schedule rejected successfully',
+        message: approvalStatus === 'approved' ? 'Work schedule approved successfully' : 'Work schedule rejected and deleted successfully',
       });
     } finally {
       connection.release();
@@ -445,12 +474,12 @@ export const updateWorkSchedule = async (req, res, next) => {
       startTime,
       endTime,
       location,
+      departmentId,
       department,
       type,
       weekNo,
       notes,
-      officer1Id,
-      officer2Id,
+      responsibleOfficerId,
       commanderOfficerId,
       participants,
     } = req.body;
@@ -491,15 +520,29 @@ export const updateWorkSchedule = async (req, res, next) => {
       if (startTime !== undefined) addField('startTime', startTime || null);
       if (endTime !== undefined) addField('endTime', endTime || null);
       if (location !== undefined) addField('location', location || '');
-      if (department !== undefined) addField('department', department || '');
+      if (department !== undefined || departmentId !== undefined) {
+        const departmentRef = departmentId
+          ? await resolveDepartmentRef(connection, { departmentId, department })
+          : null;
+        if (departmentRef) {
+          addField('department', departmentRef.name);
+          addField('departmentId', departmentRef.id);
+        } else {
+          addField('department', department || '');
+          addField('departmentId', null);
+        }
+      }
       if (type !== undefined) addField('type', type);
       if (weekNo !== undefined) addField('weekNo', weekNo || null);
       if (notes !== undefined) addField('notes', notes || '');
-      if (officer1Id !== undefined) addField('officer1Id', officer1Id || null);
-      if (officer2Id !== undefined) addField('officer2Id', officer2Id || null);
-      if (commanderOfficerId !== undefined) addField('commanderOfficerId', commanderOfficerId || null);
+      if (responsibleOfficerId !== undefined) addField('responsibleOfficerId', responsibleOfficerId || null);
+      if (commanderOfficerId !== undefined && responsibleOfficerId === undefined) addField('responsibleOfficerId', commanderOfficerId || null);
       if (participants !== undefined) addField('participants', participants ? JSON.stringify(participants) : null);
-      if (commanderOfficerId !== undefined) addField('responsibleOfficerId', commanderOfficerId || null);
+      if (responsibleOfficerId !== undefined || commanderOfficerId !== undefined) {
+        addField('officer1Id', null);
+        addField('officer2Id', null);
+        addField('commanderOfficerId', null);
+      }
 
       if (req.user?.role !== 'admin' && currentStatus === 'approved') {
         addField('approvalStatus', 'pending');

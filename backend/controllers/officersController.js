@@ -35,6 +35,54 @@ const hasOfficersUserIdColumn = async (connection) => {
   return rows.length > 0;
 };
 
+const hasOfficersDepartmentIdColumn = async (connection) => {
+  const [rows] = await connection.execute("SHOW COLUMNS FROM officers LIKE 'departmentId'");
+  return rows.length > 0;
+};
+
+const resolveDepartmentRef = async (connection, { departmentId, department }) => {
+  if (departmentId) {
+    const [rows] = await connection.execute(
+      'SELECT id, name, departmentType FROM departments WHERE id = ? AND isActive = 1 LIMIT 1',
+      [departmentId]
+    );
+    if (!rows.length) return null;
+    return rows[0];
+  }
+
+  if (!department) return null;
+
+  const [rows] = await connection.execute(
+    'SELECT id, name, departmentType FROM departments WHERE name = ? AND isActive = 1 LIMIT 1',
+    [department]
+  );
+  if (!rows.length) return null;
+  return rows[0];
+};
+
+const resolveRequesterOfficer = async (connection, reqUser = {}) => {
+  const hasUserIdColumn = await hasOfficersUserIdColumn(connection);
+  const hasDepartmentIdColumn = await hasOfficersDepartmentIdColumn(connection);
+  const selectDepartment = hasDepartmentIdColumn ? 'departmentId, department,' : 'NULL AS departmentId, department,';
+
+  if (hasUserIdColumn) {
+    const [rows] = await connection.execute(
+      `SELECT id, ${selectDepartment} role FROM officers WHERE userId = ? LIMIT 1`,
+      [reqUser.id]
+    );
+    if (rows[0]) return rows[0];
+  }
+
+  const [rows] = await connection.execute(
+    `SELECT id, ${selectDepartment} role
+     FROM officers
+     WHERE (email = ? AND ? <> '') OR fullName = ?
+     LIMIT 1`,
+    [reqUser.email || '', reqUser.email || '', reqUser.fullName || '']
+  );
+  return rows[0] || null;
+};
+
 const syncUsersToOfficers = async (connection) => {
   const hasUserIdColumn = await hasOfficersUserIdColumn(connection);
 
@@ -108,17 +156,50 @@ const syncUsersToOfficers = async (connection) => {
 // Get all officers with pagination and filters
 export const getOfficers = async (req, res, next) => {
   try {
-    const { page = 1, limit = 10, search = '', role = '', status = '' } = req.query;
+    const { page = 1, limit = 10, search = '', role = '', status = '', accessScope = '' } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     const connection = await pool.getConnection();
 
     try {
       await syncUsersToOfficers(connection);
+      const requesterOfficer = await resolveRequesterOfficer(connection, req.user || {});
+      const hasDepartmentIdColumn = await hasOfficersDepartmentIdColumn(connection);
 
       // Build WHERE clause
       let whereConditions = [];
       let params = [];
+
+      const isSystemScope = String(accessScope).toLowerCase() === 'system';
+
+      if (!isSystemScope && req.user?.role === 'manager') {
+        if (!requesterOfficer?.department) {
+          return res.json({
+            success: true,
+            data: [],
+            pagination: { total: 0, page: parseInt(page), limit: parseInt(limit), pages: 0 },
+          });
+        }
+        if (hasDepartmentIdColumn && requesterOfficer.departmentId) {
+          whereConditions.push('departmentId = ?');
+          params.push(requesterOfficer.departmentId);
+        } else {
+          whereConditions.push('department = ?');
+          params.push(requesterOfficer.department);
+        }
+      }
+
+      if (!isSystemScope && req.user?.role === 'officer') {
+        if (!requesterOfficer?.id) {
+          return res.json({
+            success: true,
+            data: [],
+            pagination: { total: 0, page: parseInt(page), limit: parseInt(limit), pages: 0 },
+          });
+        }
+        whereConditions.push('id = ?');
+        params.push(requesterOfficer.id);
+      }
 
       if (search) {
         whereConditions.push("(fullName LIKE ? OR id LIKE ? OR department LIKE ?)");
@@ -218,6 +299,7 @@ export const createOfficer = async (req, res, next) => {
       officerTitle,
       officerName,
       position,
+      departmentId = null,
       department,
       phone,
       email,
@@ -227,10 +309,10 @@ export const createOfficer = async (req, res, next) => {
     } = req.body;
 
     // Validation
-    if (!fullName || !position || !department) {
+    if (!fullName || !position || (!department && !departmentId)) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required fields: fullName, position, department',
+        error: 'Missing required fields: fullName, position, department/departmentId',
         code: 'VALIDATION_ERROR',
       });
     }
@@ -246,6 +328,44 @@ export const createOfficer = async (req, res, next) => {
     const connection = await pool.getConnection();
 
     try {
+      const requesterOfficer = await resolveRequesterOfficer(connection, req.user || {});
+      const hasDepartmentIdColumn = await hasOfficersDepartmentIdColumn(connection);
+      const departmentRef = await resolveDepartmentRef(connection, { departmentId, department });
+
+      if (!departmentRef) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid department selection',
+          code: 'INVALID_DEPARTMENT',
+        });
+      }
+
+      if (req.user?.role === 'manager') {
+        if (!requesterOfficer?.department && !requesterOfficer?.departmentId) {
+          return res.status(403).json({ success: false, error: 'Insufficient permissions', code: 'FORBIDDEN' });
+        }
+
+        if (role !== 'officer') {
+          return res.status(403).json({
+            success: false,
+            error: 'Manager can only create officers in their own department',
+            code: 'FORBIDDEN',
+          });
+        }
+
+        const managerDeptMatched = hasDepartmentIdColumn && requesterOfficer.departmentId
+          ? Number(departmentRef.id) === Number(requesterOfficer.departmentId)
+          : departmentRef.name === requesterOfficer.department;
+
+        if (!managerDeptMatched) {
+          return res.status(403).json({
+            success: false,
+            error: 'Manager can only create officers in their own department',
+            code: 'FORBIDDEN',
+          });
+        }
+      }
+
       // Generate new ID (CB + sequential number)
       const [maxIdRows] = await connection.execute(
         "SELECT MAX(CAST(SUBSTRING(id, 3) AS UNSIGNED)) as maxNum FROM officers WHERE id LIKE 'CB%'"
@@ -258,12 +378,48 @@ export const createOfficer = async (req, res, next) => {
       const resolvedTitle = officerTitle !== undefined ? officerTitle : split.officerTitle;
       const resolvedName = officerName !== undefined ? officerName : split.officerName;
 
-      await connection.execute(
-        `INSERT INTO officers
-         (id, fullName, officerTitle, officerName, position, department, phone, email, role, status, studyUntil)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [newId, fullName, resolvedTitle, resolvedName, position, department, phone || null, email || null, role, status, status === 'studying' ? studyUntil : null]
-      );
+      if (hasDepartmentIdColumn) {
+        await connection.execute(
+          `INSERT INTO officers
+           (id, fullName, officerTitle, officerName, position, departmentId, department, departmentGroup, phone, email, role, status, studyUntil)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            newId,
+            fullName,
+            resolvedTitle,
+            resolvedName,
+            position,
+            departmentRef.id,
+            departmentRef.name,
+            departmentRef.departmentType,
+            phone || null,
+            email || null,
+            role,
+            status,
+            status === 'studying' ? studyUntil : null,
+          ]
+        );
+      } else {
+        await connection.execute(
+          `INSERT INTO officers
+           (id, fullName, officerTitle, officerName, position, department, departmentGroup, phone, email, role, status, studyUntil)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            newId,
+            fullName,
+            resolvedTitle,
+            resolvedName,
+            position,
+            departmentRef.name,
+            departmentRef.departmentType,
+            phone || null,
+            email || null,
+            role,
+            status,
+            status === 'studying' ? studyUntil : null,
+          ]
+        );
+      }
 
       res.status(201).json({
         success: true,
@@ -271,7 +427,8 @@ export const createOfficer = async (req, res, next) => {
           id: newId,
           fullName,
           position,
-          department,
+          departmentId: departmentRef.id,
+          department: departmentRef.name,
           phone: phone || null,
           email: email || null,
           role,
@@ -305,7 +462,7 @@ export const createOfficer = async (req, res, next) => {
 export const updateOfficer = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { fullName, officerTitle, officerName, position, department, phone, email, role, status, studyUntil } = req.body;
+    const { fullName, officerTitle, officerName, position, departmentId, department, phone, email, role, status, studyUntil } = req.body;
 
     if (!fullName && !officerTitle && !officerName && !position && !department && !role && !status && !phone && !email && studyUntil === undefined) {
       return res.status(400).json({
@@ -318,9 +475,25 @@ export const updateOfficer = async (req, res, next) => {
     const connection = await pool.getConnection();
 
     try {
+      const requesterOfficer = await resolveRequesterOfficer(connection, req.user || {});
+      const hasDepartmentIdColumn = await hasOfficersDepartmentIdColumn(connection);
+      const departmentRef = (department !== undefined || departmentId !== undefined)
+        ? await resolveDepartmentRef(connection, { departmentId, department })
+        : null;
+
+      if ((department !== undefined || departmentId !== undefined) && !departmentRef) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid department selection',
+          code: 'INVALID_DEPARTMENT',
+        });
+      }
+
       // Check if exists
       const [check] = await connection.execute(
-        'SELECT id FROM officers WHERE id = ?',
+        hasDepartmentIdColumn
+          ? 'SELECT id, departmentId, department, role, status FROM officers WHERE id = ?'
+          : 'SELECT id, NULL AS departmentId, department, role, status FROM officers WHERE id = ?',
         [id]
       );
 
@@ -330,6 +503,35 @@ export const updateOfficer = async (req, res, next) => {
           error: 'Officer not found',
           code: 'OFFICER_NOT_FOUND',
         });
+      }
+
+      if (req.user?.role === 'manager') {
+        const target = check[0];
+        const sameDepartment = hasDepartmentIdColumn && requesterOfficer?.departmentId
+          ? Number(target.departmentId) === Number(requesterOfficer.departmentId)
+          : target.department === requesterOfficer?.department;
+
+        if ((!requesterOfficer?.department && !requesterOfficer?.departmentId) || !sameDepartment || target.role === 'leader' || target.role === 'manager') {
+          return res.status(403).json({
+            success: false,
+            error: 'Manager can only update officers in their own department',
+            code: 'FORBIDDEN',
+          });
+        }
+
+        const movingDepartment = departmentRef
+          ? (hasDepartmentIdColumn && requesterOfficer?.departmentId
+            ? Number(departmentRef.id) !== Number(requesterOfficer.departmentId)
+            : departmentRef.name !== requesterOfficer.department)
+          : false;
+
+        if (movingDepartment || (role !== undefined && role !== 'officer')) {
+          return res.status(403).json({
+            success: false,
+            error: 'Manager can only keep officers within their own department',
+            code: 'FORBIDDEN',
+          });
+        }
       }
 
       // Build update query
@@ -344,9 +546,15 @@ export const updateOfficer = async (req, res, next) => {
         updateFields.push('position = ?');
         params.push(position);
       }
-      if (department !== undefined) {
+      if (departmentRef) {
+        if (hasDepartmentIdColumn) {
+          updateFields.push('departmentId = ?');
+          params.push(departmentRef.id);
+        }
         updateFields.push('department = ?');
-        params.push(department);
+        params.push(departmentRef.name);
+        updateFields.push('departmentGroup = ?');
+        params.push(departmentRef.departmentType);
       }
       if (phone !== undefined) {
         updateFields.push('phone = ?');
@@ -424,9 +632,14 @@ export const deleteOfficer = async (req, res, next) => {
     const connection = await pool.getConnection();
 
     try {
+      const requesterOfficer = await resolveRequesterOfficer(connection, req.user || {});
+      const hasDepartmentIdColumn = await hasOfficersDepartmentIdColumn(connection);
+
       // Check if exists
       const [check] = await connection.execute(
-        'SELECT id, fullName, email, role FROM officers WHERE id = ?',
+        hasDepartmentIdColumn
+          ? 'SELECT id, fullName, email, role, department, departmentId FROM officers WHERE id = ?'
+          : 'SELECT id, fullName, email, role, department, NULL AS departmentId FROM officers WHERE id = ?',
         [id]
       );
 
@@ -436,6 +649,21 @@ export const deleteOfficer = async (req, res, next) => {
           error: 'Officer not found',
           code: 'OFFICER_NOT_FOUND',
         });
+      }
+
+      if (req.user?.role === 'manager') {
+        const target = check[0];
+        const sameDepartment = hasDepartmentIdColumn && requesterOfficer?.departmentId
+          ? Number(target.departmentId) === Number(requesterOfficer.departmentId)
+          : target.department === requesterOfficer?.department;
+
+        if ((!requesterOfficer?.department && !requesterOfficer?.departmentId) || !sameDepartment || target.role !== 'officer') {
+          return res.status(403).json({
+            success: false,
+            error: 'Manager can only delete officers in their own department',
+            code: 'FORBIDDEN',
+          });
+        }
       }
 
       await connection.beginTransaction();

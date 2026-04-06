@@ -157,8 +157,8 @@ const ROLE_BADGE = {
 const TaiKhoan = ({ user, reloadData, departmentData = [] }) => {
   const canProvisionUser = ['Quản trị viên', 'Quản lý'].includes(user?.role);
   const accountDepartmentOptions = (departmentData || []).length
-    ? departmentData.map((d) => d.name)
-    : UNIT_OPTIONS;
+    ? departmentData.map((d) => ({ id: d.id, name: d.name }))
+    : UNIT_OPTIONS.map((name, idx) => ({ id: idx + 1, name }));
   const [createForm, setCreateForm] = useState({
     username: '',
     password: '',
@@ -166,6 +166,7 @@ const TaiKhoan = ({ user, reloadData, departmentData = [] }) => {
     email: '',
     phone: '',
     position: '',
+    departmentId: '',
     department: '',
     role: 'officer',
     status: 'active',
@@ -188,7 +189,7 @@ const TaiKhoan = ({ user, reloadData, departmentData = [] }) => {
     e.preventDefault();
     setCreateResult({ type: '', message: '' });
 
-    if (!createForm.username || !createForm.password || !createForm.fullName || !createForm.department) {
+    if (!createForm.username || !createForm.password || !createForm.fullName || !createForm.departmentId) {
       setCreateResult({
         type: 'error',
         message: 'Vui lòng nhập đầy đủ: tên đăng nhập, mật khẩu, họ tên, đơn vị.',
@@ -205,6 +206,7 @@ const TaiKhoan = ({ user, reloadData, departmentData = [] }) => {
         email: createForm.email.trim() || null,
         phone: createForm.phone.trim() || null,
         position: createForm.position.trim() || null,
+        departmentId: Number(createForm.departmentId),
         department: createForm.department,
         role: createForm.role,
         status: createForm.status,
@@ -223,6 +225,7 @@ const TaiKhoan = ({ user, reloadData, departmentData = [] }) => {
         email: '',
         phone: '',
         position: '',
+        departmentId: '',
         department: '',
         role: 'officer',
         status: 'active',
@@ -348,12 +351,19 @@ const TaiKhoan = ({ user, reloadData, departmentData = [] }) => {
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đơn vị <span className="text-red-500">*</span></label>
                 <select
                   className="input-field"
-                  value={createForm.department}
-                  onChange={(e) => setCreateForm((prev) => ({ ...prev, department: e.target.value }))}
+                  value={createForm.departmentId}
+                  onChange={(e) => {
+                    const selected = accountDepartmentOptions.find((x) => String(x.id) === e.target.value);
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      departmentId: e.target.value,
+                      department: selected?.name || '',
+                    }));
+                  }}
                 >
                   <option value="">-- Chọn đơn vị --</option>
                   {accountDepartmentOptions.map((unit) => (
-                    <option key={unit} value={unit}>{unit}</option>
+                    <option key={unit.id} value={unit.id}>{unit.name}</option>
                   ))}
                 </select>
               </div>
@@ -416,7 +426,7 @@ const PAGE_COMPONENTS = {
 const PAGE_ACCESS = {
   'Quản trị viên': ['dashboard', 'canbo', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ngayle', 'phongban', 'ykien', 'quytrinh', 'taikhoan'],
   'Quản lý': ['dashboard', 'canbo', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ngayle', 'ykien', 'quytrinh', 'taikhoan'],
-  'Cán bộ': ['dashboard', 'canbo', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ykien', 'quytrinh'],
+  'Cán bộ': ['dashboard', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ykien', 'quytrinh'],
 };
 
 function App() {
@@ -456,6 +466,7 @@ function App() {
           capBac: o.officerTitle || '',
           hoTenDayDu: o.fullName,
           chucVu: o.position || '',
+          donViId: o.departmentId || null,
           donVi: o.department || '',
           soDienThoai: o.phone || '',
           email: o.email || '',
@@ -491,7 +502,8 @@ function App() {
         canBo2Id: w.officer2Id || '',
         canBoTrucChiHuy: w.commanderOfficerName || '',
         canBoTrucChiHuyId: w.commanderOfficerId || '',
-        donVi: w.department || '',
+        donVi: w.departmentName || w.department || '',
+        donViId: w.departmentId || null,
         trangThaiDuyet: w.approvalStatus || 'approved',
         nguoiDuyet: w.approvedByName || '',
         duyetLuc: w.approvedAt || '',
@@ -524,6 +536,7 @@ function App() {
         gioKetThuc: toTimeOnly(d.endTime),
         viTri: d.location || '',
         donVi: d.department || '',
+        donViId: d.departmentId || null,
         ghiChu: d.notes || '',
       }));
 
@@ -554,6 +567,10 @@ function App() {
         id: d.id,
         name: d.name,
         departmentType: d.departmentType,
+        headOfficerId: d.headOfficerId || null,
+        headOfficerName: d.headOfficerName || '',
+        managerCount: Number(d.managerCount || 0),
+        officerCount: Number(d.officerCount || 0),
       }));
 
       setCanBoData(mappedOfficers);
@@ -599,6 +616,7 @@ function App() {
           avatar: profile.avatar,
           position: profile.position || '',
           department: profile.department || '',
+          departmentId: profile.departmentId || null,
         });
 
         const loaded = await loadData();
@@ -631,6 +649,7 @@ function App() {
       avatar: userData.avatar,
       position: userData.position || '',
       department: userData.department || '',
+      departmentId: userData.departmentId || null,
     });
     setActivePage('dashboard');
     const loaded = await loadData();

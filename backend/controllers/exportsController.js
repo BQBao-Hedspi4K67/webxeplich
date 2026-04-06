@@ -80,6 +80,55 @@ const formatWorkResponsible = (row) => {
   return entries.map(([label, value]) => `${label}: ${value}`).join(' | ');
 };
 
+const toDateOnly = (value) => String(value || '').slice(0, 10);
+
+const formatDateVN = (dateValue) => {
+  const [y, m, d] = toDateOnly(dateValue).split('-');
+  if (!y || !m || !d) return toDateOnly(dateValue);
+  return `${d}/${m}/${y}`;
+};
+
+const WEEKDAY_LABELS = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+
+const getWeekdayLabel = (dateValue) => {
+  const dt = new Date(`${toDateOnly(dateValue)}T00:00:00`);
+  if (Number.isNaN(dt.getTime())) return '';
+  return WEEKDAY_LABELS[dt.getDay()] || '';
+};
+
+const getScopeBounds = ({ scope, weekNo, month, year }) => {
+  if (scope === 'week' && weekNo) {
+    return getIsoWeekRange(weekNo, year);
+  }
+
+  if (scope === 'month' && month) {
+    const [y, m] = String(month).split('-').map(Number);
+    if (!y || !m) return null;
+    const start = new Date(Date.UTC(y, m - 1, 1));
+    const end = new Date(Date.UTC(y, m, 0));
+    return {
+      startDate: start.toISOString().slice(0, 10),
+      endDate: end.toISOString().slice(0, 10),
+    };
+  }
+
+  return null;
+};
+
+const getDateListByBounds = (bounds) => {
+  if (!bounds?.startDate || !bounds?.endDate) return [];
+  const out = [];
+  const cursor = new Date(`${bounds.startDate}T00:00:00Z`);
+  const end = new Date(`${bounds.endDate}T00:00:00Z`);
+
+  while (cursor <= end) {
+    out.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  return out;
+};
+
 const buildUnifiedRows = ({ workRows, dutyRows }) => {
   const work = (workRows || []).map((row) => ({
     date: row.date,
@@ -102,7 +151,199 @@ const buildUnifiedRows = ({ workRows, dutyRows }) => {
 };
 
 const shouldShowOnlyApprovedWorkSchedules = (role) => role !== 'admin' && role !== 'manager';
-const writePdf = (res, fileName, rows, title) => {
+
+const drawPdfTopHeader = (doc, selectedFont, { title, bounds }) => {
+  const leftX = doc.page.margins.left;
+  const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const rightBoxWidth = 150;
+  const topY = doc.page.margins.top;
+
+  if (selectedFont) {
+    doc.font(selectedFont);
+  }
+
+  doc.fontSize(14).text('BỘ CÔNG AN', leftX, topY + 2, { width: 120, align: 'center' });
+  doc.fontSize(12).text('T07', leftX, topY + 25, { width: 120, align: 'center', underline: true });
+
+  const centerX = leftX + 120;
+  const centerWidth = contentWidth - 120 - rightBoxWidth;
+  doc.fontSize(20).text(title, centerX, topY + 5, { width: centerWidth, align: 'center' });
+
+  const rangeText = bounds
+    ? `(Từ ngày ${formatDateVN(bounds.startDate)} đến hết ngày ${formatDateVN(bounds.endDate)})`
+    : '(Theo phạm vi được chọn)';
+  // Keep this line full-width so the end date is never clipped by the right update box.
+  doc.fontSize(13).text(rangeText, leftX, topY + 42, { width: contentWidth, align: 'center' });
+
+  const rightX = leftX + contentWidth - rightBoxWidth;
+  doc.rect(rightX, topY, rightBoxWidth, 28).stroke('#111827');
+  doc.fontSize(10).text(`Cập nhật ${new Date().toLocaleDateString('vi-VN')}`, rightX + 6, topY + 8, {
+    width: rightBoxWidth - 12,
+    align: 'center',
+  });
+
+  doc.y = topY + 68;
+};
+
+const drawTableRow = (doc, y, widths, cells, { isHeader = false, minHeight = 24 } = {}) => {
+  const startX = doc.page.margins.left;
+  const padding = 4;
+  const fontSize = isHeader ? 10 : 9;
+  doc.fontSize(fontSize);
+
+  const textHeights = cells.map((cell, idx) => doc.heightOfString(String(cell || ''), {
+    width: widths[idx] - (padding * 2),
+    align: 'left',
+  }));
+
+  const rowHeight = Math.max(minHeight, ...textHeights.map((h) => h + (padding * 2)));
+  let x = startX;
+
+  for (let i = 0; i < cells.length; i += 1) {
+    if (isHeader) {
+      doc.rect(x, y, widths[i], rowHeight).fillAndStroke('#f3f4f6', '#1f2937');
+      doc.fillColor('#111827');
+    } else {
+      doc.rect(x, y, widths[i], rowHeight).stroke('#9ca3af');
+      doc.fillColor('#111827');
+    }
+
+    doc.text(String(cells[i] || ''), x + padding, y + padding, {
+      width: widths[i] - (padding * 2),
+      align: i === 0 ? 'center' : 'left',
+    });
+    x += widths[i];
+  }
+
+  return y + rowHeight;
+};
+
+const ensurePageSpace = (doc, y, needed, selectedFont) => {
+  const bottom = doc.page.height - doc.page.margins.bottom;
+  if (y + needed <= bottom) return y;
+  doc.addPage();
+  if (selectedFont) doc.font(selectedFont);
+  return doc.page.margins.top;
+};
+
+const buildWorkRowsByDay = (workRows, dateList) => {
+  const byDate = new Map();
+  for (const date of dateList) {
+    byDate.set(date, { morning: [], afternoon: [] });
+  }
+
+  for (const row of workRows || []) {
+    const date = toDateOnly(row.date);
+    if (!byDate.has(date)) byDate.set(date, { morning: [], afternoon: [] });
+
+    const timeRange = formatTimeRange(row.startTime, row.endTime);
+    const location = row.location ? ` (${row.location})` : '';
+    const responsible = formatWorkResponsible(row);
+    const line = `${timeRange ? `- ${timeRange}: ` : '- '}${row.title || ''}${location}${responsible ? `\n  ${responsible}` : ''}`;
+
+    const hour = Number(String(row.startTime || '').slice(0, 2));
+    if (!Number.isNaN(hour) && hour >= 12) {
+      byDate.get(date).afternoon.push(line);
+    } else {
+      byDate.get(date).morning.push(line);
+    }
+  }
+
+  return dateList.map((date) => {
+    const slot = byDate.get(date) || { morning: [], afternoon: [] };
+    return {
+      date,
+      morningText: slot.morning.join('\n\n') || '---',
+      afternoonText: slot.afternoon.join('\n\n') || '---',
+    };
+  });
+};
+
+const writeWorkSchedulePdf = (doc, selectedFont, workRows, bounds) => {
+  drawPdfTopHeader(doc, selectedFont, { title: 'LỊCH CÔNG TÁC TUẦN', bounds });
+
+  const dateList = getDateListByBounds(bounds);
+  const rows = buildWorkRowsByDay(workRows, dateList.length ? dateList : Array.from(new Set((workRows || []).map((x) => toDateOnly(x.date)))));
+  const widths = [110, 206, 206];
+  let y = doc.y;
+
+  y = drawTableRow(doc, y, widths, ['THỨ/NGÀY', 'SÁNG', 'CHIỀU'], { isHeader: true, minHeight: 28 });
+
+  for (const row of rows) {
+    y = ensurePageSpace(doc, y, 60, selectedFont);
+    const dayCell = `${getWeekdayLabel(row.date)}\n${formatDateVN(row.date)}`;
+    y = drawTableRow(doc, y, widths, [dayCell, row.morningText, row.afternoonText], { minHeight: 44 });
+  }
+
+  if (!rows.length) {
+    doc.moveDown(1);
+    doc.fontSize(11).fillColor('#6b7280').text('Không có dữ liệu lịch công tác trong phạm vi đã chọn.', { align: 'center' });
+  }
+};
+
+const buildDutyRowsByDay = (dutyRows, bounds) => {
+  const dateList = getDateListByBounds(bounds);
+  const byDate = new Map(dateList.map((d) => [d, {
+    nhaHieuBo: '---',
+    nhaXe: '---',
+    tramXa: '---',
+    giamDoc: '---',
+  }]));
+
+  const setSlot = (date, key, value) => {
+    if (!byDate.has(date)) {
+      byDate.set(date, { nhaHieuBo: '---', nhaXe: '---', tramXa: '---', giamDoc: '---' });
+    }
+    byDate.get(date)[key] = value;
+  };
+
+  for (const row of dutyRows || []) {
+    const officerName = row.officerName || row.officerId || '';
+    const timeRange = formatTimeRange(row.startTime, row.endTime);
+    const value = `${officerName}${timeRange ? `\n${timeRange}` : ''}`;
+
+    if (row.dutyType === 'director_weekly') {
+      const start = toDateOnly(row.date);
+      const end = toDateOnly(row.endDate || row.date);
+      const dates = dateList.length ? dateList.filter((d) => d >= start && d <= end) : [start];
+      for (const d of dates) {
+        setSlot(d, 'giamDoc', `Trực ban Giám đốc\n${value}`);
+      }
+      continue;
+    }
+
+    const d = toDateOnly(row.date);
+    if (row.location === 'Nhà hiệu bộ') setSlot(d, 'nhaHieuBo', `Trực cán bộ - Nhà hiệu bộ\n${value}`);
+    if (row.location === 'Nhà xe') setSlot(d, 'nhaXe', `Trực cán bộ - Nhà xe\n${value}`);
+    if (row.location === 'Trạm xá') setSlot(d, 'tramXa', `Trực cán bộ - Trạm xá\n${value}`);
+  }
+
+  const keys = dateList.length ? dateList : Array.from(byDate.keys()).sort();
+  return keys.map((date) => ({ date, ...(byDate.get(date) || { nhaHieuBo: '---', nhaXe: '---', tramXa: '---', giamDoc: '---' }) }));
+};
+
+const writeDutySchedulePdf = (doc, selectedFont, dutyRows, bounds) => {
+  drawPdfTopHeader(doc, selectedFont, { title: 'LỊCH TRỰC BAN', bounds });
+
+  const rows = buildDutyRowsByDay(dutyRows, bounds);
+  const widths = [90, 108, 108, 108, 108];
+  let y = doc.y;
+
+  y = drawTableRow(doc, y, widths, ['THỨ/NGÀY', 'NHÀ HIỆU BỘ', 'NHÀ XE', 'TRẠM XÁ', 'TRỰC BAN GIÁM ĐỐC'], { isHeader: true, minHeight: 30 });
+
+  for (const row of rows) {
+    y = ensurePageSpace(doc, y, 64, selectedFont);
+    const dayCell = `${getWeekdayLabel(row.date)}\n${formatDateVN(row.date)}`;
+    y = drawTableRow(doc, y, widths, [dayCell, row.nhaHieuBo, row.nhaXe, row.tramXa, row.giamDoc], { minHeight: 52 });
+  }
+
+  if (!rows.length) {
+    doc.moveDown(1);
+    doc.fontSize(11).fillColor('#6b7280').text('Không có dữ liệu lịch trực ban trong phạm vi đã chọn.', { align: 'center' });
+  }
+};
+
+const writePdf = (res, fileName, payload, meta) => {
   const doc = new PDFDocument({ margin: 36, size: 'A4' });
   const selectedFont = pickPdfFontPath();
 
@@ -114,67 +355,15 @@ const writePdf = (res, fileName, rows, title) => {
     doc.font(selectedFont);
   }
 
-  doc.fontSize(14).text(title, { align: 'center' });
-  doc.moveDown(0.5);
-  doc.fontSize(10).text(`Ngày xuất: ${new Date().toLocaleString('vi-VN')}`, { align: 'right' });
-  doc.moveDown(0.7);
-
-  const headers = ['STT', 'Ngày', 'Nội dung', 'Thời gian', 'Phụ trách'];
-  const widths = [35, 70, 175, 85, 165];
-  const startX = doc.page.margins.left;
-  const pageBottom = () => doc.page.height - doc.page.margins.bottom;
-  const padding = 4;
-  let y = doc.y;
-
-  const drawRow = (cells, isHeader = false) => {
-    const fontSize = isHeader ? 9 : 8.5;
-    doc.fontSize(fontSize).fillColor('#111827');
-
-    const textHeights = cells.map((cell, idx) => doc.heightOfString(String(cell || ''), {
-      width: widths[idx] - (padding * 2),
-      align: 'left',
-    }));
-
-    const baseHeight = isHeader ? 22 : 20;
-    const rowHeight = Math.max(baseHeight, ...textHeights.map((h) => h + (padding * 2)));
-
-    if (y + rowHeight > pageBottom()) {
-      doc.addPage();
-      if (selectedFont) doc.font(selectedFont);
-      y = doc.page.margins.top;
-      drawRow(headers, true);
-    }
-
-    let x = startX;
-    for (let i = 0; i < cells.length; i += 1) {
-      if (isHeader) {
-        doc.rect(x, y, widths[i], rowHeight).fillAndStroke('#f1f5f9', '#cbd5e1');
-      } else {
-        doc.rect(x, y, widths[i], rowHeight).stroke('#d1d5db');
-      }
-      doc.fillColor('#111827').text(String(cells[i] || ''), x + padding, y + padding, {
-        width: widths[i] - (padding * 2),
-        align: 'left',
-      });
-      x += widths[i];
-    }
-    y += rowHeight;
-  };
-
-  drawRow(headers, true);
-  rows.forEach((row, index) => {
-    drawRow([
-      String(index + 1),
-      row.date,
-      row.title,
-      row.timeRange,
-      row.responsible,
-    ]);
-  });
-
-  if (!rows.length) {
-    doc.moveDown(1);
-    doc.fontSize(10).fillColor('#6b7280').text('Không có dữ liệu trong phạm vi đã chọn.', { align: 'center' });
+  if (meta.type === 'congtac') {
+    writeWorkSchedulePdf(doc, selectedFont, payload.workRows || [], meta.bounds);
+  } else if (meta.type === 'trucban') {
+    writeDutySchedulePdf(doc, selectedFont, payload.dutyRows || [], meta.bounds);
+  } else {
+    writeWorkSchedulePdf(doc, selectedFont, payload.workRows || [], meta.bounds);
+    doc.addPage();
+    if (selectedFont) doc.font(selectedFont);
+    writeDutySchedulePdf(doc, selectedFont, payload.dutyRows || [], meta.bounds);
   }
 
   doc.end();
@@ -221,22 +410,48 @@ export const getExportPreview = async (req, res, next) => {
       }
 
       if (type === 'trucban' || type === 'both') {
-        const [dutyRows] = await connection.execute(
-          `SELECT ds.id,
-                  ds.dutyType,
-                  ds.date,
-                  ds.endDate,
-                  ds.startTime,
-                  ds.endTime,
-                  ds.location,
-                  o.fullName AS officerName
-           FROM duty_schedules ds
-           LEFT JOIN officers o ON ds.officerId = o.id
-           WHERE ${selector.where}
-           ORDER BY ds.date ASC, ds.startTime ASC`,
-          selector.params
-        );
-        result.dutySchedules = dutyRows;
+        const bounds = getScopeBounds({ scope, weekNo, month, year });
+        if (bounds) {
+          const [dutyRows] = await connection.execute(
+            `SELECT ds.id,
+                    ds.dutyType,
+                    ds.date,
+                    ds.endDate,
+                    ds.startTime,
+                    ds.endTime,
+                    ds.location,
+                    ds.officerId,
+                    o.fullName AS officerName
+             FROM duty_schedules ds
+             LEFT JOIN officers o ON ds.officerId = o.id
+             WHERE (
+               (ds.dutyType = 'officer_daily' AND ds.date BETWEEN ? AND ?)
+               OR
+               (ds.dutyType = 'director_weekly' AND ds.date <= ? AND COALESCE(ds.endDate, ds.date) >= ?)
+             )
+             ORDER BY ds.date ASC, ds.startTime ASC`,
+            [bounds.startDate, bounds.endDate, bounds.endDate, bounds.startDate]
+          );
+          result.dutySchedules = dutyRows;
+        } else {
+          const [dutyRows] = await connection.execute(
+            `SELECT ds.id,
+                    ds.dutyType,
+                    ds.date,
+                    ds.endDate,
+                    ds.startTime,
+                    ds.endTime,
+                    ds.location,
+                    ds.officerId,
+                    o.fullName AS officerName
+             FROM duty_schedules ds
+             LEFT JOIN officers o ON ds.officerId = o.id
+             WHERE ${selector.where}
+             ORDER BY ds.date ASC, ds.startTime ASC`,
+            selector.params
+          );
+          result.dutySchedules = dutyRows;
+        }
       }
 
       res.json({ success: true, data: result });
@@ -303,23 +518,52 @@ export const downloadExport = async (req, res, next) => {
       }
 
       if (type === 'trucban' || type === 'both') {
-        const [rows] = await connection.execute(
-          `SELECT
-             ds.id,
-             ds.date,
-             ds.startTime,
-             ds.endTime,
-             ds.location,
-             COALESCE(o.fullName, ds.officerId) AS officerName
-           FROM duty_schedules ds
-           LEFT JOIN officers o ON o.id = ds.officerId
-           WHERE ${selector.where}`,
-          selector.params
-        );
-        dutyRows = rows;
+        const bounds = getScopeBounds({ scope, weekNo, month, year });
+        if (bounds) {
+          const [rows] = await connection.execute(
+            `SELECT
+               ds.id,
+               ds.dutyType,
+               ds.date,
+               ds.endDate,
+               ds.startTime,
+               ds.endTime,
+               ds.location,
+               ds.officerId,
+               COALESCE(o.fullName, ds.officerId) AS officerName
+             FROM duty_schedules ds
+             LEFT JOIN officers o ON o.id = ds.officerId
+             WHERE (
+               (ds.dutyType = 'officer_daily' AND ds.date BETWEEN ? AND ?)
+               OR
+               (ds.dutyType = 'director_weekly' AND ds.date <= ? AND COALESCE(ds.endDate, ds.date) >= ?)
+             )
+             ORDER BY ds.date ASC, ds.startTime ASC`,
+            [bounds.startDate, bounds.endDate, bounds.endDate, bounds.startDate]
+          );
+          dutyRows = rows;
+        } else {
+          const [rows] = await connection.execute(
+            `SELECT
+               ds.id,
+               ds.dutyType,
+               ds.date,
+               ds.endDate,
+               ds.startTime,
+               ds.endTime,
+               ds.location,
+               ds.officerId,
+               COALESCE(o.fullName, ds.officerId) AS officerName
+             FROM duty_schedules ds
+             LEFT JOIN officers o ON o.id = ds.officerId
+             WHERE ${selector.where}`,
+            selector.params
+          );
+          dutyRows = rows;
+        }
       }
 
-      const unifiedRows = buildUnifiedRows({ workRows, dutyRows });
+      const bounds = getScopeBounds({ scope, weekNo, month, year });
 
       const fileNameBase = `lich_${type}_${scope}_${weekNo || month || 'all'}`;
       const actor = req.user;
@@ -327,21 +571,14 @@ export const downloadExport = async (req, res, next) => {
       await connection.execute(
         `INSERT INTO export_logs (userId, username, role, exportType, exportScope, exportFormat, itemCount)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [actor.id, actor.username, actor.role, type, scope, 'pdf', unifiedRows.length]
+        [actor.id, actor.username, actor.role, type, scope, 'pdf', (workRows?.length || 0) + (dutyRows?.length || 0)]
       );
-
-      const pdfTitle =
-        type === 'congtac'
-          ? 'BẢNG PHÂN CÔNG LỊCH CÔNG TÁC'
-          : type === 'trucban'
-            ? 'BẢNG PHÂN CÔNG LỊCH TRỰC BAN'
-            : 'BẢNG PHÂN CÔNG LỊCH CÔNG TÁC VÀ TRỰC BAN';
 
       writePdf(
         res,
         fileNameBase,
-        unifiedRows,
-        pdfTitle
+        { workRows, dutyRows },
+        { type, bounds }
       );
       return null;
     } finally {

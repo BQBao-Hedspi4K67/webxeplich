@@ -29,22 +29,61 @@ const hasOfficersUserIdColumn = async (connection) => {
   return rows.length > 0;
 };
 
+const hasOfficersDepartmentIdColumn = async (connection) => {
+  const [rows] = await connection.execute("SHOW COLUMNS FROM officers LIKE 'departmentId'");
+  return rows.length > 0;
+};
+
 const hasDepartmentsTable = async (connection) => {
   const [rows] = await connection.execute("SHOW TABLES LIKE 'departments'");
   return rows.length > 0;
 };
 
-const validateDepartment = async (connection, department) => {
+const validateDepartment = async (connection, { departmentId, department }) => {
   const hasTable = await hasDepartmentsTable(connection);
   if (!hasTable) {
-    return ALLOWED_DEPARTMENTS.includes(department);
+    if (!department) return null;
+    return ALLOWED_DEPARTMENTS.includes(department) ? { id: null, name: department, departmentType: 'phong' } : null;
+  }
+
+  if (departmentId) {
+    const [rows] = await connection.execute(
+      'SELECT id, name, departmentType FROM departments WHERE id = ? AND isActive = 1 LIMIT 1',
+      [departmentId]
+    );
+    return rows[0] || null;
+  }
+
+  if (!department) return null;
+
+  const [rows] = await connection.execute(
+    'SELECT id, name, departmentType FROM departments WHERE name = ? AND isActive = 1 LIMIT 1',
+    [department]
+  );
+  return rows[0] || null;
+};
+
+const resolveRequesterOfficer = async (connection, reqUser = {}) => {
+  const hasUserIdColumn = await hasOfficersUserIdColumn(connection);
+  const hasDepartmentIdColumn = await hasOfficersDepartmentIdColumn(connection);
+  const selectDepartment = hasDepartmentIdColumn ? 'departmentId, department,' : 'NULL AS departmentId, department,';
+
+  if (hasUserIdColumn) {
+    const [rows] = await connection.execute(
+      `SELECT id, ${selectDepartment} role FROM officers WHERE userId = ? LIMIT 1`,
+      [reqUser.id]
+    );
+    if (rows[0]) return rows[0];
   }
 
   const [rows] = await connection.execute(
-    'SELECT id FROM departments WHERE name = ? LIMIT 1',
-    [department]
+    `SELECT id, ${selectDepartment} role
+     FROM officers
+     WHERE (email = ? AND ? <> '') OR fullName = ?
+     LIMIT 1`,
+    [reqUser.email || '', reqUser.email || '', reqUser.fullName || '']
   );
-  return rows.length > 0;
+  return rows[0] || null;
 };
 
 // Login
@@ -81,11 +120,14 @@ export const login = async (req, res, next) => {
 
       const user = rows[0];
       const hasUserIdColumn = await hasOfficersUserIdColumn(connection);
+      const hasDepartmentIdColumn = await hasOfficersDepartmentIdColumn(connection);
 
       let officerProfile = null;
       const [officerRows] = hasUserIdColumn
         ? await connection.execute(
-          'SELECT id, position, department FROM officers WHERE userId = ? LIMIT 1',
+          hasDepartmentIdColumn
+            ? 'SELECT id, position, department, departmentId FROM officers WHERE userId = ? LIMIT 1'
+            : 'SELECT id, position, department, NULL AS departmentId FROM officers WHERE userId = ? LIMIT 1',
           [user.id]
         )
         : [[], null];
@@ -94,7 +136,7 @@ export const login = async (req, res, next) => {
         officerProfile = officerRows[0];
       } else {
         const [fallbackOfficerRows] = await connection.execute(
-          `SELECT id, position, department FROM officers
+          `SELECT id, position, department, ${hasDepartmentIdColumn ? 'departmentId' : 'NULL AS departmentId'} FROM officers
            WHERE (email = ? AND ? IS NOT NULL AND ? <> '') OR fullName = ?
            LIMIT 1`,
           [user.email || null, user.email || null, user.email || null, user.fullName]
@@ -138,6 +180,7 @@ export const login = async (req, res, next) => {
             officerId: officerProfile?.id || null,
             position: officerProfile?.position || '',
             department: officerProfile?.department || '',
+            departmentId: officerProfile?.departmentId || null,
           },
         },
         message: 'Login successful',
@@ -157,6 +200,7 @@ export const getProfile = async (req, res, next) => {
 
     try {
       const hasUserIdColumn = await hasOfficersUserIdColumn(connection);
+      const hasDepartmentIdColumn = await hasOfficersDepartmentIdColumn(connection);
       const [rows] = hasUserIdColumn
         ? await connection.execute(
           `SELECT
@@ -169,7 +213,8 @@ export const getProfile = async (req, res, next) => {
              u.status,
              o.id AS officerId,
              o.position,
-             o.department
+             o.department,
+             ${hasDepartmentIdColumn ? 'o.departmentId' : 'NULL AS departmentId'}
            FROM users u
            LEFT JOIN officers o ON o.userId = u.id
            WHERE u.id = ?
@@ -187,7 +232,8 @@ export const getProfile = async (req, res, next) => {
              u.status,
              NULL AS officerId,
              NULL AS position,
-             NULL AS department
+             NULL AS department,
+             NULL AS departmentId
            FROM users u
            WHERE u.id = ?
            LIMIT 1`,
@@ -206,7 +252,7 @@ export const getProfile = async (req, res, next) => {
 
       if (!profile.officerId) {
         const [fallbackOfficerRows] = await connection.execute(
-          `SELECT id, position, department FROM officers
+          `SELECT id, position, department, ${hasDepartmentIdColumn ? 'departmentId' : 'NULL AS departmentId'} FROM officers
            WHERE (email = ? AND ? IS NOT NULL AND ? <> '') OR fullName = ?
            LIMIT 1`,
           [profile.email || null, profile.email || null, profile.email || null, profile.fullName]
@@ -226,6 +272,7 @@ export const getProfile = async (req, res, next) => {
             officerId: fallbackOfficer.id,
             position: fallbackOfficer.position,
             department: fallbackOfficer.department,
+            departmentId: fallbackOfficer.departmentId || null,
           };
         }
       }
@@ -253,13 +300,14 @@ export const logout = (req, res) => {
 // Create user account (internal provisioning only)
 export const createUserAccount = async (req, res, next) => {
   try {
-    const {
+    let {
       username,
       password,
       fullName,
       email = null,
       phone = null,
       position = '',
+      departmentId = null,
       department = '',
       role = 'officer',
       avatar = null,
@@ -275,37 +323,11 @@ export const createUserAccount = async (req, res, next) => {
       };
     };
 
-    if (!username || !password || !fullName || !department) {
+    if (!username || !password || !fullName || (!department && !departmentId)) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required fields: username, password, fullName, department',
+        error: 'Missing required fields: username, password, fullName, department/departmentId',
         code: 'VALIDATION_ERROR',
-      });
-    }
-
-    const isDepartmentValid = await (async () => {
-      const connection = await pool.getConnection();
-      try {
-        return validateDepartment(connection, department);
-      } finally {
-        connection.release();
-      }
-    })();
-
-    if (!isDepartmentValid) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid department selection',
-        code: 'INVALID_DEPARTMENT',
-      });
-    }
-
-    const allowedRoles = ['manager', 'officer'];
-    if (!allowedRoles.includes(role)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid role. Only manager or officer can be created.',
-        code: 'INVALID_ROLE',
       });
     }
 
@@ -321,6 +343,37 @@ export const createUserAccount = async (req, res, next) => {
     try {
       await connection.beginTransaction();
       const hasUserIdColumn = await hasOfficersUserIdColumn(connection);
+      const hasDepartmentIdColumn = await hasOfficersDepartmentIdColumn(connection);
+      const requesterOfficer = await resolveRequesterOfficer(connection, req.user || {});
+
+      if (req.user?.role === 'manager') {
+        if (!requesterOfficer?.department && !requesterOfficer?.departmentId) {
+          return res.status(403).json({ success: false, error: 'Insufficient permissions', code: 'FORBIDDEN' });
+        }
+        role = 'officer';
+        department = requesterOfficer.department;
+      }
+
+      const departmentRef = await validateDepartment(connection, {
+        departmentId: req.user?.role === 'manager' ? requesterOfficer?.departmentId : departmentId,
+        department: req.user?.role === 'manager' ? requesterOfficer?.department : department,
+      });
+      if (!departmentRef) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid department selection',
+          code: 'INVALID_DEPARTMENT',
+        });
+      }
+
+      const allowedRoles = req.user?.role === 'manager' ? ['officer'] : ['manager', 'officer'];
+      if (!allowedRoles.includes(role)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid role for current user',
+          code: 'INVALID_ROLE',
+        });
+      }
 
       const [existingUsername] = await connection.execute(
         'SELECT id FROM users WHERE username = ? LIMIT 1',
@@ -365,20 +418,42 @@ export const createUserAccount = async (req, res, next) => {
       const newOfficerId = `CB${String(nextOfficerNum).padStart(3, '0')}`;
 
       const officerPosition = position || (role === 'manager' ? 'Quản lý' : 'Cán bộ');
-      const officerDepartment = department;
+      const officerDepartment = departmentRef.name;
       const split = splitTitleAndName(fullName);
 
       if (hasUserIdColumn) {
-        await connection.execute(
-          `INSERT INTO officers (id, userId, fullName, officerTitle, officerName, position, department, phone, email, role, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [newOfficerId, result.insertId, fullName, split.officerTitle, split.officerName, officerPosition, officerDepartment, phone, email, role, status]
-        );
+        if (hasDepartmentIdColumn) {
+          await connection.execute(
+            `INSERT INTO officers (id, userId, fullName, officerTitle, officerName, position, departmentId, department, departmentGroup, phone, email, role, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              newOfficerId,
+              result.insertId,
+              fullName,
+              split.officerTitle,
+              split.officerName,
+              officerPosition,
+              departmentRef.id,
+              officerDepartment,
+              departmentRef.departmentType || 'phong',
+              phone,
+              email,
+              role,
+              status,
+            ]
+          );
+        } else {
+          await connection.execute(
+            `INSERT INTO officers (id, userId, fullName, officerTitle, officerName, position, department, departmentGroup, phone, email, role, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [newOfficerId, result.insertId, fullName, split.officerTitle, split.officerName, officerPosition, officerDepartment, departmentRef.departmentType || 'phong', phone, email, role, status]
+          );
+        }
       } else {
         await connection.execute(
-          `INSERT INTO officers (id, fullName, officerTitle, officerName, position, department, phone, email, role, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [newOfficerId, fullName, split.officerTitle, split.officerName, officerPosition, officerDepartment, phone, email, role, status]
+          `INSERT INTO officers (id, fullName, officerTitle, officerName, position, department, departmentGroup, phone, email, role, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [newOfficerId, fullName, split.officerTitle, split.officerName, officerPosition, officerDepartment, departmentRef.departmentType || 'phong', phone, email, role, status]
         );
       }
 
@@ -395,6 +470,7 @@ export const createUserAccount = async (req, res, next) => {
           ...createdRows[0],
           officerId: newOfficerId,
           officerPosition,
+          officerDepartmentId: departmentRef.id || null,
           officerDepartment,
         },
         message: 'User account created successfully',

@@ -16,6 +16,9 @@ router.get('/:id', dutyCtrl.getDutyScheduleById);
 // Create schedule (admin/manager only)
 router.post('/', requireRole('admin', 'manager'), dutyCtrl.createDutySchedule);
 
+// Auto assign officer daily duty for selected week (admin only)
+router.post('/auto-assign-week', requireRole('admin'), dutyCtrl.autoAssignOfficerDailyWeek);
+
 // Update schedule (admin/manager only)
 router.put('/:id', requireRole('admin', 'manager'), dutyCtrl.updateDutySchedule);
 

@@ -68,7 +68,7 @@ const assertManagerCanReviewDepartment = async (connection, requesterOfficer) =>
   return requesterOfficer.role === 'manager';
 };
 
-export const getOpinions = async (req, res, next) => {
+export const getLeaveRequests = async (req, res, next) => {
   try {
     const {
       page = 1,
@@ -117,13 +117,17 @@ export const getOpinions = async (req, res, next) => {
 
       const whereClause = whereConditions.length ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
+      // FIX: Add JOIN to COUNT query to resolve 'o.departmentId' reference
       const [countRows] = await connection.execute(
-        `SELECT COUNT(*) as total FROM leave_requests lr ${whereClause}`,
+        `SELECT COUNT(*) as total 
+         FROM leave_requests lr
+         LEFT JOIN officers o ON o.id = lr.officerId
+         ${whereClause}`,
         params
       );
 
       const [rows] = await connection.execute(
-        `SELECT lr.*, o.fullName AS officerName
+        `SELECT lr.*, o.fullName AS officerName, o.department, o.departmentId
          FROM leave_requests lr
          LEFT JOIN officers o ON o.id = lr.officerId
          ${whereClause}
@@ -150,14 +154,14 @@ export const getOpinions = async (req, res, next) => {
   }
 };
 
-export const getOpinionById = async (req, res, next) => {
+export const getLeaveRequestById = async (req, res, next) => {
   try {
     const { id } = req.params;
     const connection = await pool.getConnection();
 
     try {
       const [rows] = await connection.execute(
-        `SELECT lr.*, o.fullName AS officerName
+        `SELECT lr.*, o.fullName AS officerName, o.department, o.departmentId
          FROM leave_requests lr
          LEFT JOIN officers o ON o.id = lr.officerId
          WHERE lr.id = ?`,
@@ -181,7 +185,7 @@ export const getOpinionById = async (req, res, next) => {
   }
 };
 
-export const createOpinion = async (req, res, next) => {
+export const createLeaveRequest = async (req, res, next) => {
   try {
     const { officerId, leaveDate, reason, dutyScheduleId } = req.body;
 
@@ -197,7 +201,7 @@ export const createOpinion = async (req, res, next) => {
 
     try {
       const [officerRows] = await connection.execute(
-        'SELECT id FROM officers WHERE id = ? LIMIT 1',
+        'SELECT id, role FROM officers WHERE id = ? LIMIT 1',
         [officerId]
       );
 
@@ -264,10 +268,13 @@ export const createOpinion = async (req, res, next) => {
       const [idRows] = await connection.execute('SELECT LAST_INSERT_ID() as id');
       const leaveRequestId = idRows[0].id;
 
+      // ========== NOTIFICATIONS ==========
       await ensureNotificationTargetingSchema(connection);
+
+      // 1. Notify director about new leave request
       await createRoleNotification(connection, {
-        title: 'Co don xin nghi cho duyet',
-        content: `Can bo ${officerId} vua gui don xin nghi truc ngay ${leaveDateOnly}.`,
+        title: 'Có đơn xin nghỉ để duyệt',
+        content: `Cán bộ ${officerId} vừa gửi đơn xin nghỉ trực ngày ${leaveDateOnly}.`,
         type: 'info',
         module: 'leave_request',
         entityType: 'leave_request',
@@ -275,12 +282,15 @@ export const createOpinion = async (req, res, next) => {
         targetRole: 'admin',
       });
 
+      // 2. Notify department head/manager
       const [requestOfficerRows] = await connection.execute(
-        'SELECT department, departmentId FROM officers WHERE id = ? LIMIT 1',
+        'SELECT department, departmentId, role FROM officers WHERE id = ? LIMIT 1',
         [officerId]
       );
-      const requestDepartment = requestOfficerRows[0]?.department || '';
-      const requestDepartmentId = requestOfficerRows[0]?.departmentId || null;
+      const requestOfficer = requestOfficerRows[0];
+      const requestDepartment = requestOfficer?.department || '';
+      const requestDepartmentId = requestOfficer?.departmentId || null;
+      const isManager = requestOfficer?.role === 'manager';
 
       if (requestDepartment) {
         let managerOfficerId = null;
@@ -315,13 +325,26 @@ export const createOpinion = async (req, res, next) => {
         if (managerOfficerId) {
           const managerUserId = await resolveUserIdByOfficerId(connection, managerOfficerId);
           await createUserNotification(connection, {
-            title: 'Co don xin nghi cho duyet',
-            content: `Can bo ${officerId} vua gui don xin nghi truc ngay ${leaveDateOnly}.`,
+            title: 'Có đơn xin nghỉ để duyệt',
+            content: `Cán bộ ${officerId} vừa gửi đơn xin nghỉ trực ngày ${leaveDateOnly}.`,
             type: 'info',
             module: 'leave_request',
             entityType: 'leave_request',
             entityId: String(leaveRequestId),
             targetUserId: managerUserId,
+          });
+        }
+
+        // 3. If the requester is a manager, also notify director
+        if (isManager) {
+          await createRoleNotification(connection, {
+            title: 'Trưởng phòng xin nghỉ',
+            content: `Trưởng phòng ${officerId} (${requestDepartment}) vừa gửi đơn xin nghỉ trực ngày ${leaveDateOnly}.`,
+            type: 'info',
+            module: 'leave_request',
+            entityType: 'leave_request',
+            entityId: String(leaveRequestId),
+            targetRole: 'admin',
           });
         }
       }
@@ -334,7 +357,7 @@ export const createOpinion = async (req, res, next) => {
         action: 'create',
         entityType: 'leave_request',
         entityId: String(leaveRequestId),
-        summary: `Gui don xin nghi #${leaveRequestId}`,
+        summary: `Gửi đơn xin nghỉ #${leaveRequestId}`,
       });
 
       res.status(201).json({
@@ -349,7 +372,7 @@ export const createOpinion = async (req, res, next) => {
   }
 };
 
-export const updateOpinionStatus = async (req, res, next) => {
+export const updateLeaveRequestStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { status, adminFeedback = '' } = req.body;
@@ -423,18 +446,19 @@ export const updateOpinionStatus = async (req, res, next) => {
         }
       }
 
+      // UPDATE: Keep the record, just update status (don't delete)
       await connection.execute(
         `UPDATE leave_requests
          SET status = ?, adminFeedback = ?, reviewedByOfficerId = ?, reviewedAt = NOW()
          WHERE id = ?`,
-        [status, adminFeedback || null, req.user?.officerId || null, id]
+        [status, adminFeedback || null, requesterOfficer?.id || null, id]
       );
 
       if (status === LEAVE_REQUEST_STATUS.APPROVED) {
         const leaveDate = toDateOnly(leaveRequest.leaveDate);
 
         const [dutyRows] = await connection.execute(
-          `SELECT id, dutyType, date
+          `SELECT id, dutyType, date, location, officerId
            FROM duty_schedules
            WHERE id = ?
            LIMIT 1`,
@@ -443,48 +467,102 @@ export const updateOpinionStatus = async (req, res, next) => {
 
         if (dutyRows.length) {
           const duty = dutyRows[0];
+          const dutyLocation = duty.location;
 
+          // ========== DUTY REASSIGNMENT LOGIC ==========
+          // When an officer on duty at location X on date D requests leave:
+          // 1. DELETE the original duty FIRST (to avoid UNIQUE constraint conflict)
+          // 2. Find next officer scheduled for same location X (date > D)
+          // 3. Move that officer to date D
+          // 4. Shift all following officers forward by 1 day for that location
+          
+          // Step 1: Delete the original duty FIRST to avoid constraint violations
           await connection.execute(
             'DELETE FROM duty_schedules WHERE id = ?',
             [duty.id]
           );
-
+          
           if (duty.dutyType === 'officer_daily') {
-            // Shift all later officer_daily duties up by one day.
-            await connection.execute(
-              `UPDATE duty_schedules
-               SET date = DATE_SUB(date, INTERVAL 1 DAY)
-               WHERE dutyType = 'officer_daily'
-                 AND date > ?`,
-              [leaveDate]
+            // Find next scheduled duty for the same location after this date
+            const [nextDutyRows] = await connection.execute(
+              `SELECT id, officerId, date
+               FROM duty_schedules
+               WHERE dutyType = 'officer_daily' 
+                 AND location = ?
+                 AND date > ?
+               ORDER BY date ASC
+               LIMIT 1`,
+              [dutyLocation, leaveDate]
             );
+
+            if (nextDutyRows.length > 0) {
+              const nextDuty = nextDutyRows[0];
+              // Move next officer to cover the leave date
+              await connection.execute(
+                `UPDATE duty_schedules
+                 SET date = ?
+                 WHERE id = ?`,
+                [leaveDate, nextDuty.id]
+              );
+
+              // Shift all duties after the next duty forward by 1 day (to maintain rotation)
+              await connection.execute(
+                `UPDATE duty_schedules
+                 SET date = DATE_SUB(date, INTERVAL 1 DAY)
+                 WHERE dutyType = 'officer_daily'
+                   AND location = ?
+                   AND date > ?`,
+                [dutyLocation, nextDuty.date]
+              );
+            } else {
+              // No next duty found, just find any available officer for that location in the past
+              const [anyOfficerRows] = await connection.execute(
+                `SELECT officerId
+                 FROM duty_schedules
+                 WHERE dutyType = 'officer_daily'
+                   AND location = ?
+                 ORDER BY date DESC
+                 LIMIT 1`,
+                [dutyLocation]
+              );
+
+              if (anyOfficerRows.length > 0) {
+                const backupOfficerId = anyOfficerRows[0].officerId;
+                // Create new duty entry for replacement
+                await connection.execute(
+                  `INSERT INTO duty_schedules (id, officerId, dutyType, date, location, notes)
+                   VALUES (?, ?, 'officer_daily', ?, ?, 'Đảm bảo trực thay')`,
+                  [
+                    `TBCB_${leaveDate.replace(/-/g, '')}_${backupOfficerId}`,
+                    backupOfficerId,
+                    leaveDate,
+                    dutyLocation,
+                  ]
+                );
+              }
+            }
           }
         }
 
         // Remove approved-leave officer from work assignments on leave date.
         await connection.execute(
           `UPDATE work_schedules
-           SET
-             responsibleOfficerId = CASE WHEN responsibleOfficerId = ? AND date = ? THEN NULL ELSE responsibleOfficerId END,
+           SET responsibleOfficerId = NULL
            WHERE date = ?
              AND responsibleOfficerId = ?`,
-          [
-            leaveRequest.officerId,
-            leaveDate,
-            leaveDate,
-            leaveRequest.officerId,
-          ]
+          [leaveDate, leaveRequest.officerId]
         );
       }
 
+      // ========== NOTIFICATIONS ==========
       await ensureNotificationTargetingSchema(connection);
       const submitterUserId = await resolveUserIdByOfficerId(connection, leaveRequest.officerId);
       await createUserNotification(connection, {
-        title: status === 'approved' ? 'Don xin nghi da duoc duyet' : 'Don xin nghi bi tu choi',
+        title: status === 'approved' ? 'Đơn xin nghỉ đã được duyệt' : 'Đơn xin nghỉ bị từ chối',
         content:
           status === 'approved'
-            ? `Don xin nghi #${id} da duoc phe duyet.`
-            : `Don xin nghi #${id} da bi tu choi.`,
+            ? `Đơn xin nghỉ #${id} đã được phê duyệt.`
+            : `Đơn xin nghỉ #${id} bị từ chối.`,
         type: status === 'approved' ? 'success' : 'warning',
         module: 'leave_request',
         entityType: 'leave_request',
@@ -500,7 +578,7 @@ export const updateOpinionStatus = async (req, res, next) => {
         action: status === 'approved' ? 'approve' : 'reject',
         entityType: 'leave_request',
         entityId: String(id),
-        summary: `${status === 'approved' ? 'Duyet' : 'Tu choi'} don xin nghi #${id}`,
+        summary: `${status === 'approved' ? 'Duyệt' : 'Từ chối'} đơn xin nghỉ #${id}`,
       });
 
       res.json({ success: true, message: 'Leave request updated successfully' });
@@ -512,30 +590,15 @@ export const updateOpinionStatus = async (req, res, next) => {
   }
 };
 
-export const deleteOpinion = async (req, res, next) => {
+// NOTE: Delete is disabled to preserve leave request history
+// Leave requests should be kept for audit purposes
+export const deleteLeaveRequest = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const connection = await pool.getConnection();
-
-    try {
-      const [rows] = await connection.execute(
-        'SELECT id FROM leave_requests WHERE id = ? LIMIT 1',
-        [id]
-      );
-
-      if (!rows.length) {
-        return res.status(404).json({
-          success: false,
-          error: 'Leave request not found',
-          code: 'LEAVE_REQUEST_NOT_FOUND',
-        });
-      }
-
-      await connection.execute('DELETE FROM leave_requests WHERE id = ?', [id]);
-      res.json({ success: true, message: 'Leave request deleted successfully' });
-    } finally {
-      connection.release();
-    }
+    return res.status(405).json({
+      success: false,
+      error: 'Leave requests cannot be deleted. They are preserved for audit purposes.',
+      code: 'METHOD_NOT_ALLOWED',
+    });
   } catch (err) {
     next(err);
   }

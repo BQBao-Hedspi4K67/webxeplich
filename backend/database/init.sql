@@ -37,6 +37,7 @@ CREATE TABLE officers (
   officerTitle VARCHAR(100) NOT NULL,
   officerName VARCHAR(100) NOT NULL,
   position VARCHAR(150),
+  departmentId INT NULL,
   department VARCHAR(150),
   departmentGroup ENUM('ban_giam_doc', 'phong', 'khoa') DEFAULT 'phong',
   phone VARCHAR(20),
@@ -47,6 +48,7 @@ CREATE TABLE officers (
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (userId) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_department_id (departmentId),
   INDEX idx_department (department),
   INDEX idx_department_group (departmentGroup),
   INDEX idx_status (status),
@@ -59,12 +61,19 @@ CREATE TABLE departments (
   id INT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(150) NOT NULL UNIQUE,
   departmentType ENUM('ban_giam_doc', 'phong', 'khoa') NOT NULL,
+  headOfficerId VARCHAR(10) NULL,
   isActive TINYINT(1) DEFAULT 1,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (headOfficerId) REFERENCES officers(id) ON DELETE SET NULL,
   INDEX idx_department_type (departmentType),
+  INDEX idx_head_officer (headOfficerId),
   INDEX idx_is_active (isActive)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+ALTER TABLE officers
+ADD CONSTRAINT fk_officers_department
+FOREIGN KEY (departmentId) REFERENCES departments(id) ON DELETE SET NULL;
 
 -- ========== TABLE: holidays ==========
 -- Lich nghi le/ky niem de hien thi tren lich thang
@@ -91,6 +100,7 @@ CREATE TABLE work_schedules (
   endTime TIME,
   location VARCHAR(200),
   department VARCHAR(150),
+  departmentId INT NULL,
   type VARCHAR(50) NOT NULL,
   weekNo INT,
   notes TEXT,
@@ -109,11 +119,13 @@ CREATE TABLE work_schedules (
   FOREIGN KEY (officer1Id) REFERENCES officers(id) ON DELETE SET NULL,
   FOREIGN KEY (officer2Id) REFERENCES officers(id) ON DELETE SET NULL,
   FOREIGN KEY (commanderOfficerId) REFERENCES officers(id) ON DELETE SET NULL,
+  FOREIGN KEY (departmentId) REFERENCES departments(id) ON DELETE SET NULL,
   FOREIGN KEY (approvedByUserId) REFERENCES users(id) ON DELETE SET NULL,
   FOREIGN KEY (createdByUserId) REFERENCES users(id) ON DELETE SET NULL,
   INDEX idx_date (date),
   INDEX idx_weekNo (weekNo),
   INDEX idx_type (type),
+  INDEX idx_department_id (departmentId),
   INDEX idx_responsible (responsibleOfficerId),
   INDEX idx_officer1 (officer1Id),
   INDEX idx_officer2 (officer2Id),
@@ -133,7 +145,7 @@ CREATE TABLE duty_schedules (
   shift VARCHAR(50),
   startTime TIME DEFAULT '00:00',
   endTime TIME DEFAULT '23:59',
-  location VARCHAR(200),
+  location ENUM('Nhà hiệu bộ', 'Nhà xe', 'Trạm xá', 'Trực ban Giám đốc') NOT NULL,
   notes TEXT,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -141,6 +153,7 @@ CREATE TABLE duty_schedules (
   INDEX idx_officerId (officerId),
   INDEX idx_date (date),
   INDEX idx_dutyType (dutyType),
+  UNIQUE KEY uq_daily_location (dutyType, date, location),
   UNIQUE KEY uq_director_week_start (weekStartDate)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -269,7 +282,10 @@ INSERT INTO users (username, passwordHash, fullName, email, role, avatar, status
 ('canbo8', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Đỗ Minh Quân', 'dmquan@hvktcnan.edu.vn', 'officer', 'DQ', 'active'),
 ('canbo9', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Trương Anh Vũ', 'tavu@hvktcnan.edu.vn', 'officer', 'TV', 'active'),
 ('canbo10', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Nguyễn Thị Yến', 'ntyen@hvktcnan.edu.vn', 'officer', 'NY', 'active'),
-('canbo11', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Đặng Ngọc Hà', 'dnha@hvktcnan.edu.vn', 'officer', 'DH', 'active');
+('canbo11', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Đặng Ngọc Hà', 'dnha@hvktcnan.edu.vn', 'officer', 'DH', 'active'),
+('canbo12', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng úy Nguyễn Quốc Bình', 'nqbinh@hvktcnan.edu.vn', 'officer', 'NB', 'active'),
+('canbo13', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng úy Trần Mai Chi', 'tmchi@hvktcnan.edu.vn', 'officer', 'TC', 'active'),
+('canbo14', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng úy Lê Hoàng Nam', 'lhnam@hvktcnan.edu.vn', 'officer', 'LN', 'active');
 
 -- ========== OFFICERS ==========
 INSERT INTO officers (id, userId, fullName, officerTitle, officerName, position, department, departmentGroup, phone, email, role, status, studyUntil) VALUES
@@ -286,39 +302,51 @@ INSERT INTO officers (id, userId, fullName, officerTitle, officerName, position,
 ('CB010', 10, 'Thượng tá Bùi Văn Nam', 'Thượng tá', 'Bùi Văn Nam', 'Trưởng phòng', 'Phòng quản lý học viên', 'phong', '0911110010', 'bvnam@hvktcnan.edu.vn', 'manager', 'active', NULL),
 ('CB011', 11, 'Thượng tá Đặng Thị Hương', 'Thượng tá', 'Đặng Thị Hương', 'Trưởng phòng', 'Phòng hậu cần', 'phong', '0911110011', 'dthuong@hvktcnan.edu.vn', 'manager', 'active', NULL),
 
-('CB012', 12, 'Đại úy Võ Thanh Long', 'Đại úy', 'Võ Thanh Long', 'Giảng viên', 'Khoa Lý luận chính trị và KHXHNV', 'khoa', '0911110012', 'vtlong@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB013', 13, 'Đại úy Trần Đức Anh', 'Đại úy', 'Trần Đức Anh', 'Giảng viên', 'Khoa Luật', 'khoa', '0911110013', 'tdanh@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB014', 14, 'Đại úy Nguyễn Gia Bảo', 'Đại úy', 'Nguyễn Gia Bảo', 'Giảng viên', 'Khoa nghiệp vụ cơ bản', 'khoa', '0911110014', 'ngbao@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB015', 15, 'Đại úy Lê Tuấn Kiệt', 'Đại úy', 'Lê Tuấn Kiệt', 'Giảng viên', 'Khoa khoa học cơ bản và ngoại ngữ', 'khoa', '0911110015', 'ltkiet@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB016', 16, 'Đại úy Phạm Hữu Đạt', 'Đại úy', 'Phạm Hữu Đạt', 'Giảng viên', 'Khoa quân sự, võ thuật, TDTT', 'khoa', '0911110016', 'phdat@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB017', 17, 'Đại úy Bùi Hải Nam', 'Đại úy', 'Bùi Hải Nam', 'Giảng viên', 'Khoa mật mã', 'khoa', '0911110017', 'bhnam@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB018', 18, 'Đại úy Hoàng Văn Tuấn', 'Đại úy', 'Hoàng Văn Tuấn', 'Giảng viên', 'Khoa Công nghệ và ATTT', 'khoa', '0911110018', 'hvtuan@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB019', 19, 'Đại úy Đỗ Minh Quân', 'Đại úy', 'Đỗ Minh Quân', 'Giảng viên', 'Khoa Điện tử viễn thông và kỹ thuật nghiệp vụ', 'khoa', '0911110019', 'dmquan@hvktcnan.edu.vn', 'officer', 'studying', '2026-06-30'),
-('CB020', 20, 'Đại úy Trương Anh Vũ', 'Đại úy', 'Trương Anh Vũ', 'Giảng viên', 'Khoa Hồ sơ - Lưu trữ', 'khoa', '0911110020', 'tavu@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB021', 21, 'Đại úy Nguyễn Thị Yến', 'Đại úy', 'Nguyễn Thị Yến', 'Giảng viên', 'Khoa Hậu cần', 'khoa', '0911110021', 'ntyen@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB022', 22, 'Đại úy Đặng Ngọc Hà', 'Đại úy', 'Đặng Ngọc Hà', 'Giảng viên', 'Khoa Y Dược', 'khoa', '0911110022', 'dnha@hvktcnan.edu.vn', 'officer', 'active', NULL);
+('CB012', 12, 'Đại úy Võ Thanh Long', 'Đại úy', 'Võ Thanh Long', 'Cán bộ tổng hợp', 'Phòng hành chính tổng hợp', 'phong', '0911110012', 'vtlong@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB013', 13, 'Đại úy Trần Đức Anh', 'Đại úy', 'Trần Đức Anh', 'Cán bộ tổng hợp', 'Phòng hành chính tổng hợp', 'phong', '0911110013', 'tdanh@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB014', 14, 'Đại úy Nguyễn Gia Bảo', 'Đại úy', 'Nguyễn Gia Bảo', 'Cán bộ chính trị', 'Phòng chính trị', 'phong', '0911110014', 'ngbao@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB015', 15, 'Đại úy Lê Tuấn Kiệt', 'Đại úy', 'Lê Tuấn Kiệt', 'Cán bộ chính trị', 'Phòng chính trị', 'phong', '0911110015', 'ltkiet@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB016', 16, 'Đại úy Phạm Hữu Đạt', 'Đại úy', 'Phạm Hữu Đạt', 'Cán bộ đào tạo', 'Phòng quản lý đào tạo và BDNC', 'phong', '0911110016', 'phdat@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB017', 17, 'Đại úy Bùi Hải Nam', 'Đại úy', 'Bùi Hải Nam', 'Cán bộ đào tạo', 'Phòng quản lý đào tạo và BDNC', 'phong', '0911110017', 'bhnam@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB018', 18, 'Đại úy Hoàng Văn Tuấn', 'Đại úy', 'Hoàng Văn Tuấn', 'Cán bộ kiểm định', 'Phòng ĐBCL đào tạo', 'phong', '0911110018', 'hvtuan@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB019', 19, 'Đại úy Đỗ Minh Quân', 'Đại úy', 'Đỗ Minh Quân', 'Cán bộ kiểm định', 'Phòng ĐBCL đào tạo', 'phong', '0911110019', 'dmquan@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB020', 20, 'Đại úy Trương Anh Vũ', 'Đại úy', 'Trương Anh Vũ', 'Cán bộ nghiên cứu', 'Phòng quản lý nghiên cứu khoa học', 'phong', '0911110020', 'tavu@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB021', 21, 'Đại úy Nguyễn Thị Yến', 'Đại úy', 'Nguyễn Thị Yến', 'Cán bộ nghiên cứu', 'Phòng quản lý nghiên cứu khoa học', 'phong', '0911110021', 'ntyen@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB022', 22, 'Đại úy Đặng Ngọc Hà', 'Đại úy', 'Đặng Ngọc Hà', 'Cán bộ quản lý học viên', 'Phòng quản lý học viên', 'phong', '0911110022', 'dnha@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB023', 23, 'Thượng úy Nguyễn Quốc Bình', 'Thượng úy', 'Nguyễn Quốc Bình', 'Cán bộ quản lý học viên', 'Phòng quản lý học viên', 'phong', '0911110023', 'nqbinh@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB024', 24, 'Thượng úy Trần Mai Chi', 'Thượng úy', 'Trần Mai Chi', 'Cán bộ hậu cần', 'Phòng hậu cần', 'phong', '0911110024', 'tmchi@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB025', 25, 'Thượng úy Lê Hoàng Nam', 'Thượng úy', 'Lê Hoàng Nam', 'Cán bộ hậu cần', 'Phòng hậu cần', 'phong', '0911110025', 'lhnam@hvktcnan.edu.vn', 'officer', 'active', NULL);
 
 -- ========== DEPARTMENTS ==========
-INSERT INTO departments (name, departmentType, isActive) VALUES
-('Ban Giám đốc', 'ban_giam_doc', 1),
-('Phòng hành chính tổng hợp', 'phong', 1),
-('Phòng chính trị', 'phong', 1),
-('Phòng quản lý đào tạo và BDNC', 'phong', 1),
-('Phòng ĐBCL đào tạo', 'phong', 1),
-('Phòng quản lý nghiên cứu khoa học', 'phong', 1),
-('Phòng quản lý học viên', 'phong', 1),
-('Phòng hậu cần', 'phong', 1),
-('Khoa Lý luận chính trị và KHXHNV', 'khoa', 1),
-('Khoa Luật', 'khoa', 1),
-('Khoa nghiệp vụ cơ bản', 'khoa', 1),
-('Khoa khoa học cơ bản và ngoại ngữ', 'khoa', 1),
-('Khoa quân sự, võ thuật, TDTT', 'khoa', 1),
-('Khoa mật mã', 'khoa', 1),
-('Khoa Công nghệ và ATTT', 'khoa', 1),
-('Khoa Điện tử viễn thông và kỹ thuật nghiệp vụ', 'khoa', 1),
-('Khoa Hồ sơ - Lưu trữ', 'khoa', 1),
-('Khoa Hậu cần', 'khoa', 1),
-('Khoa Y Dược', 'khoa', 1);
+INSERT INTO departments (name, departmentType, headOfficerId, isActive) VALUES
+('Ban Giám đốc', 'ban_giam_doc', 'CB001', 1),
+('Phòng hành chính tổng hợp', 'phong', 'CB005', 1),
+('Phòng chính trị', 'phong', 'CB006', 1),
+('Phòng quản lý đào tạo và BDNC', 'phong', 'CB007', 1),
+('Phòng ĐBCL đào tạo', 'phong', 'CB008', 1),
+('Phòng quản lý nghiên cứu khoa học', 'phong', 'CB009', 1),
+('Phòng quản lý học viên', 'phong', 'CB010', 1),
+('Phòng hậu cần', 'phong', 'CB011', 1),
+('Khoa Lý luận chính trị và KHXHNV', 'khoa', NULL, 1),
+('Khoa Luật', 'khoa', NULL, 1),
+('Khoa nghiệp vụ cơ bản', 'khoa', NULL, 1),
+('Khoa khoa học cơ bản và ngoại ngữ', 'khoa', NULL, 1),
+('Khoa quân sự, võ thuật, TDTT', 'khoa', NULL, 1),
+('Khoa mật mã', 'khoa', NULL, 1),
+('Khoa Công nghệ và ATTT', 'khoa', NULL, 1),
+('Khoa Điện tử viễn thông và kỹ thuật nghiệp vụ', 'khoa', NULL, 1),
+('Khoa Hồ sơ - Lưu trữ', 'khoa', NULL, 1),
+('Khoa Hậu cần', 'khoa', NULL, 1),
+('Khoa Y Dược', 'khoa', NULL, 1);
+
+-- Dong bo khoa ngoai departmentId theo ten don vi cho du lieu seed
+UPDATE officers o
+JOIN departments d ON d.name = o.department
+SET o.departmentId = d.id;
+
+UPDATE work_schedules ws
+JOIN departments d ON d.name = ws.department
+SET ws.departmentId = d.id;
 
 -- ========== HOLIDAYS ==========
 INSERT INTO holidays (holidayDate, holidayName, holidayType, isRecurring) VALUES
@@ -333,25 +361,25 @@ INSERT INTO holidays (holidayDate, holidayName, holidayType, isRecurring) VALUES
 -- ========== WORK SCHEDULES ==========
 INSERT INTO work_schedules (
   id, title, date, startTime, endTime, location, department, type, weekNo, notes,
-  responsibleOfficerId, officer1Id, officer2Id, commanderOfficerId,
+  responsibleOfficerId,
   createdByUserId
 ) VALUES
-('LCT001', 'Giao ban Ban Giám đốc', '2026-04-06', '08:00', '09:30', 'Phòng họp A', 'Ban Giám đốc', 'hop', 15, 'Họp giao ban đầu tuần', 'CB001', 'CB005', 'CB006', 'CB002', 1),
-('LCT002', 'Họp triển khai công tác đào tạo', '2026-04-07', '14:00', '16:00', 'Phòng họp B', 'Phòng quản lý đào tạo và BDNC', 'hop', 15, 'Triển khai kế hoạch tháng 4', 'CB007', 'CB012', 'CB013', 'CB003', 7),
-('LCT003', 'Khảo sát chất lượng đào tạo', '2026-04-08', '09:00', '11:00', 'Khoa Công nghệ và ATTT', 'Phòng ĐBCL đào tạo', 'khaoSat', 15, 'Đánh giá nội bộ', 'CB008', 'CB018', 'CB014', 'CB004', 8),
-('LCT004', 'Hội thảo nghiên cứu khoa học', '2026-04-09', '08:30', '11:30', 'Hội trường lớn', 'Phòng quản lý nghiên cứu khoa học', 'hoiThao', 15, 'Báo cáo đề tài cấp cơ sở', 'CB009', 'CB015', 'CB016', 'CB002', 9),
-('LCT005', 'Lớp bồi dưỡng chuyên môn', '2026-04-10', '13:30', '16:30', 'Phòng học C3', 'Khoa Luật', 'baoCao', 15, 'Nhóm cán bộ đang học', 'CB013', 'CB019', 'CB020', 'CB011', 10);
+('LCT001', 'Giao ban Ban Giám đốc', '2026-04-06', '08:00', '09:30', 'Phòng họp A', 'Ban Giám đốc', 'hop', 15, 'Họp giao ban đầu tuần', 'CB001', 1),
+('LCT002', 'Họp triển khai công tác đào tạo', '2026-04-07', '14:00', '16:00', 'Phòng họp B', 'Phòng quản lý đào tạo và BDNC', 'hop', 15, 'Triển khai kế hoạch tháng 4', 'CB007', 7),
+('LCT003', 'Khảo sát chất lượng đào tạo', '2026-04-08', '09:00', '11:00', 'Khoa Công nghệ và ATTT', 'Phòng ĐBCL đào tạo', 'khaoSat', 15, 'Đánh giá nội bộ', 'CB008', 8),
+('LCT004', 'Hội thảo nghiên cứu khoa học', '2026-04-09', '08:30', '11:30', 'Hội trường lớn', 'Phòng quản lý nghiên cứu khoa học', 'hoiThao', 15, 'Báo cáo đề tài cấp cơ sở', 'CB009', 9),
+('LCT005', 'Lớp bồi dưỡng chuyên môn', '2026-04-10', '13:30', '16:30', 'Phòng học C3', 'Khoa Luật', 'baoCao', 15, 'Nhóm cán bộ đang học', 'CB013', 10);
 
 -- ========== DUTY SCHEDULES ==========
 INSERT INTO duty_schedules (id, officerId, dutyType, date, endDate, weekStartDate, shift, startTime, endTime, location, notes) VALUES
 ('TBGD015', 'CB001', 'director_weekly', '2026-04-06', '2026-04-12', '2026-04-06', 'tuan', '00:00', '23:59', 'Trực ban Giám đốc', 'Tuần 15'),
-('TBCB015-01', 'CB012', 'officer_daily', '2026-04-06', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Cổng chính', ''),
-('TBCB015-02', 'CB013', 'officer_daily', '2026-04-07', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Khu nhà A', ''),
-('TBCB015-03', 'CB014', 'officer_daily', '2026-04-08', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Khu nhà B', ''),
-('TBCB015-04', 'CB015', 'officer_daily', '2026-04-09', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Cổng phụ', ''),
-('TBCB015-05', 'CB016', 'officer_daily', '2026-04-10', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Khu nhà C', ''),
-('TBCB015-06', 'CB018', 'officer_daily', '2026-04-11', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Khu học tập', ''),
-('TBCB015-07', 'CB020', 'officer_daily', '2026-04-12', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Cổng chính', '');
+('TBCB015-01', 'CB012', 'officer_daily', '2026-04-06', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', ''),
+('TBCB015-02', 'CB013', 'officer_daily', '2026-04-06', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà xe', ''),
+('TBCB015-03', 'CB014', 'officer_daily', '2026-04-06', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Trạm xá', ''),
+('TBCB015-04', 'CB015', 'officer_daily', '2026-04-07', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', ''),
+('TBCB015-05', 'CB016', 'officer_daily', '2026-04-07', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà xe', ''),
+('TBCB015-06', 'CB018', 'officer_daily', '2026-04-07', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Trạm xá', ''),
+('TBCB015-07', 'CB020', 'officer_daily', '2026-04-08', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', '');
 
 -- ========== ACTIVITY LOGS ==========
 INSERT INTO activity_logs (actorUserId, actorUsername, actorRole, module, action, entityType, entityId, summary, metadata) VALUES

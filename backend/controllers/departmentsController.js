@@ -6,19 +6,34 @@ const ensureDepartmentsTable = async (connection) => {
       id INT PRIMARY KEY AUTO_INCREMENT,
       name VARCHAR(150) NOT NULL UNIQUE,
       departmentType ENUM('ban_giam_doc', 'phong', 'khoa') NOT NULL,
+      headOfficerId VARCHAR(10) NULL,
       isActive TINYINT(1) DEFAULT 1,
       createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (headOfficerId) REFERENCES officers(id) ON DELETE SET NULL,
       INDEX idx_department_type (departmentType),
+      INDEX idx_head_officer (headOfficerId),
       INDEX idx_is_active (isActive)
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `);
+
+  const [columns] = await connection.execute('SHOW COLUMNS FROM departments');
+  const colNames = new Set(columns.map((c) => c.Field));
+  if (!colNames.has('headOfficerId')) {
+    await connection.execute('ALTER TABLE departments ADD COLUMN headOfficerId VARCHAR(10) NULL AFTER departmentType');
+    await connection.execute('ALTER TABLE departments ADD INDEX idx_head_officer (headOfficerId)');
+  }
 };
 
 const normalizeDepartmentType = (name = '') => {
   if (name === 'Ban Giám đốc') return 'ban_giam_doc';
   if (/^Khoa\s/i.test(name)) return 'khoa';
   return 'phong';
+};
+
+const hasOfficersDepartmentIdColumn = async (connection) => {
+  const [rows] = await connection.execute("SHOW COLUMNS FROM officers LIKE 'departmentId'");
+  return rows.length > 0;
 };
 
 export const getDepartments = async (req, res, next) => {
@@ -28,12 +43,29 @@ export const getDepartments = async (req, res, next) => {
 
     try {
       await ensureDepartmentsTable(connection);
+      const hasDepartmentId = await hasOfficersDepartmentIdColumn(connection);
+      const officerJoin = hasDepartmentId
+        ? 'LEFT JOIN officers ofc ON (ofc.departmentId = d.id OR (ofc.departmentId IS NULL AND ofc.department = d.name))'
+        : 'LEFT JOIN officers ofc ON ofc.department = d.name';
 
       const includeAll = String(includeInactive).toLowerCase() === 'true';
       const [rows] = await connection.execute(
-        `SELECT id, name, departmentType, isActive, createdAt, updatedAt
-         FROM departments
+        `SELECT
+           d.id,
+           d.name,
+           d.departmentType,
+           d.headOfficerId,
+           o.fullName AS headOfficerName,
+           d.isActive,
+           d.createdAt,
+           d.updatedAt,
+           SUM(CASE WHEN ofc.role = 'manager' AND ofc.status = 'active' THEN 1 ELSE 0 END) AS managerCount,
+           SUM(CASE WHEN ofc.role = 'officer' AND ofc.status = 'active' THEN 1 ELSE 0 END) AS officerCount
+         FROM departments d
+         LEFT JOIN officers o ON o.id = d.headOfficerId
+         ${officerJoin}
          ${includeAll ? '' : 'WHERE isActive = 1'}
+         GROUP BY d.id, d.name, d.departmentType, d.headOfficerId, o.fullName, d.isActive, d.createdAt, d.updatedAt
          ORDER BY
            CASE departmentType
              WHEN 'ban_giam_doc' THEN 1
@@ -55,7 +87,7 @@ export const getDepartments = async (req, res, next) => {
 
 export const createDepartment = async (req, res, next) => {
   try {
-    const { name, departmentType = '' } = req.body;
+    const { name, departmentType = '', headOfficerId = null } = req.body;
 
     if (!name || !String(name).trim()) {
       return res.status(400).json({
@@ -79,10 +111,11 @@ export const createDepartment = async (req, res, next) => {
     const connection = await pool.getConnection();
     try {
       await ensureDepartmentsTable(connection);
+      const hasDepartmentId = await hasOfficersDepartmentIdColumn(connection);
 
       const [result] = await connection.execute(
-        'INSERT INTO departments (name, departmentType, isActive) VALUES (?, ?, 1)',
-        [departmentName, type]
+        'INSERT INTO departments (name, departmentType, headOfficerId, isActive) VALUES (?, ?, ?, 1)',
+        [departmentName, type, headOfficerId || null]
       );
 
       res.status(201).json({
@@ -108,7 +141,7 @@ export const createDepartment = async (req, res, next) => {
 export const updateDepartment = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, departmentType, isActive } = req.body;
+    const { name, departmentType, headOfficerId, isActive } = req.body;
 
     const fields = [];
     const params = [];
@@ -133,6 +166,11 @@ export const updateDepartment = async (req, res, next) => {
     if (isActive !== undefined) {
       fields.push('isActive = ?');
       params.push(isActive ? 1 : 0);
+    }
+
+    if (headOfficerId !== undefined) {
+      fields.push('headOfficerId = ?');
+      params.push(headOfficerId || null);
     }
 
     if (!fields.length) {
@@ -192,6 +230,26 @@ export const deleteDepartment = async (req, res, next) => {
           success: false,
           error: 'Department not found',
           code: 'DEPARTMENT_NOT_FOUND',
+        });
+      }
+
+      const [officerRows] = hasDepartmentId
+        ? await connection.execute(
+          `SELECT COUNT(*) AS total
+           FROM officers
+           WHERE departmentId = ?
+              OR (departmentId IS NULL AND department = (SELECT name FROM departments WHERE id = ?))`,
+          [id, id]
+        )
+        : await connection.execute(
+          'SELECT COUNT(*) AS total FROM officers WHERE department = (SELECT name FROM departments WHERE id = ?)',
+          [id]
+        );
+      if ((officerRows[0]?.total || 0) > 0) {
+        return res.status(409).json({
+          success: false,
+          error: 'Cannot delete department while officers are still assigned',
+          code: 'DEPARTMENT_HAS_OFFICERS',
         });
       }
 

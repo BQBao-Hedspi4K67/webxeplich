@@ -107,9 +107,10 @@ const buildFallbackFilename = (endpoint, contentType = '') => {
   const when = params.get('weekNo') || params.get('month') || 'all';
   const formatParam = params.get('format') || '';
 
-  let ext = 'dat';
+  let ext = 'pdf';
   if (formatParam === 'json' || contentType.includes('application/json')) ext = 'json';
   if (formatParam === 'csv' || contentType.includes('text/csv')) ext = 'csv';
+  if (formatParam === 'pdf' || contentType.includes('application/pdf')) ext = 'pdf';
 
   if (path.includes('/exports/download')) {
     return `lich_${type}_${scope}_${when}.${ext}`;
@@ -227,6 +228,9 @@ const apiClient = {
     update: (id, data) => apiClient.put(`/duty-schedules/${id}`, data),
 
     delete: (id) => apiClient.delete(`/duty-schedules/${id}`),
+
+    autoAssignWeek: (weekStartDate) =>
+      apiClient.post('/duty-schedules/auto-assign-week', { weekStartDate }),
 
     // Filters
     byOfficer: (officerId) =>
