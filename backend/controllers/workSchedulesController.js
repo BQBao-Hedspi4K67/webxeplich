@@ -35,6 +35,19 @@ const ensureWorkScheduleApprovalSchema = async (connection) => {
     await connection.execute('CREATE INDEX idx_department_id ON work_schedules (departmentId)');
   }
 
+  if (!colNames.has('createdByOfficerId')) {
+    await connection.execute('ALTER TABLE work_schedules ADD COLUMN createdByOfficerId VARCHAR(10) NULL AFTER createdByUserId');
+    await connection.execute('CREATE INDEX idx_created_by_officer ON work_schedules (createdByOfficerId)');
+  }
+
+  await connection.execute(
+    `UPDATE work_schedules ws
+     LEFT JOIN officers o ON o.userId = ws.createdByUserId
+     SET ws.createdByOfficerId = o.id
+     WHERE ws.createdByOfficerId IS NULL
+       AND ws.createdByUserId IS NOT NULL`
+  );
+
   workScheduleApprovalSchemaEnsured = true;
 };
 
@@ -54,6 +67,95 @@ const resolveDepartmentRef = async (connection, { departmentId, department }) =>
     [department]
   );
   return rows[0] || null;
+};
+
+const resolveRequesterOfficer = async (connection, reqUser = {}) => {
+  const [rowsByUser] = await connection.execute(
+    `SELECT id, departmentId, department
+     FROM officers
+     WHERE userId = ?
+     LIMIT 1`,
+    [reqUser.id]
+  );
+  if (rowsByUser[0]) return rowsByUser[0];
+
+  const [rowsByProfile] = await connection.execute(
+    `SELECT id, departmentId, department
+     FROM officers
+     WHERE (email = ? AND ? <> '') OR fullName = ?
+     LIMIT 1`,
+    [reqUser.email || '', reqUser.email || '', reqUser.fullName || '']
+  );
+  return rowsByProfile[0] || null;
+};
+
+const resolveOfficerDepartment = async (connection, officerId) => {
+  if (!officerId) return null;
+  const [rows] = await connection.execute(
+    `SELECT departmentId, department
+     FROM officers
+     WHERE id = ?
+     LIMIT 1`,
+    [officerId]
+  );
+  return rows[0] || null;
+};
+
+const resolveOfficerByUserId = async (connection, userId) => {
+  if (!userId) return null;
+  const [rows] = await connection.execute(
+    `SELECT id, departmentId, department
+     FROM officers
+     WHERE userId = ?
+     LIMIT 1`,
+    [userId]
+  );
+  return rows[0] || null;
+};
+
+const canManagerApproveSchedule = async (connection, reqUser, schedule) => {
+  const managerOfficer = await resolveRequesterOfficer(connection, reqUser);
+  if (!managerOfficer) return false;
+
+  const managerDepartmentId = Number(managerOfficer.departmentId || 0) || null;
+  const managerDepartmentName = String(managerOfficer.department || '').trim();
+
+  if (schedule.createdByUserId && Number(schedule.createdByUserId) === Number(reqUser.id)) {
+    return true;
+  }
+
+  let creatorOfficer = null;
+
+  if (schedule.createdByOfficerId) {
+    creatorOfficer = {
+      id: schedule.createdByOfficerId,
+      departmentId: schedule.createdByDepartmentId || null,
+      department: schedule.createdByDepartmentName || '',
+    };
+  }
+
+  if (!creatorOfficer && schedule.createdByUserId) {
+    creatorOfficer = await resolveOfficerByUserId(connection, schedule.createdByUserId);
+  }
+
+  if (!creatorOfficer) return false;
+
+  if (creatorOfficer.id && creatorOfficer.id === managerOfficer.id) {
+    return true;
+  }
+
+  const scheduleDepartmentId = Number(creatorOfficer.departmentId || 0) || null;
+  const scheduleDepartmentName = String(creatorOfficer.department || '').trim();
+
+  if (managerDepartmentId && scheduleDepartmentId && managerDepartmentId === scheduleDepartmentId) {
+    return true;
+  }
+
+  if (managerDepartmentName && scheduleDepartmentName && managerDepartmentName === scheduleDepartmentName) {
+    return true;
+  }
+
+  return false;
 };
 
 const buildQuery = (filters = {}, options = {}) => {
@@ -114,6 +216,11 @@ const scheduleSelect = `
     ws.*,
     d.name AS departmentName,
     approver.fullName AS approvedByName,
+    creatorUser.fullName AS createdByUserName,
+    creatorOfficer.id AS createdByOfficerId,
+    creatorOfficer.fullName AS createdByOfficerName,
+    creatorOfficer.departmentId AS createdByDepartmentId,
+    creatorOfficer.department AS createdByDepartmentName,
     ro.fullName AS responsibleOfficerName,
     o1.fullName AS officer1Name,
     o2.fullName AS officer2Name,
@@ -121,6 +228,8 @@ const scheduleSelect = `
   FROM work_schedules ws
   LEFT JOIN departments d ON d.id = ws.departmentId
   LEFT JOIN users approver ON approver.id = ws.approvedByUserId
+  LEFT JOIN users creatorUser ON creatorUser.id = ws.createdByUserId
+  LEFT JOIN officers creatorOfficer ON creatorOfficer.id = ws.createdByOfficerId
   LEFT JOIN officers ro ON ro.id = ws.responsibleOfficerId
   LEFT JOIN officers o1 ON o1.id = ws.officer1Id
   LEFT JOIN officers o2 ON o2.id = ws.officer2Id
@@ -283,6 +392,7 @@ export const createWorkSchedule = async (req, res, next) => {
       const approvalStatus = 'pending';
       const approvedByUserId = null;
       const approvedAt = null;
+      const requesterOfficer = await resolveRequesterOfficer(connection, req.user || {});
       const departmentRef = departmentId
         ? await resolveDepartmentRef(connection, { departmentId, department })
         : null;
@@ -291,8 +401,8 @@ export const createWorkSchedule = async (req, res, next) => {
         `INSERT INTO work_schedules (
           id, title, date, startTime, endTime, location, department, departmentId, type, weekNo, notes,
           responsibleOfficerId, officer1Id, officer2Id, commanderOfficerId,
-          participants, approvalStatus, approvedByUserId, approvedAt, createdByUserId
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )`,
+          participants, approvalStatus, approvedByUserId, approvedAt, createdByUserId, createdByOfficerId
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )`,
         [
           newId,
           title,
@@ -314,6 +424,7 @@ export const createWorkSchedule = async (req, res, next) => {
           approvedByUserId,
           approvedAt,
           req.user?.id || null,
+          requesterOfficer?.id || null,
         ]
       );
 
@@ -397,6 +508,18 @@ export const approveWorkSchedule = async (req, res, next) => {
       }
 
       const schedule = rows[0];
+
+      if (req.user?.role === 'manager') {
+        const allowed = await canManagerApproveSchedule(connection, req.user, schedule);
+        if (!allowed) {
+          return res.status(403).json({
+            success: false,
+            error: 'Manager chỉ được duyệt lịch của mình hoặc lịch của cán bộ thuộc phòng mình.',
+            code: 'MANAGER_APPROVAL_FORBIDDEN',
+          });
+        }
+      }
+
       const approvalStatus = status;
 
       if (approvalStatus === 'approved') {

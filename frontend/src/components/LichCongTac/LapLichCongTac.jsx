@@ -55,7 +55,7 @@ const initialForm = {
 const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], departmentData = [], holidayData = [], reloadData }) => {
   const canCreate = Boolean(user?.role);
   const canEdit = ['Quản trị viên', 'Quản lý'].includes(user?.role);
-  const canReview = user?.backendRole === 'admin';
+  const canReview = user?.backendRole === 'admin' || user?.backendRole === 'manager';
   const [data, setData] = useState(lichCongTacData);
   const [officerOptions, setOfficerOptions] = useState(canBoData || []);
   const [viewMode, setViewMode] = useState('month'); // 'week' | 'month'
@@ -128,12 +128,13 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
     return `${y}-${m}-${d_str}`;
   };
 
-  const donViOptions = Array.from(new Set(
-    data
+  const donViOptions = Array.from(new Set([
+    ...(departmentData || []).map((d) => String(d.name || '').trim()).filter(Boolean),
+    ...data
       .map((l) => l.donVi)
       .filter(Boolean)
-      .flatMap((dv) => String(dv).split(',').map((x) => x.trim()).filter(Boolean))
-  ));
+      .flatMap((dv) => String(dv).split(',').map((x) => x.trim()).filter(Boolean)),
+  ])).sort((a, b) => a.localeCompare(b, 'vi'));
 
   const weekData = data.filter((l) => {
     const inRange = l.ngay >= toDateOnly(weekDates[0]) && l.ngay <= toDateOnly(weekDates[6]);
@@ -265,6 +266,30 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
     return { label: 'Đã duyệt', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
   };
 
+  const canReviewSchedule = (schedule) => {
+    if (!canReview || schedule?.trangThaiDuyet !== 'pending') return false;
+    if (user?.backendRole === 'admin') return true;
+    if (user?.backendRole !== 'manager') return false;
+
+    const currentUserId = Number(user?.userId || 0) || null;
+    const creatorUserId = Number(schedule?.nguoiTaoUserId || 0) || null;
+    if (currentUserId && creatorUserId && currentUserId === creatorUserId) return true;
+
+    if (user?.id && schedule?.nguoiTaoOfficerId && String(user.id) === String(schedule.nguoiTaoOfficerId)) {
+      return true;
+    }
+
+    const managerDepartmentId = Number(user?.departmentId || 0) || null;
+    const creatorDepartmentId = Number(schedule?.nguoiTaoDonViId || 0) || null;
+    if (managerDepartmentId && creatorDepartmentId && managerDepartmentId === creatorDepartmentId) {
+      return true;
+    }
+
+    const managerDepartmentName = String(user?.department || '').trim();
+    const creatorDepartmentName = String(schedule?.nguoiTaoDonVi || '').trim();
+    return Boolean(managerDepartmentName && creatorDepartmentName && managerDepartmentName === creatorDepartmentName);
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-5">
       {/* Header */}
@@ -383,7 +408,8 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                               </span>
                             </div>
                             <div className="text-[9px] opacity-70 mt-0.5">{formatDisplayTime(evt.gioBatDau)}–{formatDisplayTime(evt.gioKetThuc)}</div>
-                            {canReview && evt.trangThaiDuyet === 'pending' && (
+                            <div className="text-[9px] opacity-70">Tạo: {evt.nguoiTao || '---'}</div>
+                            {canReviewSchedule(evt) && (
                               <div className="mt-1 flex items-center gap-1">
                                 <button
                                   type="button"
@@ -491,7 +517,8 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                                 {approval.label}
                               </span>
                             </div>
-                            {canReview && evt.trangThaiDuyet === 'pending' && (
+                            <div className="text-[10px] mt-0.5 opacity-70">Tạo: {evt.nguoiTao || '---'}</div>
+                            {canReviewSchedule(evt) && (
                               <div className="mt-1 flex items-center gap-1">
                                 <button
                                   type="button"

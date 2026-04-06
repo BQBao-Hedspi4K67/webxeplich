@@ -41,6 +41,8 @@ export const DEPARTMENTS = [
   'Phòng quản lý nghiên cứu khoa học',
   'Phòng quản lý học viên',
   'Phòng hậu cần',
+  'Đội lái xe',
+  'Đội bệnh xá',
 ];
 
 export const SCHOOLS = [

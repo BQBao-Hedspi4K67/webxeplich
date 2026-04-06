@@ -16,8 +16,8 @@ router.get('/:id', workCtrl.getWorkScheduleById);
 // Create schedule (all authenticated roles)
 router.post('/', workCtrl.createWorkSchedule);
 
-// Approve/reject schedule (admin/ban giam doc)
-router.put('/:id/approve', requireRole('admin'), workCtrl.approveWorkSchedule);
+// Approve/reject schedule (admin or manager with scoped checks)
+router.put('/:id/approve', requireRole('admin', 'manager'), workCtrl.approveWorkSchedule);
 
 // Update schedule (admin/manager only)
 router.put('/:id', requireRole('admin', 'manager'), workCtrl.updateWorkSchedule);

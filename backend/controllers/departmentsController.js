@@ -5,7 +5,7 @@ const ensureDepartmentsTable = async (connection) => {
     CREATE TABLE IF NOT EXISTS departments (
       id INT PRIMARY KEY AUTO_INCREMENT,
       name VARCHAR(150) NOT NULL UNIQUE,
-      departmentType ENUM('ban_giam_doc', 'phong', 'khoa') NOT NULL,
+      departmentType ENUM('ban_giam_doc', 'phong', 'khoa', 'doi') NOT NULL,
       headOfficerId VARCHAR(10) NULL,
       isActive TINYINT(1) DEFAULT 1,
       createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -17,6 +17,8 @@ const ensureDepartmentsTable = async (connection) => {
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `);
 
+  await connection.execute("ALTER TABLE departments MODIFY COLUMN departmentType ENUM('ban_giam_doc', 'phong', 'khoa', 'doi') NOT NULL");
+
   const [columns] = await connection.execute('SHOW COLUMNS FROM departments');
   const colNames = new Set(columns.map((c) => c.Field));
   if (!colNames.has('headOfficerId')) {
@@ -27,6 +29,7 @@ const ensureDepartmentsTable = async (connection) => {
 
 const normalizeDepartmentType = (name = '') => {
   if (name === 'Ban Giám đốc') return 'ban_giam_doc';
+  if (/^Đội\s/i.test(name)) return 'doi';
   if (/^Khoa\s/i.test(name)) return 'khoa';
   return 'phong';
 };
@@ -100,7 +103,7 @@ export const createDepartment = async (req, res, next) => {
     const departmentName = String(name).trim();
     const type = departmentType || normalizeDepartmentType(departmentName);
 
-    if (!['ban_giam_doc', 'phong', 'khoa'].includes(type)) {
+    if (!['ban_giam_doc', 'phong', 'khoa', 'doi'].includes(type)) {
       return res.status(400).json({
         success: false,
         error: 'Invalid departmentType',
@@ -152,7 +155,7 @@ export const updateDepartment = async (req, res, next) => {
     }
 
     if (departmentType !== undefined) {
-      if (!['ban_giam_doc', 'phong', 'khoa'].includes(departmentType)) {
+      if (!['ban_giam_doc', 'phong', 'khoa', 'doi'].includes(departmentType)) {
         return res.status(400).json({
           success: false,
           error: 'Invalid departmentType',
@@ -223,6 +226,7 @@ export const deleteDepartment = async (req, res, next) => {
 
     try {
       await ensureDepartmentsTable(connection);
+      const hasDepartmentId = await hasOfficersDepartmentIdColumn(connection);
 
       const [checkRows] = await connection.execute('SELECT id FROM departments WHERE id = ? LIMIT 1', [id]);
       if (!checkRows.length) {

@@ -232,6 +232,9 @@ const apiClient = {
     autoAssignWeek: (weekStartDate) =>
       apiClient.post('/duty-schedules/auto-assign-week', { weekStartDate }),
 
+    autoAssignHoliday: (payload = {}) =>
+      apiClient.post('/duty-schedules/auto-assign-holiday', payload),
+
     // Filters
     byOfficer: (officerId) =>
       apiClient.get('/duty-schedules', { officerId }),

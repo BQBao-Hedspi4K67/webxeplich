@@ -15,6 +15,7 @@ export const OFFICER_ROLES = {
 export const DUTY_TYPES = {
   DIRECTOR_WEEKLY: 'director_weekly',
   OFFICER_DAILY: 'officer_daily',
+  HOLIDAY_DAILY: 'holiday_daily',
 };
 
 export const DUTY_STATUS = {

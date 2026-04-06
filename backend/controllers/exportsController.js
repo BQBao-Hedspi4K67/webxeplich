@@ -284,42 +284,91 @@ const writeWorkSchedulePdf = (doc, selectedFont, workRows, bounds) => {
 const buildDutyRowsByDay = (dutyRows, bounds) => {
   const dateList = getDateListByBounds(bounds);
   const byDate = new Map(dateList.map((d) => [d, {
-    nhaHieuBo: '---',
-    nhaXe: '---',
-    tramXa: '---',
-    giamDoc: '---',
+    hbOfficer1: null,
+    hbOfficer2: null,
+    hbCommander: null,
+    driver: null,
+    medic: null,
+    director: null,
   }]));
 
-  const setSlot = (date, key, value) => {
+  const ensureDay = (date) => {
     if (!byDate.has(date)) {
-      byDate.set(date, { nhaHieuBo: '---', nhaXe: '---', tramXa: '---', giamDoc: '---' });
+      byDate.set(date, {
+        hbOfficer1: null,
+        hbOfficer2: null,
+        hbCommander: null,
+        driver: null,
+        medic: null,
+        director: null,
+      });
     }
-    byDate.get(date)[key] = value;
+    return byDate.get(date);
+  };
+
+  const buildPersonText = (row) => {
+    const officerName = row.officerName || row.officerId || '---';
+    const timeRange = formatTimeRange(row.startTime, row.endTime);
+    const dutyTypeTag = row.dutyType === 'holiday_daily' ? ' (Trực lễ)' : '';
+    return `${officerName}${dutyTypeTag}${timeRange ? `\n${timeRange}` : ''}`;
   };
 
   for (const row of dutyRows || []) {
-    const officerName = row.officerName || row.officerId || '';
-    const timeRange = formatTimeRange(row.startTime, row.endTime);
-    const value = `${officerName}${timeRange ? `\n${timeRange}` : ''}`;
+    const value = buildPersonText(row);
 
     if (row.dutyType === 'director_weekly') {
       const start = toDateOnly(row.date);
       const end = toDateOnly(row.endDate || row.date);
       const dates = dateList.length ? dateList.filter((d) => d >= start && d <= end) : [start];
       for (const d of dates) {
-        setSlot(d, 'giamDoc', `Trực ban Giám đốc\n${value}`);
+        const day = ensureDay(d);
+        day.director = `Trực ban Giám đốc\n${value}`;
       }
       continue;
     }
 
     const d = toDateOnly(row.date);
-    if (row.location === 'Nhà hiệu bộ') setSlot(d, 'nhaHieuBo', `Trực cán bộ - Nhà hiệu bộ\n${value}`);
-    if (row.location === 'Nhà xe') setSlot(d, 'nhaXe', `Trực cán bộ - Nhà xe\n${value}`);
-    if (row.location === 'Trạm xá') setSlot(d, 'tramXa', `Trực cán bộ - Trạm xá\n${value}`);
+    const day = ensureDay(d);
+    const dutyRole = String(row.dutyRole || 'officer');
+    const slotNo = Number(row.slotNo || 1);
+    const location = String(row.location || '');
+
+    if (location === 'Nhà hiệu bộ') {
+      if (dutyRole === 'commander') {
+        day.hbCommander = `Chỉ huy: ${value}`;
+      } else if (slotNo === 2) {
+        day.hbOfficer2 = `Cán bộ 2: ${value}`;
+      } else {
+        day.hbOfficer1 = `Cán bộ 1: ${value}`;
+      }
+    }
+
+    if (location === 'Lái xe' || location === 'Nhà xe') {
+      day.driver = value;
+    }
+
+    if (location === 'Bệnh xá' || location === 'Trạm xá') {
+      day.medic = value;
+    }
   }
 
   const keys = dateList.length ? dateList : Array.from(byDate.keys()).sort();
-  return keys.map((date) => ({ date, ...(byDate.get(date) || { nhaHieuBo: '---', nhaXe: '---', tramXa: '---', giamDoc: '---' }) }));
+  return keys.map((date) => {
+    const day = byDate.get(date) || {};
+    const hbText = [
+      day.hbOfficer1,
+      day.hbOfficer2,
+      day.hbCommander,
+    ].filter(Boolean).join('\n\n') || '---';
+
+    return {
+      date,
+      nhaHieuBo: hbText,
+      laiXe: day.driver || '---',
+      benhXa: day.medic || '---',
+      giamDoc: day.director || '---',
+    };
+  });
 };
 
 const writeDutySchedulePdf = (doc, selectedFont, dutyRows, bounds) => {
@@ -329,12 +378,12 @@ const writeDutySchedulePdf = (doc, selectedFont, dutyRows, bounds) => {
   const widths = [90, 108, 108, 108, 108];
   let y = doc.y;
 
-  y = drawTableRow(doc, y, widths, ['THỨ/NGÀY', 'NHÀ HIỆU BỘ', 'NHÀ XE', 'TRẠM XÁ', 'TRỰC BAN GIÁM ĐỐC'], { isHeader: true, minHeight: 30 });
+  y = drawTableRow(doc, y, widths, ['THỨ/NGÀY', 'NHÀ HIỆU BỘ', 'LÁI XE', 'BỆNH XÁ', 'TRỰC BAN GIÁM ĐỐC'], { isHeader: true, minHeight: 30 });
 
   for (const row of rows) {
     y = ensurePageSpace(doc, y, 64, selectedFont);
     const dayCell = `${getWeekdayLabel(row.date)}\n${formatDateVN(row.date)}`;
-    y = drawTableRow(doc, y, widths, [dayCell, row.nhaHieuBo, row.nhaXe, row.tramXa, row.giamDoc], { minHeight: 52 });
+    y = drawTableRow(doc, y, widths, [dayCell, row.nhaHieuBo, row.laiXe, row.benhXa, row.giamDoc], { minHeight: 52 });
   }
 
   if (!rows.length) {
@@ -420,12 +469,15 @@ export const getExportPreview = async (req, res, next) => {
                     ds.startTime,
                     ds.endTime,
                     ds.location,
+                  ds.dutyRole,
+                  ds.slotNo,
+                  ds.assignmentGroup,
                     ds.officerId,
                     o.fullName AS officerName
              FROM duty_schedules ds
              LEFT JOIN officers o ON ds.officerId = o.id
              WHERE (
-               (ds.dutyType = 'officer_daily' AND ds.date BETWEEN ? AND ?)
+               (ds.dutyType IN ('officer_daily', 'holiday_daily') AND ds.date BETWEEN ? AND ?)
                OR
                (ds.dutyType = 'director_weekly' AND ds.date <= ? AND COALESCE(ds.endDate, ds.date) >= ?)
              )
@@ -442,6 +494,9 @@ export const getExportPreview = async (req, res, next) => {
                     ds.startTime,
                     ds.endTime,
                     ds.location,
+                  ds.dutyRole,
+                  ds.slotNo,
+                  ds.assignmentGroup,
                     ds.officerId,
                     o.fullName AS officerName
              FROM duty_schedules ds
@@ -529,12 +584,15 @@ export const downloadExport = async (req, res, next) => {
                ds.startTime,
                ds.endTime,
                ds.location,
+              ds.dutyRole,
+              ds.slotNo,
+              ds.assignmentGroup,
                ds.officerId,
                COALESCE(o.fullName, ds.officerId) AS officerName
              FROM duty_schedules ds
              LEFT JOIN officers o ON o.id = ds.officerId
              WHERE (
-               (ds.dutyType = 'officer_daily' AND ds.date BETWEEN ? AND ?)
+               (ds.dutyType IN ('officer_daily', 'holiday_daily') AND ds.date BETWEEN ? AND ?)
                OR
                (ds.dutyType = 'director_weekly' AND ds.date <= ? AND COALESCE(ds.endDate, ds.date) >= ?)
              )
@@ -552,6 +610,9 @@ export const downloadExport = async (req, res, next) => {
                ds.startTime,
                ds.endTime,
                ds.location,
+              ds.dutyRole,
+              ds.slotNo,
+              ds.assignmentGroup,
                ds.officerId,
                COALESCE(o.fullName, ds.officerId) AS officerName
              FROM duty_schedules ds

@@ -6,6 +6,7 @@ const TYPE_LABEL = {
   ban_giam_doc: 'Ban Giám đốc',
   phong: 'Phòng ban',
   khoa: 'Khoa',
+  doi: 'Đội',
 };
 
 const initialForm = {
@@ -170,6 +171,7 @@ const QuanLyPhongBan = ({ user, departmentData = [], reloadData }) => {
                 <select className="input-field" value={form.departmentType} onChange={(e) => setForm((prev) => ({ ...prev, departmentType: e.target.value }))}>
                   <option value="phong">Phòng ban</option>
                   <option value="khoa">Khoa</option>
+                  <option value="doi">Đội</option>
                   <option value="ban_giam_doc">Ban Giám đốc</option>
                 </select>
               </div>
