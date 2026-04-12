@@ -858,8 +858,8 @@ const assignDutyByDates = async ({ connection, dates, dutyType, actor }) => {
         slotNo: slot.slotNo,
         assignmentGroup,
         notes: dutyType === DUTY_TYPES.HOLIDAY_DAILY
-          ? 'Auto xep truc le theo vong cong bang'
-          : 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)',
+          ? 'Tự động xếp trực lễ theo vòng công bằng'
+          : 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)',
       };
 
       await createDutyRow(connection, row);
@@ -905,6 +905,21 @@ export const autoAssignOfficerDailyWeek = async (req, res, next) => {
     const connection = await pool.getConnection();
     try {
       await ensureDutySchema(connection);
+
+      // Check if this week has already been auto-scheduled
+      const [existingLog] = await connection.execute(
+        'SELECT id FROM auto_schedule_logs WHERE weekStartDate = ? AND scheduleType = ? LIMIT 1',
+        [dates[0], DUTY_TYPES.OFFICER_DAILY]
+      );
+
+      if (existingLog.length > 0) {
+        return res.status(409).json({
+          success: false,
+          error: 'Tuần này đã được tự động xếp lịch rồi. Không được xếp lịch lần thứ 2.',
+          code: 'ALREADY_AUTO_SCHEDULED',
+        });
+      }
+
       const result = await assignDutyByDates({
         connection,
         dates,
@@ -919,6 +934,12 @@ export const autoAssignOfficerDailyWeek = async (req, res, next) => {
           code: result.code,
         });
       }
+
+      // Insert log record to prevent re-scheduling
+      await connection.execute(
+        'INSERT INTO auto_schedule_logs (weekStartDate, scheduleType, createdByUserId, createdByUsername) VALUES (?, ?, ?, ?)',
+        [dates[0], DUTY_TYPES.OFFICER_DAILY, req.user?.id || null, req.user?.username || null]
+      );
 
       return res.status(201).json({
         success: true,
@@ -963,6 +984,10 @@ export const autoAssignHolidayDuty = async (req, res, next) => {
     const connection = await pool.getConnection();
     try {
       await ensureDutySchema(connection);
+
+      // Holiday schedule CAN be re-assigned multiple times (no lock)
+      // Just allow overwriting without checking auto_schedule_logs
+
       const holidaySet = await getHolidaySet(connection, rangeStart, rangeEnd);
       const dates = Array.from(holidaySet).sort();
 
@@ -988,6 +1013,8 @@ export const autoAssignHolidayDuty = async (req, res, next) => {
           code: result.code,
         });
       }
+
+      // Note: Do NOT insert log for holiday_daily - allow re-scheduling multiple times
 
       return res.status(201).json({
         success: true,
@@ -1212,6 +1239,19 @@ export const deleteDutySchedule = async (req, res, next) => {
         return res.status(404).json({ success: false, error: 'Duty schedule not found', code: 'SCHEDULE_NOT_FOUND' });
       }
 
+      const [leaveRows] = await connection.execute(
+        'SELECT id FROM leave_requests WHERE dutyScheduleId = ? LIMIT 1',
+        [id]
+      );
+
+      if (leaveRows.length) {
+        return res.status(409).json({
+          success: false,
+          error: 'Duty schedule is referenced by a leave request and cannot be deleted.',
+          code: 'SCHEDULE_IN_USE',
+        });
+      }
+
       await connection.execute('DELETE FROM duty_schedules WHERE id = ?', [id]);
 
       await logActivity({
@@ -1226,6 +1266,53 @@ export const deleteDutySchedule = async (req, res, next) => {
       });
 
       return res.json({ success: true, message: 'Duty schedule deleted successfully' });
+    } finally {
+      connection.release();
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Check if a week has been auto-scheduled
+export const checkAutoScheduled = async (req, res, next) => {
+  try {
+    const { weekStartDate, scheduleType = 'officer_daily' } = req.query;
+
+    if (!weekStartDate) {
+      return res.status(400).json({
+        success: false,
+        error: 'weekStartDate is required',
+        code: 'MISSING_WEEK_START_DATE',
+      });
+    }
+
+    const formattedDate = toDateOnly(weekStartDate);
+    if (!formattedDate) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid weekStartDate format',
+        code: 'INVALID_DATE_FORMAT',
+      });
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      const [rows] = await connection.execute(
+        'SELECT id, createdAt, createdByUsername FROM auto_schedule_logs WHERE weekStartDate = ? AND scheduleType = ?',
+        [formattedDate, scheduleType]
+      );
+
+      const isScheduled = rows.length > 0;
+      return res.json({
+        success: true,
+        data: {
+          isScheduled,
+          weekStartDate: formattedDate,
+          scheduleType,
+          log: isScheduled ? rows[0] : null,
+        },
+      });
     } finally {
       connection.release();
     }

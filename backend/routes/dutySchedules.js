@@ -10,6 +10,9 @@ router.use(verifyToken);
 // Get duty schedules (all roles can view)
 router.get('/', dutyCtrl.getDutySchedules);
 
+// Check if week has been auto-scheduled (MUST be before /:id)
+router.get('/check-auto-scheduled', dutyCtrl.checkAutoScheduled);
+
 // Get single schedule
 router.get('/:id', dutyCtrl.getDutyScheduleById);
 

@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from 'react';
-import { CalendarCheck2, ClipboardCheck, Filter } from 'lucide-react';
 import { CA_TRUC_COLORS, LOAI_LICH_COLORS } from '../../data/uiConstants';
 
 const simplify = (value) => String(value || '')
@@ -103,50 +102,12 @@ const LichCuaToi = ({ user, canBoData = [], lichCongTacData = [], lichTrucBanDat
       .sort((a, b) => String(a.date).localeCompare(String(b.date)));
   }, [myWorkSchedules, myDutySchedules, monthFilter, typeFilter]);
 
-  const stats = {
-    work: myWorkSchedules.length,
-    duty: myDutySchedules.length,
-    total: myWorkSchedules.length + myDutySchedules.length,
-  };
-
   return (
     <div className="max-w-7xl mx-auto space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Lịch của tôi</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Theo dõi lịch công tác và trực ban được phân công cho chính bạn</p>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="card py-3.5 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-            <CalendarCheck2 size={18} className="text-blue-600" />
-          </div>
-          <div>
-            <div className="text-xl font-extrabold text-blue-600">{stats.work}</div>
-            <div className="text-xs text-slate-500">Lịch công tác của tôi</div>
-          </div>
-        </div>
-
-        <div className="card py-3.5 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
-            <ClipboardCheck size={18} className="text-emerald-600" />
-          </div>
-          <div>
-            <div className="text-xl font-extrabold text-emerald-600">{stats.duty}</div>
-            <div className="text-xs text-slate-500">Ca trực của tôi</div>
-          </div>
-        </div>
-
-        <div className="card py-3.5 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
-            <Filter size={18} className="text-indigo-600" />
-          </div>
-          <div>
-            <div className="text-xl font-extrabold text-indigo-600">{stats.total}</div>
-            <div className="text-xs text-slate-500">Tổng lịch cá nhân</div>
-          </div>
         </div>
       </div>
 

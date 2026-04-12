@@ -86,7 +86,6 @@ const QuanLyNgayLe = ({ user, holidayData = [], reloadData }) => {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Quản lý ngày lễ</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Cập nhật lịch nghỉ lễ và chào cờ trực tiếp từ giao diện.</p>
         </div>
         {canEdit && (
           <button onClick={openAdd} className="btn-primary">

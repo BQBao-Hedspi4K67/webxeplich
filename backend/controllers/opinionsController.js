@@ -434,7 +434,7 @@ export const updateOpinionStatus = async (req, res, next) => {
         const leaveDate = toDateOnly(leaveRequest.leaveDate);
 
         const [dutyRows] = await connection.execute(
-          `SELECT id, dutyType, date
+          `SELECT id, dutyType, date, location, dutyRole, slotNo
            FROM duty_schedules
            WHERE id = ?
            LIMIT 1`,
@@ -443,20 +443,33 @@ export const updateOpinionStatus = async (req, res, next) => {
 
         if (dutyRows.length) {
           const duty = dutyRows[0];
-
-          await connection.execute(
-            'DELETE FROM duty_schedules WHERE id = ?',
-            [duty.id]
-          );
+          const dutyLocation = duty.location;
 
           if (duty.dutyType === 'officer_daily') {
-            // Shift all later officer_daily duties up by one day.
+            const [replacementRows] = await connection.execute(
+              `SELECT officerId
+               FROM duty_schedules
+               WHERE dutyType = 'officer_daily'
+                 AND location = ?
+                 AND dutyRole = ?
+                 AND slotNo = ?
+                 AND id <> ?
+               ORDER BY date DESC
+               LIMIT 1`,
+              [dutyLocation, duty.dutyRole, duty.slotNo, duty.id]
+            );
+
+            const replacementOfficerId = replacementRows[0]?.officerId || null;
+
             await connection.execute(
               `UPDATE duty_schedules
-               SET date = DATE_SUB(date, INTERVAL 1 DAY)
-               WHERE dutyType = 'officer_daily'
-                 AND date > ?`,
-              [leaveDate]
+               SET officerId = ?, notes = CONCAT_WS(' | ', NULLIF(notes, ''), ?)
+               WHERE id = ?`,
+              [
+                replacementOfficerId || duty.officerId,
+                `Đã xử lý đơn xin nghỉ #${id}`,
+                duty.id,
+              ]
             );
           }
         }
@@ -464,16 +477,10 @@ export const updateOpinionStatus = async (req, res, next) => {
         // Remove approved-leave officer from work assignments on leave date.
         await connection.execute(
           `UPDATE work_schedules
-           SET
-             responsibleOfficerId = CASE WHEN responsibleOfficerId = ? AND date = ? THEN NULL ELSE responsibleOfficerId END,
+           SET responsibleOfficerId = NULL
            WHERE date = ?
              AND responsibleOfficerId = ?`,
-          [
-            leaveRequest.officerId,
-            leaveDate,
-            leaveDate,
-            leaveRequest.officerId,
-          ]
+          [leaveDate, leaveRequest.officerId]
         );
       }
 
@@ -514,28 +521,11 @@ export const updateOpinionStatus = async (req, res, next) => {
 
 export const deleteOpinion = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const connection = await pool.getConnection();
-
-    try {
-      const [rows] = await connection.execute(
-        'SELECT id FROM leave_requests WHERE id = ? LIMIT 1',
-        [id]
-      );
-
-      if (!rows.length) {
-        return res.status(404).json({
-          success: false,
-          error: 'Leave request not found',
-          code: 'LEAVE_REQUEST_NOT_FOUND',
-        });
-      }
-
-      await connection.execute('DELETE FROM leave_requests WHERE id = ?', [id]);
-      res.json({ success: true, message: 'Leave request deleted successfully' });
-    } finally {
-      connection.release();
-    }
+    return res.status(405).json({
+      success: false,
+      error: 'Leave requests cannot be deleted. They are preserved for audit purposes.',
+      code: 'METHOD_NOT_ALLOWED',
+    });
   } catch (err) {
     next(err);
   }

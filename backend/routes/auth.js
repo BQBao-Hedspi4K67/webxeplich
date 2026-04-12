@@ -11,6 +11,7 @@ router.post('/logout', authCtrl.logout);
 
 // Protected routes
 router.get('/profile', verifyToken, authCtrl.getProfile);
+router.put('/profile/contact', verifyToken, authCtrl.updateMyContact);
 router.post('/users', verifyToken, requireRole('admin', 'manager'), authCtrl.createUserAccount);
 
 export default router;

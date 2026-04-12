@@ -458,7 +458,7 @@ export const updateLeaveRequestStatus = async (req, res, next) => {
         const leaveDate = toDateOnly(leaveRequest.leaveDate);
 
         const [dutyRows] = await connection.execute(
-          `SELECT id, dutyType, date, location, officerId
+          `SELECT id, dutyType, date, location, officerId, dutyRole, slotNo
            FROM duty_schedules
            WHERE id = ?
            LIMIT 1`,
@@ -469,78 +469,32 @@ export const updateLeaveRequestStatus = async (req, res, next) => {
           const duty = dutyRows[0];
           const dutyLocation = duty.location;
 
-          // ========== DUTY REASSIGNMENT LOGIC ==========
-          // When an officer on duty at location X on date D requests leave:
-          // 1. DELETE the original duty FIRST (to avoid UNIQUE constraint conflict)
-          // 2. Find next officer scheduled for same location X (date > D)
-          // 3. Move that officer to date D
-          // 4. Shift all following officers forward by 1 day for that location
-          
-          // Step 1: Delete the original duty FIRST to avoid constraint violations
-          await connection.execute(
-            'DELETE FROM duty_schedules WHERE id = ?',
-            [duty.id]
-          );
-          
           if (duty.dutyType === 'officer_daily') {
-            // Find next scheduled duty for the same location after this date
-            const [nextDutyRows] = await connection.execute(
-              `SELECT id, officerId, date
+            const [replacementRows] = await connection.execute(
+              `SELECT officerId
                FROM duty_schedules
-               WHERE dutyType = 'officer_daily' 
+               WHERE dutyType = 'officer_daily'
                  AND location = ?
-                 AND date > ?
-               ORDER BY date ASC
+                 AND dutyRole = ?
+                 AND slotNo = ?
+                 AND id <> ?
+               ORDER BY date DESC
                LIMIT 1`,
-              [dutyLocation, leaveDate]
+              [dutyLocation, duty.dutyRole, duty.slotNo, duty.id]
             );
 
-            if (nextDutyRows.length > 0) {
-              const nextDuty = nextDutyRows[0];
-              // Move next officer to cover the leave date
-              await connection.execute(
-                `UPDATE duty_schedules
-                 SET date = ?
-                 WHERE id = ?`,
-                [leaveDate, nextDuty.id]
-              );
+            const replacementOfficerId = replacementRows[0]?.officerId || null;
 
-              // Shift all duties after the next duty forward by 1 day (to maintain rotation)
-              await connection.execute(
-                `UPDATE duty_schedules
-                 SET date = DATE_SUB(date, INTERVAL 1 DAY)
-                 WHERE dutyType = 'officer_daily'
-                   AND location = ?
-                   AND date > ?`,
-                [dutyLocation, nextDuty.date]
-              );
-            } else {
-              // No next duty found, just find any available officer for that location in the past
-              const [anyOfficerRows] = await connection.execute(
-                `SELECT officerId
-                 FROM duty_schedules
-                 WHERE dutyType = 'officer_daily'
-                   AND location = ?
-                 ORDER BY date DESC
-                 LIMIT 1`,
-                [dutyLocation]
-              );
-
-              if (anyOfficerRows.length > 0) {
-                const backupOfficerId = anyOfficerRows[0].officerId;
-                // Create new duty entry for replacement
-                await connection.execute(
-                  `INSERT INTO duty_schedules (id, officerId, dutyType, date, location, notes)
-                   VALUES (?, ?, 'officer_daily', ?, ?, 'Đảm bảo trực thay')`,
-                  [
-                    `TBCB_${leaveDate.replace(/-/g, '')}_${backupOfficerId}`,
-                    backupOfficerId,
-                    leaveDate,
-                    dutyLocation,
-                  ]
-                );
-              }
-            }
+            await connection.execute(
+              `UPDATE duty_schedules
+               SET officerId = ?, notes = CONCAT_WS(' | ', NULLIF(notes, ''), ?)
+               WHERE id = ?`,
+              [
+                replacementOfficerId || duty.officerId,
+                `Đã xử lý đơn xin nghỉ #${id}`,
+                duty.id,
+              ]
+            );
           }
         }
 

@@ -69,7 +69,6 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], reloadData }
     <div className="max-w-7xl mx-auto space-y-5">
       <div>
         <h2 className="text-xl font-bold text-slate-800">Đơn xin nghỉ</h2>
-        <p className="text-sm text-slate-500 mt-0.5">Cán bộ chỉ xin nghỉ theo đúng lịch trực ban đã được phân công.</p>
       </div>
 
       {isCanBo && (

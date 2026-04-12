@@ -63,6 +63,44 @@ const validateDepartment = async (connection, { departmentId, department }) => {
   return rows[0] || null;
 };
 
+const normalizeUsernameToken = (value = '') => {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .trim();
+};
+
+const buildUsernameBase = (fullName = '') => {
+  const tokens = normalizeUsernameToken(fullName).split(/\s+/).filter(Boolean);
+  if (!tokens.length) return 'user';
+  if (tokens.length === 1) return tokens[0].slice(0, 40);
+
+  const lastName = tokens[tokens.length - 1];
+  const initials = tokens.slice(0, -1).map((token) => token[0]).join('');
+  const base = `${initials}${lastName}`;
+  return base.slice(0, 40) || 'user';
+};
+
+const generateUniqueUsername = async (connection, fullName) => {
+  const base = buildUsernameBase(fullName);
+  const [rows] = await connection.execute(
+    'SELECT username FROM users WHERE username LIKE ?',
+    [`${base}%`]
+  );
+
+  const existing = new Set(rows.map((row) => String(row.username || '').toLowerCase()));
+  if (!existing.has(base)) return base;
+
+  let suffix = 2;
+  while (existing.has(`${base}${suffix}`)) {
+    suffix += 1;
+  }
+  return `${base}${suffix}`;
+};
+
 const resolveRequesterOfficer = async (connection, reqUser = {}) => {
   const hasUserIdColumn = await hasOfficersUserIdColumn(connection);
   const hasDepartmentIdColumn = await hasOfficersDepartmentIdColumn(connection);
@@ -126,8 +164,8 @@ export const login = async (req, res, next) => {
       const [officerRows] = hasUserIdColumn
         ? await connection.execute(
           hasDepartmentIdColumn
-            ? 'SELECT id, position, department, departmentId FROM officers WHERE userId = ? LIMIT 1'
-            : 'SELECT id, position, department, NULL AS departmentId FROM officers WHERE userId = ? LIMIT 1',
+            ? 'SELECT id, position, department, departmentId, phone, email FROM officers WHERE userId = ? LIMIT 1'
+            : 'SELECT id, position, department, NULL AS departmentId, phone, email FROM officers WHERE userId = ? LIMIT 1',
           [user.id]
         )
         : [[], null];
@@ -136,7 +174,7 @@ export const login = async (req, res, next) => {
         officerProfile = officerRows[0];
       } else {
         const [fallbackOfficerRows] = await connection.execute(
-          `SELECT id, position, department, ${hasDepartmentIdColumn ? 'departmentId' : 'NULL AS departmentId'} FROM officers
+          `SELECT id, position, department, ${hasDepartmentIdColumn ? 'departmentId' : 'NULL AS departmentId'}, phone, email FROM officers
            WHERE (email = ? AND ? IS NOT NULL AND ? <> '') OR fullName = ?
            LIMIT 1`,
           [user.email || null, user.email || null, user.email || null, user.fullName]
@@ -181,6 +219,7 @@ export const login = async (req, res, next) => {
             position: officerProfile?.position || '',
             department: officerProfile?.department || '',
             departmentId: officerProfile?.departmentId || null,
+            phone: officerProfile?.phone || '',
           },
         },
         message: 'Login successful',
@@ -214,6 +253,7 @@ export const getProfile = async (req, res, next) => {
              o.id AS officerId,
              o.position,
              o.department,
+             o.phone,
              ${hasDepartmentIdColumn ? 'o.departmentId' : 'NULL AS departmentId'}
            FROM users u
            LEFT JOIN officers o ON o.userId = u.id
@@ -233,6 +273,7 @@ export const getProfile = async (req, res, next) => {
              NULL AS officerId,
              NULL AS position,
              NULL AS department,
+             NULL AS phone,
              NULL AS departmentId
            FROM users u
            WHERE u.id = ?
@@ -252,7 +293,7 @@ export const getProfile = async (req, res, next) => {
 
       if (!profile.officerId) {
         const [fallbackOfficerRows] = await connection.execute(
-          `SELECT id, position, department, ${hasDepartmentIdColumn ? 'departmentId' : 'NULL AS departmentId'} FROM officers
+          `SELECT id, position, department, ${hasDepartmentIdColumn ? 'departmentId' : 'NULL AS departmentId'}, phone FROM officers
            WHERE (email = ? AND ? IS NOT NULL AND ? <> '') OR fullName = ?
            LIMIT 1`,
           [profile.email || null, profile.email || null, profile.email || null, profile.fullName]
@@ -273,6 +314,7 @@ export const getProfile = async (req, res, next) => {
             position: fallbackOfficer.position,
             department: fallbackOfficer.department,
             departmentId: fallbackOfficer.departmentId || null,
+            phone: fallbackOfficer.phone || '',
           };
         }
       }
@@ -301,8 +343,6 @@ export const logout = (req, res) => {
 export const createUserAccount = async (req, res, next) => {
   try {
     let {
-      username,
-      password,
       fullName,
       email = null,
       phone = null,
@@ -323,10 +363,10 @@ export const createUserAccount = async (req, res, next) => {
       };
     };
 
-    if (!username || !password || !fullName || (!department && !departmentId)) {
+    if (!fullName || (!department && !departmentId)) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required fields: username, password, fullName, department/departmentId',
+        error: 'Missing required fields: fullName, department/departmentId',
         code: 'VALIDATION_ERROR',
       });
     }
@@ -375,18 +415,7 @@ export const createUserAccount = async (req, res, next) => {
         });
       }
 
-      const [existingUsername] = await connection.execute(
-        'SELECT id FROM users WHERE username = ? LIMIT 1',
-        [username]
-      );
-
-      if (existingUsername.length > 0) {
-        return res.status(409).json({
-          success: false,
-          error: 'Username already exists',
-          code: 'USERNAME_EXISTS',
-        });
-      }
+      const username = await generateUniqueUsername(connection, fullName);
 
       if (email) {
         const [existingEmail] = await connection.execute(
@@ -403,7 +432,7 @@ export const createUserAccount = async (req, res, next) => {
         }
       }
 
-      const passwordHash = await bcrypt.hash(password, 10);
+      const passwordHash = await bcrypt.hash('123456', 10);
 
       const [result] = await connection.execute(
         `INSERT INTO users (username, passwordHash, fullName, email, role, avatar, status)
@@ -474,6 +503,73 @@ export const createUserAccount = async (req, res, next) => {
           officerDepartment,
         },
         message: 'User account created successfully',
+      });
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Update contact info for current user
+export const updateMyContact = async (req, res, next) => {
+  try {
+    const { phone = null, email = null } = req.body || {};
+
+    const normalizedPhone = phone === null ? null : String(phone).trim();
+    const normalizedEmail = email === null ? null : String(email).trim().toLowerCase();
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      if (normalizedEmail) {
+        const [emailRows] = await connection.execute(
+          'SELECT id FROM users WHERE email = ? AND id <> ? LIMIT 1',
+          [normalizedEmail, req.user.id]
+        );
+        if (emailRows.length) {
+          return res.status(409).json({
+            success: false,
+            error: 'Email already exists',
+            code: 'EMAIL_EXISTS',
+          });
+        }
+      }
+
+      await connection.execute(
+        'UPDATE users SET email = ? WHERE id = ?',
+        [normalizedEmail || null, req.user.id]
+      );
+
+      const hasUserIdColumn = await hasOfficersUserIdColumn(connection);
+      if (hasUserIdColumn) {
+        await connection.execute(
+          'UPDATE officers SET phone = ?, email = ? WHERE userId = ?',
+          [normalizedPhone || null, normalizedEmail || null, req.user.id]
+        );
+      } else {
+        await connection.execute(
+          `UPDATE officers
+           SET phone = ?, email = ?
+           WHERE (email = ? AND ? <> '') OR fullName = ?`,
+          [normalizedPhone || null, normalizedEmail || null, req.user.email || '', req.user.email || '', req.user.fullName || '']
+        );
+      }
+
+      await connection.commit();
+
+      return res.json({
+        success: true,
+        data: {
+          phone: normalizedPhone || null,
+          email: normalizedEmail || null,
+        },
+        message: 'Cập nhật thông tin liên hệ thành công.',
       });
     } catch (error) {
       await connection.rollback();

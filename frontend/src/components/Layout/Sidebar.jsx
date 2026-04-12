@@ -8,7 +8,7 @@ import {
 
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
-  { id: 'canbo', label: 'Quản lý cán bộ', icon: Users, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
+  { id: 'canbo', label: 'Quản lý cán bộ', icon: Users, badge: null, roles: ['Quản trị viên', 'Quản lý'] },
   { id: 'lichcongtac', label: 'Lập lịch công tác', icon: CalendarDays, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'lichtrucan', label: 'Lập lịch trực ban', icon: ClipboardList, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'lichcuatoi', label: 'Lịch của tôi', icon: CalendarCheck, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
@@ -18,7 +18,7 @@ const menuItems = [
   { id: 'phongban', label: 'Quản lý phòng ban', icon: Building2, badge: null, roles: ['Quản trị viên'] },
   { id: 'ykien', label: 'Đơn xin nghỉ', icon: MessageSquareQuote, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'quytrinh', label: 'Quy trình chức năng', icon: FileText, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
-  { id: 'taikhoan', label: 'Quản trị tài khoản', icon: Settings, badge: null, roles: ['Quản trị viên', 'Quản lý'] },
+  { id: 'taikhoan', label: 'Quản trị tài khoản', icon: Settings, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
 ];
 
 const Sidebar = ({ activePage, onNavigate, user, onLogout }) => {

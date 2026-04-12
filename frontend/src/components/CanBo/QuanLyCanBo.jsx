@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Search, Filter, Edit2, Trash2, Eye, X, UserCheck, Users, Phone, Mail, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { Search, Filter, Edit2, Trash2, Eye, X, UserCheck, Users, Phone, Mail, Building2, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import apiClient from '../../services/api';
 import { DEPARTMENTS, SCHOOLS } from '../../data/uiConstants';
 
@@ -44,6 +44,8 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
   const [form, setForm] = useState(initialForm);
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [showDeptdropdown, setShowDeptDropdown] = useState(false);
+  const deptDropdownRef = useRef(null);
   const perPage = 8;
 
   useEffect(() => {
@@ -56,17 +58,29 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
       return;
     }
 
-    if (isAdmin && departmentNameOptions.length > 0 && !selectedDepartment) {
-      setSelectedDepartment(departmentNameOptions[0]);
+    if (isAdmin && !selectedDepartment) {
+      setSelectedDepartment('');
     }
-  }, [isAdmin, isManager, user?.department, departmentNameOptions, selectedDepartment]);
+  }, [isAdmin, isManager, user?.department, selectedDepartment]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (deptDropdownRef.current && !deptDropdownRef.current.contains(e.target)) {
+        setShowDeptDropdown(false);
+      }
+    };
+    if (showDeptdropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showDeptdropdown]);
 
   const departmentScopedData = data.filter((cb) => {
     if (isManager) {
       return !user?.department || cb.donVi === user.department;
     }
     if (isAdmin) {
-      return selectedDepartment ? cb.donVi === selectedDepartment : false;
+      return !selectedDepartment || cb.donVi === selectedDepartment;
     }
     return true;
   });
@@ -145,34 +159,62 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Quản lý cán bộ</h2>
-          <p className="text-sm text-slate-500 mt-0.5">
-            {isAdmin
-              ? 'Chọn phòng ban để xem danh sách cán bộ theo từng phòng.'
-              : isManager
-                ? 'Chỉ hiển thị cán bộ thuộc phòng của trưởng phòng.'
-                : 'Quản lý thông tin cán bộ.'}
-          </p>
         </div>
       </div>
 
       {(isAdmin || isManager) && (
-        <div className="card p-3">
-          <div className="flex flex-wrap gap-2">
-            {(isManager ? [user?.department].filter(Boolean) : departmentNameOptions).map((dept) => {
-              const active = selectedDepartment === dept;
-              return (
-                <button
-                  key={dept}
-                  type="button"
-                  onClick={() => setSelectedDepartment(dept)}
-                  className={`px-3 py-1.5 rounded-full text-sm border transition-all ${active
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:text-blue-700'}`}
-                >
-                  {dept}
-                </button>
-              );
-            })}
+        <div className="card p-3 relative">
+          <div className="flex items-center gap-2">
+            <Building2 size={16} className="text-slate-500" />
+            <span className="text-sm font-medium text-slate-700">Chọn phòng/đơn vị:</span>
+            <div className="relative" ref={deptDropdownRef}>
+              <button
+                onClick={() => setShowDeptDropdown(!showDeptdropdown)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:border-blue-300 transition-all min-w-[200px] text-left text-sm"
+              >
+                <span className="flex-1 truncate">{selectedDepartment || 'Tất cả đơn vị'}</span>
+                <ChevronDown size={16} className={`transition-transform flex-shrink-0 ${showDeptdropdown ? 'rotate-180' : ''}`} />
+              </button>
+              {showDeptdropdown && (
+                <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 w-80 max-h-96 overflow-y-auto">
+                  <div className="p-2 space-y-1">
+                    {!isManager && (
+                      <label className="flex items-center gap-2 px-3 py-2 rounded hover:bg-blue-50 cursor-pointer transition-colors border-b border-slate-100">
+                        <input
+                          type="checkbox"
+                          checked={!selectedDepartment}
+                          onChange={() => {
+                            setSelectedDepartment('');
+                            setShowDeptDropdown(false);
+                            setCurrentPage(1);
+                          }}
+                          className="w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer"
+                        />
+                        <span className="text-sm font-semibold text-slate-700 flex-1">Tất cả đơn vị</span>
+                      </label>
+                    )}
+                    {(isManager ? [user?.department].filter(Boolean) : departmentNameOptions).map((dept) => {
+                      const active = selectedDepartment === dept;
+                      return (
+                        <label key={dept} className="flex items-center gap-2 px-3 py-2 rounded hover:bg-blue-50 cursor-pointer transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={active}
+                            onChange={() => {
+                              setSelectedDepartment(dept);
+                              setShowDeptDropdown(false);
+                              setCurrentPage(1);
+                            }}
+                            className="w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer"
+                          />
+                          <span className="text-sm text-slate-700 flex-1">{dept}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

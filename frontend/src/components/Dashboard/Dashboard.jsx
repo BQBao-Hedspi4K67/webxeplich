@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Users, CalendarDays, ClipboardList, AlertCircle,
-  TrendingUp, ArrowUpRight, Clock, MapPin, User, ChevronRight, Mail, Phone
+  TrendingUp, ArrowUpRight, Clock, MapPin, User, ChevronLeft, ChevronRight, Mail, Phone
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -55,6 +55,9 @@ const Dashboard = ({
   thongKeTheoThang = [],
   hoatDongGanDay = [],
 }) => {
+  const OFFICERS_PER_PAGE = 10;
+  const [officerPage, setOfficerPage] = useState(1);
+
   const HOLIDAYS = holidayData.reduce((acc, h) => {
     if (h?.ngay) acc[h.ngay] = h.ten;
     return acc;
@@ -73,8 +76,30 @@ const Dashboard = ({
     if (l.kieuTruc === 'canbo') return l.ngay === today;
     return l.kieuTruc === 'giamdoc' && l.ngay <= today && (l.denNgay || l.ngay) >= today;
   });
+  const todayDutySorted = [...todayDuty].sort((a, b) => {
+    const byLocation = String(a.viTri || '').localeCompare(String(b.viTri || ''));
+    if (byLocation !== 0) return byLocation;
+
+    const roleOrderA = a.vaiTroTruc === 'commander' ? 0 : 1;
+    const roleOrderB = b.vaiTroTruc === 'commander' ? 0 : 1;
+    if (roleOrderA !== roleOrderB) return roleOrderA - roleOrderB;
+
+    return Number(a.slotNo || 1) - Number(b.slotNo || 1);
+  });
   const activeCanBo = canBoData.filter(c => c.trangThai === 'active').length;
-  const quickCanBo = canBoData.slice(0, 6);
+  const quickCanBo = canBoData;
+  const totalOfficerPages = Math.max(1, Math.ceil(quickCanBo.length / OFFICERS_PER_PAGE));
+
+  useEffect(() => {
+    if (officerPage > totalOfficerPages) {
+      setOfficerPage(totalOfficerPages);
+    }
+  }, [officerPage, totalOfficerPages]);
+
+  const pagedOfficers = useMemo(() => {
+    const start = (officerPage - 1) * OFFICERS_PER_PAGE;
+    return quickCanBo.slice(start, start + OFFICERS_PER_PAGE);
+  }, [quickCanBo, officerPage]);
 
   const recentActivities = hoatDongGanDay;
   const todayLabel = new Date().toLocaleDateString('vi-VN', {
@@ -125,87 +150,50 @@ const Dashboard = ({
 
   return (
     <div className="max-w-7xl mx-auto space-y-5">
-      {/* Welcome banner */}
-      <div className="bg-gradient-to-r from-[#1a3a6b] to-[#1e50a0] rounded-2xl p-5 flex items-center justify-between overflow-hidden relative shadow-lg">
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-10 -right-10 w-48 h-48 bg-white/5 rounded-full" />
-          <div className="absolute top-4 right-20 w-24 h-24 bg-white/5 rounded-full" />
-          <div className="absolute -bottom-6 right-40 w-16 h-16 bg-cyan-400/10 rounded-full" />
-        </div>
-        <div className="relative z-10">
-          <p className="text-blue-200 text-xs font-medium mb-1">{todayLabel}</p>
-          <h2 className="text-white text-xl font-bold mb-1">Chào buổi sáng! 👋</h2>
-          <p className="text-blue-200/80 text-sm">
-            Hôm nay có <span className="text-white font-semibold">{todayEvents.length} lịch công tác</span> và{' '}
-            <span className="text-white font-semibold">{todayDuty.length} lịch trực ban</span>
-          </p>
-        </div>
-        <div className="relative z-10 hidden sm:flex items-center gap-2">
-          <button onClick={() => onNavigate('lichcongtac')}
-            className="flex items-center gap-1.5 px-4 py-2 bg-white/15 hover:bg-white/25 text-white text-sm rounded-xl transition-all font-medium border border-white/20">
-            Xem lịch hôm nay <ChevronRight size={14} />
+
+      <div className="card-lg p-0 overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-bold text-slate-800">Lịch tháng</h3>
+          </div>
+          <button onClick={() => onNavigate('lichcongtac')} className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
+            Mở lịch chi tiết <ArrowUpRight size={12} />
           </button>
         </div>
-      </div>
-
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger">
-        <StatCard icon={Users} title="Tổng số cán bộ" value={activeCanBo} sub={`${canBoData.length} tổng · ${canBoData.length - activeCanBo} tạm nghỉ`} color="bg-blue-600" />
-        <StatCard icon={CalendarDays} title="Lịch công tác tuần" value={weekItems.length} sub={`Tuần ${currentWeekNo} · ${weekRangeText}`} color="bg-indigo-500" />
-        <StatCard icon={ClipboardList} title="Trực ban hôm nay" value={todayDuty.length} sub="Theo phân công trong ngày" color="bg-cyan-500" />
-        <StatCard icon={AlertCircle} title="Lịch công tác tháng" value={lichCongTacData.length} sub="Tổng lịch hiện có" color="bg-amber-500" />
-      </div>
-
-      {/* Main content grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        {/* Chart */}
-        <div className="xl:col-span-2 card">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h3 className="text-base font-bold text-slate-800">Thống kê lịch 6 tháng gần nhất</h3>
-            </div>
-            <div className="flex items-center gap-4 text-xs text-slate-500">
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded bg-blue-500" />
-                Lịch công tác
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded bg-cyan-400" />
-                Lịch trực ban
-              </div>
-            </div>
+        <div className="p-4">
+          <div className="grid grid-cols-7 gap-2 text-xs font-semibold text-slate-500 mb-2">
+            {['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'].map((x) => (
+              <div key={x} className="px-2">{x}</div>
+            ))}
           </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={thongKeTheoThang} barSize={14} barGap={4}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-              <XAxis dataKey="thang" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc' }} />
-              <Bar dataKey="lichCongTac" name="Lịch công tác" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="lichTrucBan" name="Lịch trực ban" fill="#22d3ee" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Notifications */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-bold text-slate-800">Thông báo mới</h3>
-            <span className="badge bg-red-100 text-red-600">{thongBaoData.filter(t => !t.daDoc).length} mới</span>
-          </div>
-          <div className="space-y-3">
-            {thongBaoData.slice(0, 4).map(n => {
-              const colors = { success: 'bg-emerald-100 text-emerald-600', warning: 'bg-amber-100 text-amber-600', info: 'bg-blue-100 text-blue-600' };
+          <div className="grid grid-cols-7 gap-2">
+            {monthDays.map((d, idx) => {
+              if (!d) return <div key={`empty-${idx}`} className="h-28 rounded-xl bg-slate-50" />;
+              const dateStr = toDateStr(d);
+              const isToday = dateStr === today;
+              const isMonday = d.getDay() === 1;
+              const holiday = HOLIDAYS[dateStr];
+              const dayEvents = lichCongTacData.filter((x) => x.ngay === dateStr);
               return (
-                <div key={n.id} className={`flex gap-3 p-3 rounded-xl transition-colors hover:bg-slate-50 cursor-pointer ${!n.daDoc ? 'bg-blue-50/60' : ''}`}>
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${colors[n.loai]}`}>
-                    {n.loai === 'success' ? '✓' : n.loai === 'warning' ? '!' : 'i'}
+                <div key={dateStr} className={`h-28 rounded-xl border p-2 overflow-hidden ${isToday ? 'border-blue-500 bg-blue-50/50' : 'border-slate-200 bg-white'}`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`text-xs font-bold ${isToday ? 'text-blue-600' : 'text-slate-700'}`}>{d.getDate()}</span>
+                    {isMonday && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">Chào cờ</span>}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-xs leading-tight text-slate-800 line-clamp-2 ${!n.daDoc ? 'font-semibold' : 'font-medium'}`}>{n.tieuDe}</p>
-                    <p className="text-[10px] text-slate-400 mt-1">{n.thoiGian}</p>
+                  {holiday && <div className="text-[10px] text-red-600 font-medium line-clamp-1">{holiday}</div>}
+                  <div className="space-y-1 mt-1">
+                    {dayEvents.slice(0, 2).map((evt) => {
+                      const colorInfo = LOAI_LICH_COLORS[evt.loai] || LOAI_LICH_COLORS.hop;
+                      const timeDisplay = evt.gioBatDau ? `${evt.gioBatDau}` + (evt.gioKetThuc ? `-${evt.gioKetThuc}` : '') : '';
+                      return (
+                        <div key={evt.id} className={`text-[10px] px-1.5 py-0.5 rounded ${colorInfo.bg} ${colorInfo.text}`}>
+                          {timeDisplay && <span className="font-medium">{timeDisplay} </span>}
+                          {evt.tieuDe}
+                        </div>
+                      );
+                    })}
+                    {dayEvents.length > 2 && <div className="text-[10px] text-slate-400">+{dayEvents.length - 2} lịch</div>}
                   </div>
-                  {!n.daDoc && <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1" />}
                 </div>
               );
             })}
@@ -213,86 +201,55 @@ const Dashboard = ({
         </div>
       </div>
 
-      {/* Bottom grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Today's schedule */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-bold text-slate-800">Lịch công tác hôm nay</h3>
-            <button onClick={() => onNavigate('lichcongtac')} className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
-              Xem tất cả <ArrowUpRight size={12} />
-            </button>
+      <div className="card-lg p-0 overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-bold text-slate-800">Người trực hôm nay</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Ngày {today}</p>
           </div>
-          {todayEvents.length === 0 ? (
-            <div className="text-center py-8 text-slate-400">
-              <CalendarDays size={28} className="mx-auto mb-2 opacity-40" />
-              <p className="text-sm">Không có lịch hôm nay</p>
-            </div>
-          ) : (
-            <div className="space-y-2.5">
-              {todayEvents.map(event => {
-                const colorInfo = LOAI_LICH_COLORS[event.loai] || LOAI_LICH_COLORS.hop;
-                return (
-                  <div key={event.id} className="flex gap-3 items-start p-3 rounded-xl hover:bg-slate-50 transition-colors group cursor-pointer border border-transparent hover:border-slate-200">
-                    <div className="flex flex-col items-center flex-shrink-0 w-12">
-                      <span className="text-[11px] font-bold text-blue-600">{event.gioBatDau}</span>
-                      <div className="w-px h-3 bg-slate-200 my-0.5" />
-                      <span className="text-[10px] text-slate-400">{event.gioKetThuc}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start gap-2 mb-1">
-                        <span className={`badge flex-shrink-0 ${colorInfo.bg} ${colorInfo.text}`}>{colorInfo.label}</span>
-                      </div>
-                      <p className="text-sm font-semibold text-slate-800 leading-tight line-clamp-1">{event.tieuDe}</p>
-                      <div className="flex items-center gap-3 mt-1.5">
-                        <div className="flex items-center gap-1 text-[11px] text-slate-500">
-                          <MapPin size={10} />
-                          <span className="line-clamp-1">{event.diaDiem}</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-[11px] text-slate-500">
-                          <User size={10} />
-                          <span className="truncate">{event.nguoiPhuTrach.split(' ').slice(-2).join(' ')}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <span className="badge bg-blue-100 text-blue-700">{todayDutySorted.length} người trực</span>
         </div>
 
-        {/* Recent activities */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-bold text-slate-800">Hoạt động gần đây</h3>
-            <Clock size={14} className="text-slate-400" />
+        {todayDutySorted.length === 0 ? (
+          <div className="px-5 py-8 text-center text-slate-400 text-sm">Hôm nay chưa có lịch trực.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[860px]">
+              <thead>
+                <tr>
+                  {['Cán bộ', 'Vị trí trực', 'Vai trò', 'Thời gian'].map((h) => (
+                    <th key={h} className="table-th">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {todayDutySorted.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50/70">
+                    <td className="table-td text-sm font-semibold text-slate-800">{item.tenCanBo}</td>
+                    <td className="table-td text-sm text-slate-700">{item.viTri || '-'}</td>
+                    <td className="table-td">
+                      <span className={`badge ${item.kieuTruc === 'giamdoc' || item.vaiTroTruc === 'commander' ? 'bg-purple-100 text-purple-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                        {item.kieuTruc === 'giamdoc' ? 'Trực ban giám đốc' : item.vaiTroTruc === 'commander' ? 'Chỉ huy trực' : 'Cán bộ trực'}
+                      </span>
+                    </td>
+                    <td className="table-td text-sm text-slate-700">
+                      {item.kieuTruc === 'giamdoc'
+                        ? `${item.ngay} - ${item.denNgay || item.ngay}`
+                        : `${item.gioBatDau || '--:--'} - ${item.gioKetThuc || '--:--'}`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div className="space-y-3">
-            {recentActivities.map((act, i) => (
-              <div key={i} className="flex gap-3 items-start group">
-                <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${actColors[act.type] || 'bg-slate-100 text-slate-600'}`}>
-                  {actIcons[act.type] || 'i'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-slate-700 leading-relaxed">{act.text}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">{act.time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        )}
       </div>
 
       <div className="card-lg p-0 overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
             <h3 className="text-base font-bold text-slate-800">Bảng cán bộ nhanh</h3>
-            <p className="text-xs text-slate-400 mt-0.5">Nhúng từ phân hệ Quản lý cán bộ để theo dõi nhanh trên Dashboard</p>
           </div>
-          <button onClick={() => onNavigate('canbo')} className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
-            Mở đầy đủ <ArrowUpRight size={12} />
-          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px]">
@@ -304,7 +261,7 @@ const Dashboard = ({
               </tr>
             </thead>
             <tbody>
-              {quickCanBo.map(cb => (
+              {pagedOfficers.map(cb => (
                 <tr key={cb.id} className="hover:bg-slate-50/70">
                   <td className="table-td">
                     <div className="flex items-center gap-2.5">
@@ -340,57 +297,43 @@ const Dashboard = ({
             </tbody>
           </table>
         </div>
-      </div>
+        {totalOfficerPages > 1 && (
+          <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/50">
+            <span className="text-xs text-slate-500">
+              Trang {officerPage}/{totalOfficerPages} · {quickCanBo.length} cán bộ
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setOfficerPage((p) => Math.max(1, p - 1))}
+                disabled={officerPage === 1}
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-white hover:text-slate-700 disabled:opacity-40 transition-all"
+              >
+                <ChevronLeft size={14} />
+              </button>
 
-      <div className="card-lg p-0 overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-bold text-slate-800">Lịch tháng</h3>
-            <p className="text-xs text-slate-400 mt-0.5">Mặc định thứ 2: Chào cờ, kèm lịch nghỉ lễ</p>
+              {[...Array(totalOfficerPages)].map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setOfficerPage(i + 1)}
+                  className={`w-7 h-7 rounded-lg text-xs font-medium transition-all ${officerPage === i + 1 ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-white'}`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => setOfficerPage((p) => Math.min(totalOfficerPages, p + 1))}
+                disabled={officerPage === totalOfficerPages}
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-white hover:text-slate-700 disabled:opacity-40 transition-all"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
           </div>
-          <button onClick={() => onNavigate('lichcongtac')} className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
-            Mở lịch chi tiết <ArrowUpRight size={12} />
-          </button>
-        </div>
-        <div className="p-4">
-          <div className="grid grid-cols-7 gap-2 text-xs font-semibold text-slate-500 mb-2">
-            {['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'].map((x) => (
-              <div key={x} className="px-2">{x}</div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-2">
-            {monthDays.map((d, idx) => {
-              if (!d) return <div key={`empty-${idx}`} className="h-28 rounded-xl bg-slate-50" />;
-              const dateStr = toDateStr(d);
-              const isToday = dateStr === today;
-              const isMonday = d.getDay() === 1;
-              const holiday = HOLIDAYS[dateStr];
-              const dayEvents = lichCongTacData.filter((x) => x.ngay === dateStr);
-              return (
-                <div key={dateStr} className={`h-28 rounded-xl border p-2 overflow-hidden ${isToday ? 'border-blue-500 bg-blue-50/50' : 'border-slate-200 bg-white'}`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className={`text-xs font-bold ${isToday ? 'text-blue-600' : 'text-slate-700'}`}>{d.getDate()}</span>
-                    {isMonday && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">Chào cờ</span>}
-                  </div>
-                  {holiday && <div className="text-[10px] text-red-600 font-medium line-clamp-1">{holiday}</div>}
-                  <div className="space-y-1 mt-1">
-                    {dayEvents.slice(0, 2).map((evt) => {
-                      const colorInfo = LOAI_LICH_COLORS[evt.loai] || LOAI_LICH_COLORS.hop;
-                      const timeDisplay = evt.gioBatDau ? `${evt.gioBatDau}` + (evt.gioKetThuc ? `-${evt.gioKetThuc}` : '') : '';
-                      return (
-                        <div key={evt.id} className={`text-[10px] px-1.5 py-0.5 rounded ${colorInfo.bg} ${colorInfo.text} line-clamp-1`}>
-                          {timeDisplay && <span className="font-medium">{timeDisplay} </span>}
-                          {evt.tieuDe}
-                        </div>
-                      );
-                    })}
-                    {dayEvents.length > 2 && <div className="text-[10px] text-slate-400">+{dayEvents.length - 2} lịch</div>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

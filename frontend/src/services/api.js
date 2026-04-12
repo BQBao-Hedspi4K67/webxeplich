@@ -173,6 +173,8 @@ const apiClient = {
 
     getProfile: () => apiClient.get('/auth/profile'),
 
+    updateMyContact: (data) => apiClient.put('/auth/profile/contact', data),
+
     createUser: (data) => apiClient.post('/auth/users', data),
   },
 
@@ -234,6 +236,9 @@ const apiClient = {
 
     autoAssignHoliday: (payload = {}) =>
       apiClient.post('/duty-schedules/auto-assign-holiday', payload),
+
+    checkAutoScheduled: (weekStartDate, scheduleType = 'officer_daily') =>
+      apiClient.get('/duty-schedules/check-auto-scheduled', { weekStartDate, scheduleType }),
 
     // Filters
     byOfficer: (officerId) =>

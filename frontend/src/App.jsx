@@ -121,47 +121,18 @@ const resolveOfficerProfile = (profile, officers = []) => {
   return null;
 };
 
-const ROLE_PERMISSIONS = {
-  'Quản trị viên': [
-    { perm: 'Quản lý cán bộ',       granted: true  },
-    { perm: 'Lập lịch công tác',     granted: true  },
-    { perm: 'Lập lịch trực ban',     granted: true  },
-    { perm: 'Phê duyệt lịch',         granted: true  },
-    { perm: 'Xuất / In lịch',         granted: true  },
-    { perm: 'Quản trị tài khoản',     granted: true  },
-  ],
-  'Quản lý': [
-    { perm: 'Xem danh sách cán bộ',   granted: true  },
-    { perm: 'Lập lịch công tác',     granted: true  },
-    { perm: 'Lập lịch trực ban',     granted: true  },
-    { perm: 'Phê duyệt lịch',         granted: true  },
-    { perm: 'Xuất / In lịch',         granted: true  },
-    { perm: 'Quản trị tài khoản',     granted: true },
-  ],
-  'Cán bộ': [
-    { perm: 'Xem danh sách cán bộ',   granted: true  },
-    { perm: 'Xem lịch công tác',      granted: true  },
-    { perm: 'Xem lịch trực ban',      granted: true  },
-    { perm: 'Phê duyệt lịch',         granted: false },
-    { perm: 'Xuất / In lịch',         granted: true  },
-    { perm: 'Quản trị tài khoản',     granted: false },
-  ],
-};
-
 const ROLE_BADGE = {
   'Quản trị viên': 'bg-purple-100 text-purple-700',
   'Quản lý':       'bg-blue-100 text-blue-700',
   'Cán bộ':        'bg-emerald-100 text-emerald-700',
 };
 
-const TaiKhoan = ({ user, reloadData, departmentData = [] }) => {
+const TaiKhoan = ({ user, reloadData, departmentData = [], onUserContactUpdated }) => {
   const canProvisionUser = ['Quản trị viên', 'Quản lý'].includes(user?.role);
   const accountDepartmentOptions = (departmentData || []).length
     ? departmentData.map((d) => ({ id: d.id, name: d.name }))
     : UNIT_OPTIONS.map((name, idx) => ({ id: idx + 1, name }));
   const [createForm, setCreateForm] = useState({
-    username: '',
-    password: '',
     fullName: '',
     email: '',
     phone: '',
@@ -171,28 +142,49 @@ const TaiKhoan = ({ user, reloadData, departmentData = [] }) => {
     role: 'officer',
     status: 'active',
   });
+  const [contactForm, setContactForm] = useState({
+    email: user?.email || '',
+    phone: user?.phone || '',
+  });
+  const [savedContact, setSavedContact] = useState({
+    email: user?.email || '',
+    phone: user?.phone || '',
+  });
   const [createLoading, setCreateLoading] = useState(false);
+  const [contactLoading, setContactLoading] = useState(false);
   const [createResult, setCreateResult] = useState({ type: '', message: '' });
+  const [contactResult, setContactResult] = useState({ type: '', message: '' });
+
+  useEffect(() => {
+    setContactForm({
+      email: user?.email || '',
+      phone: user?.phone || '',
+    });
+    setSavedContact({
+      email: user?.email || '',
+      phone: user?.phone || '',
+    });
+  }, [user?.email, user?.phone]);
 
   const info = {
     avatar: user?.avatar || 'NA',
     hoTen: user?.name || 'Chưa có dữ liệu',
     chucVu: user?.position || 'Chưa cập nhật',
     donVi: user?.department || 'Chưa cập nhật',
-    email: user?.email || 'Chưa cập nhật',
+    email: savedContact.email || 'Chưa cập nhật',
+    phone: savedContact.phone || 'Chưa cập nhật',
     username: user?.username || 'unknown',
   };
-  const perms = ROLE_PERMISSIONS[user?.role] || ROLE_PERMISSIONS['Cán bộ'];
   const badgeClass = ROLE_BADGE[user?.role] || 'bg-slate-100 text-slate-600';
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
     setCreateResult({ type: '', message: '' });
 
-    if (!createForm.username || !createForm.password || !createForm.fullName || !createForm.departmentId) {
+    if (!createForm.fullName || !createForm.departmentId) {
       setCreateResult({
         type: 'error',
-        message: 'Vui lòng nhập đầy đủ: tên đăng nhập, mật khẩu, họ tên, đơn vị.',
+        message: 'Vui lòng nhập đầy đủ: họ tên, đơn vị.',
       });
       return;
     }
@@ -200,8 +192,6 @@ const TaiKhoan = ({ user, reloadData, departmentData = [] }) => {
     try {
       setCreateLoading(true);
       await apiClient.auth.createUser({
-        username: createForm.username.trim(),
-        password: createForm.password,
         fullName: createForm.fullName.trim(),
         email: createForm.email.trim() || null,
         phone: createForm.phone.trim() || null,
@@ -216,11 +206,9 @@ const TaiKhoan = ({ user, reloadData, departmentData = [] }) => {
 
       setCreateResult({
         type: 'success',
-        message: 'Tạo tài khoản mới thành công.',
+        message: 'Tạo tài khoản mới thành công. Username được sinh tự động, mật khẩu mặc định là 123456.',
       });
       setCreateForm({
-        username: '',
-        password: '',
         fullName: '',
         email: '',
         phone: '',
@@ -240,11 +228,47 @@ const TaiKhoan = ({ user, reloadData, departmentData = [] }) => {
     }
   };
 
+  const handleUpdateMyContact = async (e) => {
+    e.preventDefault();
+    setContactResult({ type: '', message: '' });
+
+    try {
+      setContactLoading(true);
+      await apiClient.auth.updateMyContact({
+        email: contactForm.email.trim() || null,
+        phone: contactForm.phone.trim() || null,
+      });
+
+      setSavedContact({
+        email: contactForm.email.trim(),
+        phone: contactForm.phone.trim(),
+      });
+
+      if (onUserContactUpdated) {
+        onUserContactUpdated({
+          email: contactForm.email.trim(),
+          phone: contactForm.phone.trim(),
+        });
+      }
+
+      setContactResult({
+        type: 'success',
+        message: 'Đã lưu thông tin liên hệ thành công.',
+      });
+    } catch (err) {
+      setContactResult({
+        type: 'error',
+        message: err?.message || 'Không thể cập nhật thông tin liên hệ.',
+      });
+    } finally {
+      setContactLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-5">
       <div>
         <h2 className="text-xl font-bold text-slate-800">Quản trị tài khoản</h2>
-        <p className="text-sm text-slate-500 mt-0.5">Quản lý thông tin tài khoản và phân quyền hệ thống</p>
       </div>
       <div className="card">
         <div className="flex items-center gap-4 pb-4 border-b border-slate-100 mb-4">
@@ -263,6 +287,7 @@ const TaiKhoan = ({ user, reloadData, departmentData = [] }) => {
             { label: 'Vai trò', value: user?.role },
             { label: 'Đơn vị', value: info.donVi },
             { label: 'Email', value: info.email },
+            { label: 'Số điện thoại', value: info.phone },
           ].map((f, i) => (
             <div key={i} className="p-3 bg-slate-50 rounded-xl">
               <div className="text-xs text-slate-400 mb-0.5">{f.label}</div>
@@ -271,45 +296,12 @@ const TaiKhoan = ({ user, reloadData, departmentData = [] }) => {
           ))}
         </div>
       </div>
-      <div className="card">
-        <h4 className="text-sm font-bold text-slate-700 mb-3">Phân quyền hệ thống</h4>
-        <div className="space-y-2">
-          {perms.map((p, i) => (
-            <div key={i} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-              <span className="text-sm text-slate-700">{p.perm}</span>
-              <span className={p.granted ? 'badge bg-emerald-100 text-emerald-700' : 'badge bg-slate-100 text-slate-400'}>
-                {p.granted ? 'Được phép' : 'Không cho phép'}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {canProvisionUser && (
         <div className="card">
           <h4 className="text-sm font-bold text-slate-700 mb-1">Tạo tài khoản nội bộ</h4>
-          <p className="text-xs text-slate-500 mb-4">Cán bộ, quản lý mới được cấp tài khoản bởi Ban Giám đốc hoặc Quản lý hiện có.</p>
+          <p className="text-xs text-slate-500 mb-4">Username được sinh tự động theo quy tắc tên viết tắt; mật khẩu mặc định luôn là 123456.</p>
           <form className="space-y-3" onSubmit={handleCreateUser}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Tên đăng nhập <span className="text-red-500">*</span></label>
-                <input
-                  className="input-field"
-                  value={createForm.username}
-                  onChange={(e) => setCreateForm((prev) => ({ ...prev, username: e.target.value }))}
-                  placeholder="vd: quanly_moi"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Mật khẩu <span className="text-red-500">*</span></label>
-                <input
-                  type="password"
-                  className="input-field"
-                  value={createForm.password}
-                  onChange={(e) => setCreateForm((prev) => ({ ...prev, password: e.target.value }))}
-                  placeholder="Nhập mật khẩu tạm"
-                />
-              </div>
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Họ và tên <span className="text-red-500">*</span></label>
                 <input
@@ -405,6 +397,46 @@ const TaiKhoan = ({ user, reloadData, departmentData = [] }) => {
           </form>
         </div>
       )}
+
+      <div className="card">
+        <h4 className="text-sm font-bold text-slate-700 mb-1">Cập nhật thông tin liên hệ của tôi</h4>
+        <p className="text-xs text-slate-500 mb-4">Bạn có thể tự cập nhật số điện thoại và email cá nhân tại đây.</p>
+        <form className="space-y-3" onSubmit={handleUpdateMyContact}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Email</label>
+              <input
+                type="email"
+                className="input-field"
+                value={contactForm.email}
+                onChange={(e) => setContactForm((prev) => ({ ...prev, email: e.target.value }))}
+                placeholder="user@domain.com"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Số điện thoại</label>
+              <input
+                className="input-field"
+                value={contactForm.phone}
+                onChange={(e) => setContactForm((prev) => ({ ...prev, phone: e.target.value }))}
+                placeholder="VD: 0901234567"
+              />
+            </div>
+          </div>
+
+          {contactResult.message && (
+            <div className={`text-sm rounded-xl px-3 py-2 ${contactResult.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+              {contactResult.message}
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <button type="submit" disabled={contactLoading} className="btn-primary">
+              {contactLoading ? 'Đang lưu...' : 'Lưu thông tin liên hệ'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };
@@ -426,7 +458,7 @@ const PAGE_COMPONENTS = {
 const PAGE_ACCESS = {
   'Quản trị viên': ['dashboard', 'canbo', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ngayle', 'phongban', 'ykien', 'quytrinh', 'taikhoan'],
   'Quản lý': ['dashboard', 'canbo', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ngayle', 'ykien', 'quytrinh', 'taikhoan'],
-  'Cán bộ': ['dashboard', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ykien', 'quytrinh'],
+  'Cán bộ': ['dashboard', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ykien', 'quytrinh', 'taikhoan'],
 };
 
 function App() {
@@ -448,7 +480,7 @@ function App() {
     try {
       setLoadingData(true);
       const [officersRes, workRes, dutyRes, leaveRes, notificationsRes, dashboardRes, exportHistoryRes, holidaysRes, departmentsRes] = await Promise.all([
-        apiClient.officers.list(1, 200),
+        apiClient.officers.list(1, 200, { accessScope: 'system' }),
         apiClient.workSchedules.list(1, 500),
         apiClient.dutySchedules.list(1, 500),
         apiClient.leaveRequests.list(1, 500),
@@ -620,6 +652,7 @@ function App() {
           username: profile.username,
           name: profile.fullName,
           email: profile.email,
+          phone: profile.phone || '',
           role: BACKEND_TO_UI_ROLE[profile.role] || 'Cán bộ',
           backendRole: profile.role,
           avatar: profile.avatar,
@@ -653,6 +686,7 @@ function App() {
       username: userData.username,
       name: userData.fullName,
       email: userData.email,
+      phone: userData.phone || '',
       role: BACKEND_TO_UI_ROLE[userData.role] || 'Cán bộ',
       backendRole: userData.role,
       avatar: userData.avatar,
@@ -693,6 +727,13 @@ function App() {
 
   const pageProps = {
     user,
+    onUserContactUpdated: ({ email, phone }) => {
+      setUser((prev) => ({
+        ...prev,
+        email: email ?? '',
+        phone: phone ?? '',
+      }));
+    },
     onNavigate: navigateSafe,
     canBoData,
     departmentData,

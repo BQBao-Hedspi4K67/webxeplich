@@ -10,6 +10,66 @@ const XuatLich = ({ xuatLichHistory = [], reloadData }) => {
     const yearStart = new Date(d.getFullYear(), 0, 1);
     return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
   };
+
+  const toDateOnly = (value) => String(value || '').slice(0, 10);
+  const formatDateVN = (dateValue) => {
+    const [y, m, d] = toDateOnly(dateValue).split('-');
+    if (!y || !m || !d) return toDateOnly(dateValue);
+    return `${d}/${m}/${y}`;
+  };
+  const WEEKDAY_LABELS = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+  const getWeekdayLabel = (dateValue) => {
+    const dt = new Date(`${toDateOnly(dateValue)}T00:00:00`);
+    if (Number.isNaN(dt.getTime())) return '';
+    return WEEKDAY_LABELS[dt.getDay()] || '';
+  };
+  const getIsoWeekRange = (weekNo, year = new Date().getFullYear()) => {
+    const w = Number(weekNo);
+    const y = Number(year);
+    if (!Number.isInteger(w) || w < 1 || w > 53) return null;
+
+    const jan4 = new Date(Date.UTC(y, 0, 4));
+    const jan4Day = jan4.getUTCDay() || 7;
+    const week1Monday = new Date(jan4);
+    week1Monday.setUTCDate(jan4.getUTCDate() - jan4Day + 1);
+
+    const start = new Date(week1Monday);
+    start.setUTCDate(week1Monday.getUTCDate() + (w - 1) * 7);
+    const end = new Date(start);
+    end.setUTCDate(start.getUTCDate() + 6);
+
+    return {
+      startDate: start.toISOString().slice(0, 10),
+      endDate: end.toISOString().slice(0, 10),
+    };
+  };
+  const getScopeBounds = () => {
+    if (exportScope === 'week') return getIsoWeekRange(weekNo);
+    if (exportScope === 'month' && monthValue) {
+      const [y, m] = String(monthValue).split('-').map(Number);
+      if (!y || !m) return null;
+      const start = new Date(Date.UTC(y, m - 1, 1));
+      const end = new Date(Date.UTC(y, m, 0));
+      return {
+        startDate: start.toISOString().slice(0, 10),
+        endDate: end.toISOString().slice(0, 10),
+      };
+    }
+    return null;
+  };
+  const getDateListByBounds = (bounds) => {
+    if (!bounds?.startDate || !bounds?.endDate) return [];
+    const out = [];
+    const cursor = new Date(`${bounds.startDate}T00:00:00Z`);
+    const end = new Date(`${bounds.endDate}T00:00:00Z`);
+
+    while (cursor <= end) {
+      out.push(cursor.toISOString().slice(0, 10));
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+
+    return out;
+  };
   const [exportType, setExportType] = useState('congtac');
   const [exportScope, setExportScope] = useState('week');
   const [weekNo, setWeekNo] = useState(getIsoWeekNo());
@@ -75,28 +135,142 @@ const XuatLich = ({ xuatLichHistory = [], reloadData }) => {
     return entries.map(([label, value]) => `${label}: ${value}`).join(' | ');
   };
 
-  const previewRows = [
-    ...(previewData.workSchedules || []).map((x) => ({
-      loai: 'Công tác',
-      ngay: x.date,
-      noiDung: x.title,
-      thoiGian: `${String(x.startTime || '').slice(0, 5)}–${String(x.endTime || '').slice(0, 5)}`,
-      phuTrach: x.responsibleSummary || buildWorkResponsible(x),
-    })),
-    ...(previewData.dutySchedules || []).map((x) => ({
-      loai: 'Trực ban',
-      ngay: x.date,
-      noiDung: `Trực ban - ${x.officerName || ''}`,
-      thoiGian: `${String(x.startTime || '').slice(0, 5)}–${String(x.endTime || '').slice(0, 5)}`,
-      phuTrach: x.officerName || '',
-    })),
-  ].sort((a, b) => (a.ngay > b.ngay ? 1 : -1));
+  const previewBounds = getScopeBounds();
+  const previewDateList = getDateListByBounds(previewBounds);
+
+  const buildWorkRowsByDay = (workRows, dateList) => {
+    const byDate = new Map();
+    for (const date of dateList) {
+      byDate.set(date, { morning: [], afternoon: [] });
+    }
+
+    for (const row of workRows || []) {
+      const date = toDateOnly(row.date);
+      if (!byDate.has(date)) byDate.set(date, { morning: [], afternoon: [] });
+
+      const start = String(row.startTime || '').slice(0, 5);
+      const end = String(row.endTime || '').slice(0, 5);
+      const timeRange = start && end ? `${start} - ${end}` : start || end || '';
+      const location = row.location ? ` (${row.location})` : '';
+      const responsible = row.responsibleSummary || buildWorkResponsible(row);
+      const line = `${timeRange ? `- ${timeRange}: ` : '- '}${row.title || ''}${location}${responsible ? `\n  ${responsible}` : ''}`;
+
+      const hour = Number(start.slice(0, 2));
+      if (!Number.isNaN(hour) && hour >= 12) {
+        byDate.get(date).afternoon.push(line);
+      } else {
+        byDate.get(date).morning.push(line);
+      }
+    }
+
+    return (dateList.length ? dateList : Array.from(byDate.keys()).sort()).map((date) => {
+      const slot = byDate.get(date) || { morning: [], afternoon: [] };
+      return {
+        date,
+        morningText: slot.morning.join('\n\n') || '---',
+        afternoonText: slot.afternoon.join('\n\n') || '---',
+      };
+    });
+  };
+
+  const buildDutyRowsByDay = (dutyRows, bounds) => {
+    const dateList = getDateListByBounds(bounds);
+    const byDate = new Map(dateList.map((d) => [d, {
+      hbOfficer1: null,
+      hbOfficer2: null,
+      hbCommander: null,
+      driver: null,
+      medic: null,
+      director: null,
+    }]));
+
+    const ensureDay = (date) => {
+      if (!byDate.has(date)) {
+        byDate.set(date, {
+          hbOfficer1: null,
+          hbOfficer2: null,
+          hbCommander: null,
+          driver: null,
+          medic: null,
+          director: null,
+        });
+      }
+      return byDate.get(date);
+    };
+
+    const buildPersonText = (row) => {
+      const officerName = row.officerName || row.officerId || '---';
+      const start = String(row.startTime || '').slice(0, 5);
+      const end = String(row.endTime || '').slice(0, 5);
+      const timeRange = start && end ? `${start} - ${end}` : start || end || '';
+      const dutyTypeTag = row.dutyType === 'holiday_daily' ? ' (Trực lễ)' : '';
+      return `${officerName}${dutyTypeTag}${timeRange ? `\n${timeRange}` : ''}`;
+    };
+
+    for (const row of dutyRows || []) {
+      const value = buildPersonText(row);
+
+      if (row.dutyType === 'director_weekly') {
+        const start = toDateOnly(row.date);
+        const end = toDateOnly(row.endDate || row.date);
+        const dates = dateList.length ? dateList.filter((d) => d >= start && d <= end) : [start];
+        for (const d of dates) {
+          const day = ensureDay(d);
+          day.director = `Trực ban Giám đốc\n${value}`;
+        }
+        continue;
+      }
+
+      const d = toDateOnly(row.date);
+      const day = ensureDay(d);
+      const dutyRole = String(row.dutyRole || 'officer');
+      const slotNo = Number(row.slotNo || 1);
+      const location = String(row.location || '');
+
+      if (location === 'Nhà hiệu bộ') {
+        if (dutyRole === 'commander') {
+          day.hbCommander = `Chỉ huy: ${value}`;
+        } else if (slotNo === 2) {
+          day.hbOfficer2 = `Cán bộ 2: ${value}`;
+        } else {
+          day.hbOfficer1 = `Cán bộ 1: ${value}`;
+        }
+      }
+
+      if (location === 'Lái xe' || location === 'Nhà xe') {
+        day.driver = value;
+      }
+
+      if (location === 'Bệnh xá' || location === 'Trạm xá') {
+        day.medic = value;
+      }
+    }
+
+    const keys = dateList.length ? dateList : Array.from(byDate.keys()).sort();
+    return keys.map((date) => {
+      const day = byDate.get(date) || {};
+      const hbText = [day.hbOfficer1, day.hbOfficer2, day.hbCommander].filter(Boolean).join('\n\n') || '---';
+      return {
+        date,
+        nhaHieuBo: hbText,
+        laiXe: day.driver || '---',
+        benhXa: day.medic || '---',
+        giamDoc: day.director || '---',
+      };
+    });
+  };
+
+  const workPreviewRows = (exportType === 'trucban' ? [] : buildWorkRowsByDay(previewData.workSchedules || [], previewDateList));
+  const dutyPreviewRows = (exportType === 'congtac' ? [] : buildDutyRowsByDay(previewData.dutySchedules || [], previewBounds));
+
+  const renderPreviewCell = (value) => (
+    <div className="whitespace-pre-line leading-5 text-slate-700">{value}</div>
+  );
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
       <div>
         <h2 className="text-xl font-bold text-slate-800">Xuất / In lịch</h2>
-        <p className="text-sm text-slate-500 mt-0.5">Xuất lịch ra file hoặc in trực tiếp</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -183,46 +357,80 @@ const XuatLich = ({ xuatLichHistory = [], reloadData }) => {
                   <FileText size={36} className="opacity-40" />
                 </div>
                 <p className="text-sm font-medium text-slate-500">Chưa có bản xem trước</p>
-                <p className="text-xs text-slate-400 mt-1">Nhấn "Xem trước" để tạo bản xem trước</p>
                 <button onClick={handlePreview} className="btn-primary mt-4"><Eye size={14} /> Tạo bản xem trước</button>
               </div>
             ) : (
               <div className="flex-1 bg-slate-50 rounded-xl overflow-hidden border border-slate-200">
-                {/* Simulated document preview */}
+                {/* PDF-like document preview */}
                 <div className="bg-white mx-6 my-5 rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                  {/* Document header */}
                   <div className="bg-gradient-to-r from-[#0d2240] to-[#1a4a8a] px-6 py-4 text-white text-center">
                     <div className="text-[11px] uppercase tracking-wider text-blue-200 mb-1">BỘ CÔNG AN – HỌC VIỆN KỸ THUẬT VÀ CÔNG NGHỆ AN NINH</div>
                     <div className="text-base font-bold">
                       {exportType === 'congtac' ? 'LỊCH CÔNG TÁC' : exportType === 'trucban' ? 'LỊCH TRỰC BAN' : 'LỊCH CÔNG TÁC & TRỰC BAN'}
                     </div>
-                    <div className="text-xs text-blue-200 mt-1">{exportScope === 'week' ? `Tuần ${weekNo}` : `Tháng ${monthValue}`}</div>
+                    <div className="text-xs text-blue-200 mt-1">{previewBounds ? `(Từ ngày ${formatDateVN(previewBounds.startDate)} đến hết ngày ${formatDateVN(previewBounds.endDate)})` : '(Theo phạm vi được chọn)'}</div>
                   </div>
-                  {/* Document content preview */}
-                  <div className="p-4">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="bg-slate-100">
-                          <th className="text-left py-2 px-2 font-semibold text-slate-600 rounded-l">STT</th>
-                          <th className="text-left py-2 px-2 font-semibold text-slate-600">Ngày</th>
-                          <th className="text-left py-2 px-2 font-semibold text-slate-600">Nội dung</th>
-                          <th className="text-left py-2 px-2 font-semibold text-slate-600">Thời gian</th>
-                          <th className="text-left py-2 px-2 font-semibold text-slate-600 rounded-r">Phụ trách</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {previewRows.slice(0, 20).map((row, i) => (
-                          <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
-                            {[String(i + 1), row.ngay, row.noiDung, row.thoiGian, row.phuTrach].map((cell, j) => (
-                              <td key={j} className={`py-2 px-2 text-slate-700 border-b border-slate-100 ${j === 2 ? 'font-medium' : ''}`}>{cell}</td>
+                  <div className="p-4 space-y-5">
+                    {(exportType === 'congtac' || exportType === 'both') && (
+                      <div className="border border-slate-200 rounded-xl overflow-hidden">
+                        <div className="bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">LỊCH CÔNG TÁC TUẦN</div>
+                        <table className="w-full text-xs table-fixed">
+                          <thead>
+                            <tr className="bg-slate-50">
+                              <th className="w-[24%] text-left py-2 px-2 font-semibold text-slate-600 border-b border-slate-200">THỨ/NGÀY</th>
+                              <th className="w-[38%] text-left py-2 px-2 font-semibold text-slate-600 border-b border-slate-200">SÁNG</th>
+                              <th className="w-[38%] text-left py-2 px-2 font-semibold text-slate-600 border-b border-slate-200">CHIỀU</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {workPreviewRows.map((row, i) => (
+                              <tr key={`${row.date}-${i}`} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                                <td className="py-2 px-2 text-slate-700 border-b border-slate-100 align-top whitespace-pre-line">
+                                  <div className="font-semibold">{getWeekdayLabel(row.date)}</div>
+                                  <div className="text-slate-400">{formatDateVN(row.date)}</div>
+                                </td>
+                                <td className="py-2 px-2 text-slate-700 border-b border-slate-100 align-top whitespace-pre-line">{renderPreviewCell(row.morningText)}</td>
+                                <td className="py-2 px-2 text-slate-700 border-b border-slate-100 align-top whitespace-pre-line">{renderPreviewCell(row.afternoonText)}</td>
+                              </tr>
                             ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <div className="mt-3 flex justify-between text-[10px] text-slate-400">
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {(exportType === 'trucban' || exportType === 'both') && (
+                      <div className="border border-slate-200 rounded-xl overflow-hidden">
+                        <div className="bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">LỊCH TRỰC BAN</div>
+                        <table className="w-full text-xs table-fixed">
+                          <thead>
+                            <tr className="bg-slate-50">
+                              <th className="w-[18%] text-left py-2 px-2 font-semibold text-slate-600 border-b border-slate-200">THỨ/NGÀY</th>
+                              <th className="w-[22%] text-left py-2 px-2 font-semibold text-slate-600 border-b border-slate-200">NHÀ HIỆU BỘ</th>
+                              <th className="w-[18%] text-left py-2 px-2 font-semibold text-slate-600 border-b border-slate-200">LÁI XE</th>
+                              <th className="w-[18%] text-left py-2 px-2 font-semibold text-slate-600 border-b border-slate-200">BỆNH XÁ</th>
+                              <th className="w-[24%] text-left py-2 px-2 font-semibold text-slate-600 border-b border-slate-200">TRỰC BAN GIÁM ĐỐC</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {dutyPreviewRows.map((row, i) => (
+                              <tr key={`${row.date}-${i}`} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                                <td className="py-2 px-2 text-slate-700 border-b border-slate-100 align-top whitespace-pre-line">
+                                  <div className="font-semibold">{getWeekdayLabel(row.date)}</div>
+                                  <div className="text-slate-400">{formatDateVN(row.date)}</div>
+                                </td>
+                                <td className="py-2 px-2 text-slate-700 border-b border-slate-100 align-top whitespace-pre-line">{renderPreviewCell(row.nhaHieuBo)}</td>
+                                <td className="py-2 px-2 text-slate-700 border-b border-slate-100 align-top whitespace-pre-line">{renderPreviewCell(row.laiXe)}</td>
+                                <td className="py-2 px-2 text-slate-700 border-b border-slate-100 align-top whitespace-pre-line">{renderPreviewCell(row.benhXa)}</td>
+                                <td className="py-2 px-2 text-slate-700 border-b border-slate-100 align-top whitespace-pre-line">{renderPreviewCell(row.giamDoc)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between text-[10px] text-slate-400 pt-1">
                       <span>Ngày in: {new Date().toLocaleDateString('vi-VN')}</span>
-                      <span>Dữ liệu lấy từ hệ thống hiện tại</span>
                     </div>
                   </div>
                 </div>

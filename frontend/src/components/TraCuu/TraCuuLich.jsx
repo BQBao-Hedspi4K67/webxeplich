@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Search, Filter, CalendarDays, FileDown, Printer, X,
+  Search, Filter, CalendarDays, Eye, X,
   MapPin, User, Clock, ChevronLeft, ChevronRight, FolderSearch
 } from 'lucide-react';
 import { CA_TRUC_COLORS } from '../../data/uiConstants';
@@ -42,33 +42,6 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
   const [selectedItem, setSelectedItem] = useState(null);
   const perPage = 10;
 
-  const handleExportExcel = async () => {
-    try {
-      const exportType = filterLoai === 'all' ? 'both' : filterLoai;
-      const res = await apiClient.exports.download({
-        type: exportType,
-        scope: 'month',
-        month: filterMonth,
-        format: 'csv',
-      });
-
-      const url = window.URL.createObjectURL(res.blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = res.filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      alert(err?.message || 'Không thể xuất dữ liệu.');
-    }
-  };
-
-  const handlePrint = () => {
-    window.print();
-  };
-
   // Merge both lists into unified search
   const allItems = [
     ...lichCongTacData.map(l => ({ ...l, type: 'congtac' })),
@@ -106,15 +79,6 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Tra cứu lịch</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Tìm kiếm và xem lịch công tác, trực ban trong hệ thống</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button className="btn-secondary" onClick={handleExportExcel}>
-            <FileDown size={15} /> Xuất Excel
-          </button>
-          <button className="btn-secondary" onClick={handlePrint}>
-            <Printer size={15} /> In lịch
-          </button>
         </div>
       </div>
 
@@ -215,8 +179,7 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
                             <span className={`badge text-[11px] ${typeColors[item.type]}`}>{typeLabels[item.type]}</span>
                           </td>
                           <td className="table-td max-w-[240px]">
-                            <div className="font-semibold text-slate-800 text-sm line-clamp-1 group-hover:text-blue-600 transition-colors">{item.tieuDe}</div>
-                            {item.ghiChu && <div className="text-xs text-slate-400 mt-0.5 line-clamp-1">{item.ghiChu}</div>}
+                            <div className="font-semibold text-slate-800 text-sm group-hover:text-blue-600 transition-colors">{item.tieuDe}</div>
                           </td>
                           <td className="table-td whitespace-nowrap">
                             <span className="text-sm font-medium text-slate-700">
@@ -234,19 +197,19 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
                           <td className="table-td max-w-[180px]">
                             <div className="flex items-center gap-1.5 text-sm text-slate-600">
                               <MapPin size={11} className="text-slate-400 flex-shrink-0" />
-                              <span className="line-clamp-1">{item.diaDiem || item.viTri || '—'}</span>
+                              <span>{item.diaDiem || item.viTri || '—'}</span>
                             </div>
                           </td>
                           <td className="table-td">
                             <div className="flex items-center gap-1.5 text-sm text-slate-600">
                               <User size={11} className="text-slate-400 flex-shrink-0" />
-                              <span className="truncate max-w-[120px]">{item.nguoiPhuTrach || '—'}</span>
+                              <span>{item.nguoiPhuTrach || '—'}</span>
                             </div>
                           </td>
                           <td className="table-td">
                             <button onClick={e => { e.stopPropagation(); setSelectedItem(item); }}
                               className="text-xs text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap">
-                              Chi tiết →
+                              <Eye size={14} />
                             </button>
                           </td>
                         </tr>
@@ -373,7 +336,6 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
             </div>
             <div className="flex gap-3 px-6 pb-6">
               <button onClick={() => setSelectedItem(null)} className="btn-secondary flex-1 justify-center">Đóng</button>
-              <button className="btn-primary flex-1 justify-center"><Printer size={14} /> In lịch</button>
             </div>
           </div>
         </div>

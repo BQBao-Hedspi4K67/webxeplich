@@ -255,6 +255,22 @@ CREATE TABLE export_logs (
   INDEX idx_exportType (exportType)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+-- ========== TABLE: auto_schedule_logs ==========
+-- Luu log auto schedule de tranh xep lich 2 lan cho 1 tuan
+CREATE TABLE auto_schedule_logs (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  weekStartDate DATE NOT NULL,
+  scheduleType ENUM('officer_daily', 'holiday_daily') NOT NULL,
+  createdByUserId INT,
+  createdByUsername VARCHAR(50),
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_auto_schedule (weekStartDate, scheduleType),
+  FOREIGN KEY (createdByUserId) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_weekStartDate (weekStartDate),
+  INDEX idx_scheduleType (scheduleType),
+  INDEX idx_createdAt (createdAt)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 -- ========== SEED DATA ==========
 -- Chi GIU schema-only cho 2 bang sau:
 --   1) leave_requests

@@ -82,7 +82,6 @@ const QuanLyPhongBan = ({ user, departmentData = [], reloadData }) => {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Quản lý phòng ban</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Giám đốc quản lý danh mục phòng ban/khoa dùng chung cho toàn hệ thống.</p>
         </div>
         {canEdit && (
           <button onClick={openCreate} className="btn-primary">

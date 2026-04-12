@@ -64,14 +64,6 @@ const BangQuyTrinh = () => {
     <div className="max-w-7xl mx-auto space-y-5">
       <div>
         <h2 className="text-xl font-bold text-slate-800">Bảng quy trình chức năng theo tab</h2>
-        <p className="text-sm text-slate-500 mt-0.5">Tài liệu vận hành nhanh: mỗi tab làm gì và quyền theo từng vai trò.</p>
-      </div>
-
-      <div className="card bg-blue-50/60 border-blue-100">
-        <p className="text-sm text-slate-700">
-          Nguyên tắc phân quyền hiện tại: chức năng không có quyền sẽ không hiển thị nút thao tác trên giao diện.
-          Ví dụ: vai trò Cán bộ không nhìn thấy nút Thêm/Sửa/Xóa ở tab Quản lý cán bộ.
-        </p>
       </div>
 
       <div className="card-lg p-0 overflow-hidden">

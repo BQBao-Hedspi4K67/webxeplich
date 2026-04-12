@@ -204,6 +204,22 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
       return;
     }
 
+    // Kiểm tra thời gian trong phạm vi 7:00-18:00
+    if (form.gioBatDau) {
+      const startHour = parseInt(form.gioBatDau.split(':')[0]);
+      if (startHour < 7 || startHour >= 18) {
+        alert('Giờ bắt đầu phải trong phạm vi 7:00 - 18:00.');
+        return;
+      }
+    }
+    if (form.gioKetThuc) {
+      const endHour = parseInt(form.gioKetThuc.split(':')[0]);
+      if (endHour < 7 || endHour > 18) {
+        alert('Giờ kết thúc phải trong phạm vi 7:00 - 18:00.');
+        return;
+      }
+    }
+
     const payload = {
       title: form.tieuDe,
       date: form.ngay,
@@ -296,7 +312,6 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Lịch công tác</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Quản lý lịch công tác theo tuần và tháng</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setViewMode('week')}
@@ -377,71 +392,113 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
             })}
           </div>
 
-          {/* Time grid */}
-          <div className="overflow-y-auto max-h-[500px]">
-            {HOURS.map((hour, hi) => (
-              <div key={hi} className="grid grid-cols-8 border-b border-slate-50 min-h-[64px]">
-                <div className="p-2 text-[11px] text-slate-400 font-medium border-r border-slate-100 flex items-start pt-2 bg-slate-50/50">
-                  {hour}
-                </div>
-                {[0,1,2,3,4,5,6].map(dayIdx => {
-                  const events = getEventsForDate(dayIdx).filter(e => {
-                    const h = parseInt(e.gioBatDau.split(':')[0]);
-                    return h === parseInt(hour.split(':')[0]);
-                  });
-                  const isToday = toDateOnly(weekDates[dayIdx]) === toDateOnly(new Date());
-                  return (
-                    <div key={dayIdx}
-                      className={`border-r border-slate-100 last:border-r-0 p-1 relative group cursor-pointer ${isToday ? 'bg-blue-50/30' : 'hover:bg-slate-50'} transition-colors`}
-                      onClick={() => canCreate && !events.length && openAdd(dayIdx)}>
-                      {events.map(evt => {
+          {/* Time grid - continuous layout */}
+          <div className="overflow-y-auto max-h-[600px] relative">
+            {/* Time labels and grid lines */}
+            <div className="grid grid-cols-8 relative">
+              <div className="col-span-1">
+                {HOURS.map((hour, hi) => (
+                  <div key={hi} className="h-16 p-2 text-[11px] text-slate-400 font-medium border-r border-slate-100 border-b border-slate-50 bg-slate-50/50 flex items-start">
+                    {hour}
+                  </div>
+                ))}
+              </div>
+              
+              {/* Day columns with events */}
+              {[0,1,2,3,4,5,6].map(dayIdx => {
+                const dayEvents = getEventsForDate(dayIdx);
+                const isToday = toDateOnly(weekDates[dayIdx]) === toDateOnly(new Date());
+                
+                // Xử lý overlapping events - gán column cho mỗi event
+                const processedEvents = dayEvents.map((evt, idx) => {
+                  const startHour = parseInt(evt.gioBatDau.split(':')[0]);
+                  const startMin = parseInt(evt.gioBatDau.split(':')[1]);
+                  const endHour = parseInt(evt.gioKetThuc.split(':')[0]);
+                  const endMin = parseInt(evt.gioKetThuc.split(':')[1]);
+                  const startTotalMin = startHour * 60 + startMin;
+                  const endTotalMin = endHour * 60 + endMin;
+                  
+                  return {
+                    ...evt,
+                    startTotalMin,
+                    endTotalMin,
+                    originalIndex: idx
+                  };
+                }).sort((a, b) => a.startTotalMin - b.startTotalMin);
+                
+                // Tìm overlapping events và gán column
+                const columns = [];
+                processedEvents.forEach(evt => {
+                  let columnIdx = 0;
+                  for (let col of columns) {
+                    const overlapping = col.some(e => 
+                      !(e.endTotalMin <= evt.startTotalMin || e.startTotalMin >= evt.endTotalMin)
+                    );
+                    if (!overlapping) {
+                      columnIdx = Math.max(columnIdx, columns.indexOf(col) + 1);
+                    }
+                  }
+                  
+                  if (!columns[columnIdx]) columns[columnIdx] = [];
+                  columns[columnIdx].push({ ...evt, columnIdx });
+                });
+                
+                const totalColumns = columns.length || 1;
+                const eventsWithLayout = processedEvents.map(evt => {
+                  const col = columns.find(c => c.some(e => e.id === evt.id));
+                  const columnIdx = col ? col[0].columnIdx : 0;
+                  return { ...evt, columnIdx, totalColumns };
+                });
+                
+                return (
+                  <div key={dayIdx} className={`relative col-span-1 border-r border-slate-100 last:border-r-0 ${isToday ? 'bg-blue-50/30' : 'bg-white'}`}>
+                    {/* Hour grid lines */}
+                    {HOURS.map((hour, hi) => (
+                      <div key={hi} className="h-16 border-b border-slate-50 relative" />
+                    ))}
+                    
+                    {/* Events overlay */}
+                    <div className="absolute inset-0 pointer-events-none">
+                      {eventsWithLayout.map(evt => {
                         const colorInfo = LOAI_LICH_COLORS[evt.loai] || LOAI_LICH_COLORS.hop;
-                        const approval = getApprovalBadge(evt.trangThaiDuyet);
+                        
+                        const firstHour = parseInt(HOURS[0].split(':')[0]);
+                        const firstHourTotalMin = firstHour * 60;
+                        const offsetMin = evt.startTotalMin - firstHourTotalMin;
+                        const topOffset = (offsetMin / 60) * 64;
+                        
+                        const durationMin = evt.endTotalMin - evt.startTotalMin;
+                        const height = Math.max(40, (durationMin / 60) * 64);
+                        
+                        // Tính left và width dựa trên column
+                        const widthPercent = (100 / evt.totalColumns);
+                        const leftPercent = (evt.columnIdx * widthPercent);
+                        
                         return (
-                          <div key={evt.id}
+                          <div
+                            key={evt.id}
                             onClick={canEdit ? (e => { e.stopPropagation(); openEdit(evt); }) : undefined}
-                            className={`${colorInfo.bg} ${colorInfo.text} rounded-lg p-1.5 mb-1 cursor-pointer hover:opacity-80 transition-opacity group/evt border border-current border-opacity-20`}>
-                            <div className="flex items-start justify-between gap-1 mb-0.5">
-                              <div className="text-[10px] font-bold leading-tight line-clamp-1 flex-1">{evt.tieuDe}</div>
-                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full border font-semibold whitespace-nowrap ${approval.cls}`}>
-                                {approval.label}
-                              </span>
-                            </div>
+                            className={`absolute p-2 rounded-lg cursor-pointer hover:opacity-90 transition-opacity border border-current border-opacity-30 pointer-events-auto overflow-hidden ${colorInfo.bg} ${colorInfo.text}`}
+                            style={{
+                              top: `${topOffset}px`,
+                              height: `${height}px`,
+                              minHeight: '40px',
+                              left: `${leftPercent}%`,
+                              right: `${100 - (leftPercent + widthPercent)}%`,
+                              margin: '2px'
+                            }}
+                            title={evt.tieuDe}
+                          >
+                            <div className="text-[10px] font-bold leading-tight line-clamp-2">{evt.tieuDe}</div>
                             <div className="text-[9px] opacity-70 mt-0.5">{formatDisplayTime(evt.gioBatDau)}–{formatDisplayTime(evt.gioKetThuc)}</div>
-                            <div className="text-[9px] opacity-70">Tạo: {evt.nguoiTao || '---'}</div>
-                            {canReviewSchedule(evt) && (
-                              <div className="mt-1 flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); handleApprove(evt.id); }}
-                                  className="inline-flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700"
-                                >
-                                  Duyệt
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); handleReject(evt.id); }}
-                                  className="inline-flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded-md bg-rose-600 text-white hover:bg-rose-700"
-                                >
-                                  Không duyệt
-                                </button>
-                              </div>
-                            )}
                           </div>
                         );
                       })}
-                      {!events.length && (
-                        <div className="absolute inset-1 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center">
-                            <Plus size={10} className="text-blue-500" />
-                          </div>
-                        </div>
-                      )}
                     </div>
-                  );
-                })}
-              </div>
-            ))}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       ) : viewMode === 'month' ? (
@@ -501,41 +558,18 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                       {dayEvents.slice(0, 3).map((evt, eIdx) => {
                         const colorInfo = LOAI_LICH_COLORS[evt.loai] || LOAI_LICH_COLORS.hop;
                         const timeDisplay = evt.gioBatDau ? `${evt.gioBatDau.slice(0, 5)}` : '';
-                        const approval = getApprovalBadge(evt.trangThaiDuyet);
                         return (
                           <div 
                             key={evt.id}
-                            className={`text-[11px] px-2 py-1.5 rounded-md transition-all duration-150 cursor-pointer hover:shadow-sm hover:scale-105 transform origin-left border border-current border-opacity-30 group/evt ${colorInfo.bg} ${colorInfo.text}`}
+                            className={`text-[11px] px-2 py-1 rounded-md transition-all duration-150 cursor-pointer hover:shadow-sm border border-current border-opacity-30 group/evt ${colorInfo.bg} ${colorInfo.text}`}
                             onClick={(e) => { e.stopPropagation(); openEdit(evt); }}
                             title={evt.tieuDe}>
-                            <div className="flex items-start gap-1 justify-between">
+                            <div className="flex items-start gap-1">
                               {timeDisplay && (
-                                <span className="font-bold whitespace-nowrap text-opacity-80 flex-shrink-0">{timeDisplay}</span>
+                                <span className="font-bold whitespace-nowrap flex-shrink-0">{timeDisplay}</span>
                               )}
-                              <span className="font-medium line-clamp-1 flex-1 group-hover/evt:underline">{evt.tieuDe}</span>
-                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full border font-semibold whitespace-nowrap ${approval.cls}`}>
-                                {approval.label}
-                              </span>
+                              <span className="font-medium flex-1 group-hover/evt:underline">{evt.tieuDe}</span>
                             </div>
-                            <div className="text-[10px] mt-0.5 opacity-70">Tạo: {evt.nguoiTao || '---'}</div>
-                            {canReviewSchedule(evt) && (
-                              <div className="mt-1 flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); handleApprove(evt.id); }}
-                                  className="inline-flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700"
-                                >
-                                  Duyệt
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); handleReject(evt.id); }}
-                                  className="inline-flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded-md bg-rose-600 text-white hover:bg-rose-700"
-                                >
-                                  Không duyệt
-                                </button>
-                              </div>
-                            )}
                           </div>
                         );
                       })}
@@ -588,12 +622,12 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                   <input type="date" className="input-field" value={form.ngay} onChange={e => setForm({...form, ngay: e.target.value})} />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Từ giờ</label>
-                  <input type="time" className="input-field" value={form.gioBatDau} onChange={e => setForm({...form, gioBatDau: e.target.value})} />
+                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Từ giờ (7:00-18:00)</label>
+                  <input type="time" className="input-field" value={form.gioBatDau} min="07:00" max="18:00" onChange={e => setForm({...form, gioBatDau: e.target.value})} />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đến giờ</label>
-                  <input type="time" className="input-field" value={form.gioKetThuc} onChange={e => setForm({...form, gioKetThuc: e.target.value})} />
+                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đến giờ (7:00-18:00)</label>
+                  <input type="time" className="input-field" value={form.gioKetThuc} min="07:00" max="18:00" onChange={e => setForm({...form, gioKetThuc: e.target.value})} />
                 </div>
               </div>
               <div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, ChevronLeft, ChevronRight, X, Edit2, Trash2, ShieldCheck, Users, Star, Shuffle } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, X, Edit2, Eye, Trash2, Shuffle } from 'lucide-react';
 import { WEEK_DAYS } from '../../data/uiConstants';
 import apiClient from '../../services/api';
 import { confirmDialog } from '../../utils/notify';
@@ -69,10 +69,43 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
   const [singleOfficerId, setSingleOfficerId] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [isAutoAssigning, setIsAutoAssigning] = useState(false);
+  const [isWeekAutoScheduled, setIsWeekAutoScheduled] = useState(false);
+  const [isLoadingScheduleStatus, setIsLoadingScheduleStatus] = useState(false);
 
   useEffect(() => {
     setData(lichTrucBanData);
   }, [lichTrucBanData]);
+
+  useEffect(() => {
+    const checkAutoScheduledStatus = async () => {
+      // Nếu là holiday mode, không check (cho phép xếp lại bao nhiêu lần tùy ý)
+      if (!canEdit || mode === 'trucle' || mode === 'giamdoc') {
+        setIsWeekAutoScheduled(false);
+        return;
+      }
+      
+      setIsLoadingScheduleStatus(true);
+      try {
+        // Tính weekStartDate trực tiếp từ weekOffset
+        const weekStart = getWeekStart(weekOffset);
+        const weekStartDate = toDateOnly(weekStart);
+        
+        const res = await apiClient.dutySchedules.checkAutoScheduled(weekStartDate, 'officer_daily');
+        if (res?.data?.isScheduled) {
+          setIsWeekAutoScheduled(true);
+        } else {
+          setIsWeekAutoScheduled(false);
+        }
+      } catch (err) {
+        console.error('Lỗi kiểm tra auto schedule:', err);
+        setIsWeekAutoScheduled(false);
+      } finally {
+        setIsLoadingScheduleStatus(false);
+      }
+    };
+
+    checkAutoScheduledStatus();
+  }, [weekOffset, mode, canEdit]);
 
   const weekStart = getWeekStart(weekOffset);
   const weekDates = useMemo(
@@ -128,27 +161,78 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
     [data, weekDates]
   );
 
+  // Thống kê trực của từng cán bộ
+  const dutyStats = useMemo(() => {
+    const stats = {};
+    
+    // Tạo object thống kê cho từng officer
+    canBoData.forEach(cb => {
+      stats[cb.id] = {
+        id: cb.id,
+        hoTen: cb.hoTen,
+        vaiTro: cb.vaiTro,
+        donVi: cb.donVi,
+        ngayThuong: 0,
+        cuoiTuan: 0,
+        ngayLe: 0,
+      };
+    });
+
+    // Đếm từ dữ liệu duty schedules
+    data.forEach(x => {
+      if (!stats[x.canBoId]) {
+        stats[x.canBoId] = {
+          id: x.canBoId,
+          hoTen: '?',
+          vaiTro: '',
+          donVi: '',
+          ngayThuong: 0,
+          cuoiTuan: 0,
+          ngayLe: 0,
+        };
+      }
+
+      if (x.loaiTruc === 'holiday_daily') {
+        stats[x.canBoId].ngayLe++;
+      } else if (x.loaiTruc === 'officer_daily') {
+        const dateObj = new Date(`${x.ngay}T00:00:00Z`);
+        const dayOfWeek = dateObj.getUTCDay();
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+          stats[x.canBoId].cuoiTuan++;
+        } else {
+          stats[x.canBoId].ngayThuong++;
+        }
+      }
+    });
+
+    return Object.values(stats)
+      .filter(s => s.ngayThuong > 0 || s.cuoiTuan > 0 || s.ngayLe > 0)
+      .sort((a, b) => {
+        const totalA = a.ngayThuong + a.cuoiTuan + a.ngayLe;
+        const totalB = b.ngayThuong + b.cuoiTuan + b.ngayLe;
+        return totalB - totalA;
+      });
+  }, [data, canBoData]);
+
   const activeOfficers = useMemo(() => canBoData.filter((x) => x.trangThai === 'active'), [canBoData]);
   const hbOfficerOptions = useMemo(() => activeOfficers.filter((x) => x.vaiTro === 'Cán bộ'), [activeOfficers]);
   const commanderOptions = useMemo(() => activeOfficers.filter(commanderEligible), [activeOfficers]);
   const driverOptions = useMemo(() => activeOfficers.filter((x) => x.donVi === 'Đội lái xe' && x.vaiTro === 'Cán bộ'), [activeOfficers]);
   const medicOptions = useMemo(() => activeOfficers.filter((x) => x.donVi === 'Đội bệnh xá' && x.vaiTro === 'Cán bộ'), [activeOfficers]);
 
-  const stats = {
-    giamDocWeeks: data.filter((x) => x.loaiTruc === 'director_weekly').length,
-    canBoToday: data.filter((x) => (x.loaiTruc === 'officer_daily' || x.loaiTruc === 'holiday_daily') && x.ngay === toDateOnly(new Date())).length,
-    canBoTrongTuan: officerWeekData.length,
-    trucLeTrongTuan: holidayDutyData.length,
-  };
-
   const renderDutyCell = (slot, emptyText = 'Chưa phân công') => (
     slot ? (
       <button
         onClick={() => openEditSingle(slot)}
-        className="text-left w-full h-12 p-2 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100"
+        className="text-left w-full h-12 p-2 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100 flex items-center gap-2"
+        title="Chi tiết"
+        aria-label="Chi tiết"
       >
-        <div className="text-sm font-semibold text-slate-800 line-clamp-1">{slot.tenCanBo}</div>
-        <div className="text-xs text-slate-400 font-mono">{slot.canBoId}</div>
+        <Eye size={14} className="text-slate-500 flex-shrink-0" />
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-slate-800 line-clamp-1 whitespace-nowrap">{slot.tenCanBo}</div>
+          <div className="text-xs text-slate-400 font-mono">{slot.canBoId}</div>
+        </div>
       </button>
     ) : <span className="text-slate-400 text-sm">{emptyText}</span>
   );
@@ -266,6 +350,12 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
         ? await apiClient.dutySchedules.autoAssignHoliday({ fromDate: holidayStart, toDate: holidayEnd })
         : await apiClient.dutySchedules.autoAssignWeek(weekDates[0]);
       if (reloadData) await reloadData();
+      
+      // Mark this week/period as auto-scheduled
+      if (!isHolidayMode) {
+        setIsWeekAutoScheduled(true);
+      }
+      
       alert(res?.message || 'Đã tự động xếp lịch.');
     } catch (err) {
       alert(err?.message || 'Không thể tự động xếp lịch.');
@@ -306,8 +396,8 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
                 return (
                   <tr key={`${dutyType}-${date}`} className="hover:bg-slate-50/70">
                     <td className="table-td">
-                      <div className="font-semibold text-slate-700">{WEEK_DAYS[idx]}</div>
-                      <div className="text-xs text-slate-400">{formatDDMM(date)}</div>
+                      <div className="font-semibold text-slate-700 whitespace-nowrap inline-block">{WEEK_DAYS[idx]}</div>
+                      <div className="text-xs text-slate-400 whitespace-nowrap inline ml-2">{formatDDMM(date)}</div>
                       {holidayName && <div className="text-[11px] text-red-600 font-semibold mt-1">{holidayName}</div>}
                     </td>
                     <td className="table-td">{renderDutyCell(slot1)}</td>
@@ -319,9 +409,11 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
                       {canEdit && !blocked && (
                         <button
                           onClick={() => openDayAssign(date, dutyType)}
-                          className="text-xs text-blue-600 hover:text-blue-700 font-semibold"
+                          className="inline-flex items-center justify-center w-7 h-7 mr-6 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700"
+                          title="Thiết lập ngày"
+                          aria-label="Thiết lập ngày"
                         >
-                          Thiết lập ngày
+                          <Edit2 size={12} />
                         </button>
                       )}
                       {blocked && (
@@ -411,18 +503,89 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
     );
   };
 
+  const renderThongKe = () => {
+    return (
+      <div className="card-lg p-0 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[800px]">
+            <thead>
+              <tr>
+                <th className="table-th">Cán bộ</th>
+                <th className="table-th">Chức vụ</th>
+                <th className="table-th">Đơn vị</th>
+                <th className="table-th text-center">Ngày thường</th>
+                <th className="table-th text-center">Cuối tuần</th>
+                <th className="table-th text-center">Ngày lễ</th>
+                <th className="table-th text-center font-bold">Tổng cộng</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dutyStats.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="table-td text-center py-8 text-slate-400">
+                    Chưa có dữ liệu thống kê
+                  </td>
+                </tr>
+              ) : (
+                dutyStats.map((stat, idx) => {
+                  const total = stat.ngayThuong + stat.cuoiTuan + stat.ngayLe;
+                  return (
+                    <tr key={stat.id} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="table-td">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-600">
+                            {stat.hoTen.charAt(0)}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-slate-800">{stat.hoTen}</div>
+                            <div className="text-xs text-slate-400">{stat.id}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="table-td">
+                        <span className="text-sm text-slate-600">{stat.vaiTro}</span>
+                      </td>
+                      <td className="table-td">
+                        <span className="text-sm text-slate-600">{stat.donVi}</span>
+                      </td>
+                      <td className="table-td text-center">
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-amber-100 text-sm font-bold text-amber-700">
+                          {stat.ngayThuong}
+                        </span>
+                      </td>
+                      <td className="table-td text-center">
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-orange-100 text-sm font-bold text-orange-700">
+                          {stat.cuoiTuan}
+                        </span>
+                      </td>
+                      <td className="table-td text-center">
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-100 text-sm font-bold text-red-700">
+                          {stat.ngayLe}
+                        </span>
+                      </td>
+                      <td className="table-td text-center">
+                        <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 text-sm font-bold text-blue-700">
+                          {total}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-5">
-      {!canEdit && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <p className="text-sm text-amber-800 font-medium">Chỉ Giám đốc mới có quyền phân công lịch trực ban.</p>
-        </div>
-      )}
+
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Lập lịch trực ban</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Nhà hiệu bộ: 2 cán bộ + 1 chỉ huy, Lái xe: 1 cán bộ, Bệnh xá: 1 cán bộ.</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setMode('canbo')} className={`px-3 py-2 rounded-xl text-sm font-medium ${mode === 'canbo' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>
@@ -434,30 +597,14 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
           <button onClick={() => setMode('giamdoc')} className={`px-3 py-2 rounded-xl text-sm font-medium ${mode === 'giamdoc' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>
             Trực ban Giám đốc
           </button>
+          <button onClick={() => setMode('thongke')} className={`px-3 py-2 rounded-xl text-sm font-medium ${mode === 'thongke' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>
+            Thống kê
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: 'Tuần trực giám đốc', value: stats.giamDocWeeks, color: 'text-violet-600', bg: 'bg-violet-50', icon: Star },
-          { label: 'Cán bộ trực hôm nay', value: stats.canBoToday, color: 'text-blue-600', bg: 'bg-blue-50', icon: Users },
-          { label: 'Lịch cán bộ tuần này', value: stats.canBoTrongTuan, color: 'text-amber-600', bg: 'bg-amber-50', icon: ShieldCheck },
-          { label: 'Trực lễ tuần này', value: stats.trucLeTrongTuan, color: 'text-red-600', bg: 'bg-red-50', icon: ShieldCheck },
-        ].map((s, i) => (
-          <div key={i} className="card py-3.5 flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center flex-shrink-0`}>
-              <s.icon size={18} className={s.color} />
-            </div>
-            <div>
-              <div className={`text-xl font-extrabold ${s.color}`}>{s.value}</div>
-              <div className="text-xs text-slate-500">{s.label}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
       <div className="flex items-center gap-3">
-        {mode !== 'trucle' && (
+        {mode !== 'trucle' && mode !== 'thongke' && (
           <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1">
             <button onClick={() => setWeekOffset((w) => w - 1)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><ChevronLeft size={16} /></button>
             <span className="px-3 text-sm font-semibold text-slate-700 min-w-[170px] text-center">{weekLabel}</span>
@@ -465,9 +612,14 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
           </div>
         )}
 
-        {canEdit && mode !== 'giamdoc' && (
-          <button onClick={handleAutoAssign} disabled={isAutoAssigning} className="btn-secondary">
-            <Shuffle size={16} /> {isAutoAssigning ? 'Đang xếp...' : (mode === 'trucle' ? 'Tự động xếp ngày lễ' : 'Tự động xếp tuần này')}
+        {canEdit && mode !== 'giamdoc' && mode !== 'thongke' && (
+          <button 
+            onClick={handleAutoAssign} 
+            disabled={isAutoAssigning || isWeekAutoScheduled || isLoadingScheduleStatus}
+            title={isWeekAutoScheduled ? 'Tuần này đã được tự động xếp lịch rồi' : ''}
+            className={`btn-secondary ${isWeekAutoScheduled ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <Shuffle size={16} /> {isAutoAssigning ? 'Đang xếp...' : isWeekAutoScheduled ? 'Đã xếp (không được xếp lại)' : (mode === 'trucle' ? 'Tự động xếp ngày lễ' : 'Tự động xếp tuần này')}
           </button>
         )}
 
@@ -486,6 +638,7 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
 
       {mode === 'canbo' && renderDayTable(officerWeekData, 'officer_daily')}
       {mode === 'trucle' && renderHolidayList()}
+      {mode === 'thongke' && renderThongKe()}
 
       {mode === 'giamdoc' && (
         <div className="card">
