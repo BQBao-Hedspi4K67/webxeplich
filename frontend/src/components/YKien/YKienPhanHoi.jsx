@@ -132,7 +132,7 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], reloadData }
           <table className="w-full min-w-[900px]">
             <thead>
               <tr>
-                {['Mã', 'Cán bộ', 'Ngày nghỉ', 'Lý do', 'Trạng thái', 'Phản hồi duyệt', ''].map(h => (
+                {['Mã', 'Quân hàm + Họ và tên', 'Ngày nghỉ', 'Lý do', 'Trạng thái', 'Phản hồi duyệt', ''].map(h => (
                   <th key={h} className="table-th">{h}</th>
                 ))}
               </tr>

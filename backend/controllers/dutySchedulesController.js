@@ -2,6 +2,10 @@ import pool from '../config/database.js';
 import { DUTY_TYPES } from '../config/constants.js';
 import { logActivity } from '../utils/activityLogger.js';
 import {
+  ensureDutyScheduleAccessSchema,
+  getDutyScheduleAccessState,
+} from '../utils/dutyScheduleAccess.js';
+import {
   ensureNotificationTargetingSchema,
   createUserNotification,
   resolveUserIdByOfficerId,
@@ -84,6 +88,20 @@ const buildWeekDates = (weekStartDate) => {
     dt.setUTCDate(dt.getUTCDate() + idx);
     return dt.toISOString().slice(0, 10);
   });
+};
+
+const requireDutyScheduleManagementAccess = async (connection, reqUser) => {
+  await ensureDutyScheduleAccessSchema(connection);
+  const accessState = await getDutyScheduleAccessState(connection, reqUser || {});
+  if (!accessState.canManageDutySchedules) {
+    return {
+      ok: false,
+      status: 403,
+      error: 'Insufficient permissions',
+      code: 'FORBIDDEN',
+    };
+  }
+  return { ok: true };
 };
 
 const listHas = async (connection, sql, params = []) => {
@@ -192,7 +210,7 @@ const getAssignmentGroupForDate = async (connection, dateValue) => {
 const getOfficerInfo = async (connection, officerId) => {
   const [rows] = await connection.execute(
     `SELECT o.id,
-            o.fullName,
+            CONCAT_WS(' ', NULLIF(o.officerTitle, ''), o.fullName) AS fullName,
             o.role,
             o.status,
             o.position,
@@ -251,6 +269,18 @@ const validateOfficerForSlot = ({ officer, location, dutyRole }) => {
       code: 'INVALID_HB_OFFICER',
       status: 400,
     };
+  }
+
+  if (location === LOCATION.DIRECTOR) {
+    const isDirector = officer.role === 'leader' || String(officer.departmentName || '').trim() === 'Ban Giám đốc';
+    if (!isDirector) {
+      return {
+        ok: false,
+        error: 'Trực ban Giám đốc chỉ được gán cho cán bộ Ban Giám đốc',
+        code: 'INVALID_DIRECTOR_OFFICER',
+        status: 400,
+      };
+    }
   }
 
   return { ok: true };
@@ -420,6 +450,11 @@ export const getDutySchedules = async (req, res, next) => {
     const connection = await pool.getConnection();
 
     try {
+      const accessCheck = await requireDutyScheduleManagementAccess(connection, req.user || {});
+      if (!accessCheck.ok) {
+        return res.status(accessCheck.status || 403).json({ success: false, error: accessCheck.error, code: accessCheck.code });
+      }
+
       await ensureDutySchema(connection);
 
       const whereConditions = [];
@@ -475,7 +510,7 @@ export const getDutySchedules = async (req, res, next) => {
 
       const [schedules] = await connection.execute(
         `SELECT ds.*,
-                o.fullName as officerName,
+                CONCAT_WS(' ', NULLIF(o.officerTitle, ''), o.fullName) as officerName,
                 COALESCE(d.name, o.department, '') AS department
          FROM duty_schedules ds
          LEFT JOIN officers o ON ds.officerId = o.id
@@ -515,7 +550,7 @@ export const getDutyScheduleById = async (req, res, next) => {
 
       const [rows] = await connection.execute(
         `SELECT ds.*,
-                o.fullName as officerName,
+                CONCAT_WS(' ', NULLIF(o.officerTitle, ''), o.fullName) as officerName,
                 COALESCE(d.name, o.department, '') AS department
          FROM duty_schedules ds
          LEFT JOIN officers o ON ds.officerId = o.id
@@ -573,6 +608,11 @@ export const createDutySchedule = async (req, res, next) => {
     const connection = await pool.getConnection();
 
     try {
+      const accessCheck = await requireDutyScheduleManagementAccess(connection, req.user || {});
+      if (!accessCheck.ok) {
+        return res.status(accessCheck.status || 403).json({ success: false, error: accessCheck.error, code: accessCheck.code });
+      }
+
       await ensureDutySchema(connection);
 
       const assignmentGroup = await getAssignmentGroupForDate(connection, dutyDate);
@@ -904,6 +944,11 @@ export const autoAssignOfficerDailyWeek = async (req, res, next) => {
 
     const connection = await pool.getConnection();
     try {
+      const accessCheck = await requireDutyScheduleManagementAccess(connection, req.user || {});
+      if (!accessCheck.ok) {
+        return res.status(accessCheck.status || 403).json({ success: false, error: accessCheck.error, code: accessCheck.code });
+      }
+
       await ensureDutySchema(connection);
 
       // Check if this week has already been auto-scheduled
@@ -983,6 +1028,11 @@ export const autoAssignHolidayDuty = async (req, res, next) => {
 
     const connection = await pool.getConnection();
     try {
+      const accessCheck = await requireDutyScheduleManagementAccess(connection, req.user || {});
+      if (!accessCheck.ok) {
+        return res.status(accessCheck.status || 403).json({ success: false, error: accessCheck.error, code: accessCheck.code });
+      }
+
       await ensureDutySchema(connection);
 
       // Holiday schedule CAN be re-assigned multiple times (no lock)
@@ -1234,6 +1284,11 @@ export const deleteDutySchedule = async (req, res, next) => {
     const connection = await pool.getConnection();
 
     try {
+      const accessCheck = await requireDutyScheduleManagementAccess(connection, req.user || {});
+      if (!accessCheck.ok) {
+        return res.status(accessCheck.status || 403).json({ success: false, error: accessCheck.error, code: accessCheck.code });
+      }
+
       const [checkRows] = await connection.execute('SELECT id FROM duty_schedules WHERE id = ? LIMIT 1', [id]);
       if (!checkRows.length) {
         return res.status(404).json({ success: false, error: 'Duty schedule not found', code: 'SCHEDULE_NOT_FOUND' });

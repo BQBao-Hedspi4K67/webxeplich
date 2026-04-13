@@ -7,6 +7,10 @@ import {
   createRoleNotification,
   resolveUserIdByOfficerId,
 } from '../utils/notificationTargeting.js';
+import {
+  ensureWorkScheduleAccessSchema,
+  getWorkScheduleAccessState,
+} from '../utils/workScheduleAccess.js';
 
 let workScheduleApprovalSchemaEnsured = false;
 
@@ -89,75 +93,6 @@ const resolveRequesterOfficer = async (connection, reqUser = {}) => {
   return rowsByProfile[0] || null;
 };
 
-const resolveOfficerDepartment = async (connection, officerId) => {
-  if (!officerId) return null;
-  const [rows] = await connection.execute(
-    `SELECT departmentId, department
-     FROM officers
-     WHERE id = ?
-     LIMIT 1`,
-    [officerId]
-  );
-  return rows[0] || null;
-};
-
-const resolveOfficerByUserId = async (connection, userId) => {
-  if (!userId) return null;
-  const [rows] = await connection.execute(
-    `SELECT id, departmentId, department
-     FROM officers
-     WHERE userId = ?
-     LIMIT 1`,
-    [userId]
-  );
-  return rows[0] || null;
-};
-
-const canManagerApproveSchedule = async (connection, reqUser, schedule) => {
-  const managerOfficer = await resolveRequesterOfficer(connection, reqUser);
-  if (!managerOfficer) return false;
-
-  const managerDepartmentId = Number(managerOfficer.departmentId || 0) || null;
-  const managerDepartmentName = String(managerOfficer.department || '').trim();
-
-  if (schedule.createdByUserId && Number(schedule.createdByUserId) === Number(reqUser.id)) {
-    return true;
-  }
-
-  let creatorOfficer = null;
-
-  if (schedule.createdByOfficerId) {
-    creatorOfficer = {
-      id: schedule.createdByOfficerId,
-      departmentId: schedule.createdByDepartmentId || null,
-      department: schedule.createdByDepartmentName || '',
-    };
-  }
-
-  if (!creatorOfficer && schedule.createdByUserId) {
-    creatorOfficer = await resolveOfficerByUserId(connection, schedule.createdByUserId);
-  }
-
-  if (!creatorOfficer) return false;
-
-  if (creatorOfficer.id && creatorOfficer.id === managerOfficer.id) {
-    return true;
-  }
-
-  const scheduleDepartmentId = Number(creatorOfficer.departmentId || 0) || null;
-  const scheduleDepartmentName = String(creatorOfficer.department || '').trim();
-
-  if (managerDepartmentId && scheduleDepartmentId && managerDepartmentId === scheduleDepartmentId) {
-    return true;
-  }
-
-  if (managerDepartmentName && scheduleDepartmentName && managerDepartmentName === scheduleDepartmentName) {
-    return true;
-  }
-
-  return false;
-};
-
 const buildQuery = (filters = {}, options = {}) => {
   const {
     search = '',
@@ -215,19 +150,20 @@ const scheduleSelect = `
   SELECT
     ws.*,
     d.name AS departmentName,
-    approver.fullName AS approvedByName,
+    CONCAT_WS(' ', NULLIF(approverOfficer.officerTitle, ''), approver.fullName) AS approvedByName,
     creatorUser.fullName AS createdByUserName,
     creatorOfficer.id AS createdByOfficerId,
-    creatorOfficer.fullName AS createdByOfficerName,
+    CONCAT_WS(' ', NULLIF(creatorOfficer.officerTitle, ''), creatorOfficer.fullName) AS createdByOfficerName,
     creatorOfficer.departmentId AS createdByDepartmentId,
     creatorOfficer.department AS createdByDepartmentName,
-    ro.fullName AS responsibleOfficerName,
-    o1.fullName AS officer1Name,
-    o2.fullName AS officer2Name,
-    cmd.fullName AS commanderOfficerName
+    CONCAT_WS(' ', NULLIF(ro.officerTitle, ''), ro.fullName) AS responsibleOfficerName,
+    CONCAT_WS(' ', NULLIF(o1.officerTitle, ''), o1.fullName) AS officer1Name,
+    CONCAT_WS(' ', NULLIF(o2.officerTitle, ''), o2.fullName) AS officer2Name,
+    CONCAT_WS(' ', NULLIF(cmd.officerTitle, ''), cmd.fullName) AS commanderOfficerName
   FROM work_schedules ws
   LEFT JOIN departments d ON d.id = ws.departmentId
   LEFT JOIN users approver ON approver.id = ws.approvedByUserId
+  LEFT JOIN officers approverOfficer ON approverOfficer.userId = ws.approvedByUserId
   LEFT JOIN users creatorUser ON creatorUser.id = ws.createdByUserId
   LEFT JOIN officers creatorOfficer ON creatorOfficer.id = ws.createdByOfficerId
   LEFT JOIN officers ro ON ro.id = ws.responsibleOfficerId
@@ -310,9 +246,12 @@ export const getWorkScheduleById = async (req, res, next) => {
 
     try {
       await ensureWorkScheduleApprovalSchema(connection);
+      await ensureWorkScheduleAccessSchema(connection);
+      const accessState = await getWorkScheduleAccessState(connection, req.user || {});
+      const canViewPending = Boolean(accessState.canCreateWorkSchedules || accessState.canApproveWorkSchedules);
 
       const [rows] = await connection.execute(
-        `${scheduleSelect} WHERE ws.id = ?${req.user?.role !== 'admin' && req.user?.role !== 'manager' ? " AND ws.approvalStatus = 'approved'" : ''}`,
+        `${scheduleSelect} WHERE ws.id = ?${canViewPending ? '' : " AND ws.approvalStatus = 'approved'"}`,
         [id]
       );
 
@@ -383,6 +322,15 @@ export const createWorkSchedule = async (req, res, next) => {
 
     try {
       await ensureWorkScheduleApprovalSchema(connection);
+      await ensureWorkScheduleAccessSchema(connection);
+      const accessState = await getWorkScheduleAccessState(connection, req.user || {});
+      if (!accessState.canCreateWorkSchedules) {
+        return res.status(403).json({
+          success: false,
+          error: 'Bạn không có quyền tạo lịch công tác.',
+          code: 'FORBIDDEN',
+        });
+      }
 
       const [maxIdRows] = await connection.execute(
         "SELECT MAX(CAST(SUBSTRING(id, 4) AS UNSIGNED)) as maxNum FROM work_schedules WHERE id LIKE 'LCT%'"
@@ -440,6 +388,29 @@ export const createWorkSchedule = async (req, res, next) => {
           entityId: newId,
           targetRole: 'admin',
         });
+
+        const [approverRows] = await connection.execute(
+          `SELECT DISTINCT o.userId
+           FROM work_schedule_permissions wsp
+           INNER JOIN officers o ON o.id = wsp.officerId
+           INNER JOIN users u ON u.id = o.userId
+           WHERE wsp.canApproveWorkSchedules = 1
+             AND o.userId IS NOT NULL
+             AND u.status = 'active'`
+        );
+
+        for (const row of approverRows) {
+          if (!row.userId) continue;
+          await createUserNotification(connection, {
+            title: 'Co lich cong tac cho duyet',
+            content: `${title} (${date})`,
+            type: 'warning',
+            module: 'lichcongtac',
+            entityType: 'work_schedule',
+            entityId: newId,
+            targetUserId: row.userId,
+          });
+        }
       } else {
         const targetUserId = await resolveUserIdByOfficerId(connection, resolvedResponsibleOfficerId);
         await createUserNotification(connection, {
@@ -493,6 +464,15 @@ export const approveWorkSchedule = async (req, res, next) => {
     const connection = await pool.getConnection();
     try {
       await ensureWorkScheduleApprovalSchema(connection);
+      await ensureWorkScheduleAccessSchema(connection);
+      const accessState = await getWorkScheduleAccessState(connection, req.user || {});
+      if (!accessState.canApproveWorkSchedules) {
+        return res.status(403).json({
+          success: false,
+          error: 'Bạn không có quyền duyệt lịch công tác.',
+          code: 'FORBIDDEN',
+        });
+      }
 
       const [rows] = await connection.execute(
         `${scheduleSelect} WHERE ws.id = ?`,
@@ -508,17 +488,6 @@ export const approveWorkSchedule = async (req, res, next) => {
       }
 
       const schedule = rows[0];
-
-      if (req.user?.role === 'manager') {
-        const allowed = await canManagerApproveSchedule(connection, req.user, schedule);
-        if (!allowed) {
-          return res.status(403).json({
-            success: false,
-            error: 'Manager chỉ được duyệt lịch của mình hoặc lịch của cán bộ thuộc phòng mình.',
-            code: 'MANAGER_APPROVAL_FORBIDDEN',
-          });
-        }
-      }
 
       const approvalStatus = status;
 

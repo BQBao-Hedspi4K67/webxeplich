@@ -123,7 +123,7 @@ export const getOpinions = async (req, res, next) => {
       );
 
       const [rows] = await connection.execute(
-        `SELECT lr.*, o.fullName AS officerName
+        `SELECT lr.*, CONCAT_WS(' ', NULLIF(o.officerTitle, ''), o.fullName) AS officerName
          FROM leave_requests lr
          LEFT JOIN officers o ON o.id = lr.officerId
          ${whereClause}
@@ -157,7 +157,7 @@ export const getOpinionById = async (req, res, next) => {
 
     try {
       const [rows] = await connection.execute(
-        `SELECT lr.*, o.fullName AS officerName
+        `SELECT lr.*, CONCAT_WS(' ', NULLIF(o.officerTitle, ''), o.fullName) AS officerName
          FROM leave_requests lr
          LEFT JOIN officers o ON o.id = lr.officerId
          WHERE lr.id = ?`,

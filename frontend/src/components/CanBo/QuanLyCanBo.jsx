@@ -282,7 +282,7 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
           <table className="w-full">
             <thead>
               <tr>
-                {['Cán bộ', 'Chức vụ', 'Đơn vị', 'Liên hệ', 'Vai trò', 'Trạng thái', 'Thao tác'].map(h => (
+                {['Quân hàm + Họ và tên', 'Chức vụ', 'Đơn vị', 'Liên hệ', 'Vai trò', 'Trạng thái', 'Thao tác'].map(h => (
                   <th key={h} className="table-th">{h}</th>
                 ))}
               </tr>

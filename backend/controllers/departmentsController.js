@@ -58,7 +58,7 @@ export const getDepartments = async (req, res, next) => {
            d.name,
            d.departmentType,
            d.headOfficerId,
-           o.fullName AS headOfficerName,
+           CONCAT_WS(' ', NULLIF(o.officerTitle, ''), o.fullName) AS headOfficerName,
            d.isActive,
            d.createdAt,
            d.updatedAt,
@@ -68,7 +68,7 @@ export const getDepartments = async (req, res, next) => {
          LEFT JOIN officers o ON o.id = d.headOfficerId
          ${officerJoin}
          ${includeAll ? '' : 'WHERE isActive = 1'}
-         GROUP BY d.id, d.name, d.departmentType, d.headOfficerId, o.fullName, d.isActive, d.createdAt, d.updatedAt
+         GROUP BY d.id, d.name, d.departmentType, d.headOfficerId, o.officerTitle, o.fullName, d.isActive, d.createdAt, d.updatedAt
          ORDER BY
            CASE departmentType
              WHEN 'ban_giam_doc' THEN 1

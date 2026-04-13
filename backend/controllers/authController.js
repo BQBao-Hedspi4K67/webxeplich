@@ -1,6 +1,11 @@
 import pool from '../config/database.js';
 import bcrypt from 'bcryptjs';
 import { generateToken } from '../middleware/auth.js';
+import {
+  ensureDutyScheduleAccessSchema,
+  getDutyScheduleAccessState,
+} from '../utils/dutyScheduleAccess.js';
+import { getWorkScheduleAccessState } from '../utils/workScheduleAccess.js';
 
 const ALLOWED_DEPARTMENTS = [
   'Ban Giám đốc',
@@ -37,6 +42,18 @@ const hasOfficersDepartmentIdColumn = async (connection) => {
 const hasDepartmentsTable = async (connection) => {
   const [rows] = await connection.execute("SHOW TABLES LIKE 'departments'");
   return rows.length > 0;
+};
+
+const hasUsersMilitaryRankColumn = async (connection) => {
+  const [rows] = await connection.execute("SHOW COLUMNS FROM users LIKE 'militaryRank'");
+  return rows.length > 0;
+};
+
+const ensureUsersMilitaryRankColumn = async (connection) => {
+  const hasColumn = await hasUsersMilitaryRankColumn(connection);
+  if (!hasColumn) {
+    await connection.execute("ALTER TABLE users ADD COLUMN militaryRank VARCHAR(100) NULL AFTER fullName");
+  }
 };
 
 const validateDepartment = async (connection, { departmentId, department }) => {
@@ -82,6 +99,15 @@ const buildUsernameBase = (fullName = '') => {
   const initials = tokens.slice(0, -1).map((token) => token[0]).join('');
   const base = `${initials}${lastName}`;
   return base.slice(0, 40) || 'user';
+};
+
+const buildDisplayName = (militaryRank = '', fullName = '') => {
+  const rank = String(militaryRank || '').trim();
+  const name = String(fullName || '').trim();
+  if (!rank) return name;
+  if (!name) return rank;
+  if (name.toLowerCase().startsWith(rank.toLowerCase())) return name;
+  return `${rank} ${name}`;
 };
 
 const generateUniqueUsername = async (connection, fullName) => {
@@ -142,9 +168,11 @@ export const login = async (req, res, next) => {
     const connection = await pool.getConnection();
 
     try {
+      await ensureUsersMilitaryRankColumn(connection);
+
       // Find user
       const [rows] = await connection.execute(
-        'SELECT id, username, passwordHash, fullName, email, role, avatar FROM users WHERE username = ? AND status = ?',
+        'SELECT id, username, passwordHash, fullName, militaryRank, email, role, avatar FROM users WHERE username = ? AND status = ?',
         [username, 'active']
       );
 
@@ -164,8 +192,8 @@ export const login = async (req, res, next) => {
       const [officerRows] = hasUserIdColumn
         ? await connection.execute(
           hasDepartmentIdColumn
-            ? 'SELECT id, position, department, departmentId, phone, email FROM officers WHERE userId = ? LIMIT 1'
-            : 'SELECT id, position, department, NULL AS departmentId, phone, email FROM officers WHERE userId = ? LIMIT 1',
+            ? 'SELECT id, position, department, departmentId, phone, email, officerTitle FROM officers WHERE userId = ? LIMIT 1'
+            : 'SELECT id, position, department, NULL AS departmentId, phone, email, officerTitle FROM officers WHERE userId = ? LIMIT 1',
           [user.id]
         )
         : [[], null];
@@ -174,7 +202,7 @@ export const login = async (req, res, next) => {
         officerProfile = officerRows[0];
       } else {
         const [fallbackOfficerRows] = await connection.execute(
-          `SELECT id, position, department, ${hasDepartmentIdColumn ? 'departmentId' : 'NULL AS departmentId'}, phone, email FROM officers
+          `SELECT id, position, department, ${hasDepartmentIdColumn ? 'departmentId' : 'NULL AS departmentId'}, phone, email, officerTitle FROM officers
            WHERE (email = ? AND ? IS NOT NULL AND ? <> '') OR fullName = ?
            LIMIT 1`,
           [user.email || null, user.email || null, user.email || null, user.fullName]
@@ -190,6 +218,9 @@ export const login = async (req, res, next) => {
         }
       }
 
+      const resolvedMilitaryRank = officerProfile?.officerTitle || user.militaryRank || '';
+      const displayName = buildDisplayName(resolvedMilitaryRank, user.fullName);
+
       // Compare password
       const passwordMatch = await bcrypt.compare(password, user.passwordHash);
 
@@ -203,6 +234,20 @@ export const login = async (req, res, next) => {
 
       // Generate token
       const token = generateToken(user);
+      const accessState = await getDutyScheduleAccessState(connection, {
+        id: user.id,
+        username: user.username,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+      });
+      const workAccessState = await getWorkScheduleAccessState(connection, {
+        id: user.id,
+        username: user.username,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+      });
 
       res.json({
         success: true,
@@ -211,7 +256,8 @@ export const login = async (req, res, next) => {
           user: {
             id: user.id,
             username: user.username,
-            fullName: user.fullName,
+            fullName: displayName,
+            militaryRank: resolvedMilitaryRank,
             email: user.email,
             role: user.role,
             avatar: user.avatar,
@@ -220,6 +266,17 @@ export const login = async (req, res, next) => {
             department: officerProfile?.department || '',
             departmentId: officerProfile?.departmentId || null,
             phone: officerProfile?.phone || '',
+            canManageDutySchedules: accessState.canManageDutySchedules,
+            canManageDutySchedulesByDepartment: accessState.canManageDutySchedulesByDepartment,
+            canManageDutySchedulesByPermission: accessState.canManageDutySchedulesByPermission,
+            canGrantDutySchedulePermissions: accessState.canGrantDutySchedulePermissions,
+            canCreateWorkSchedules: workAccessState.canCreateWorkSchedules,
+            canApproveWorkSchedules: workAccessState.canApproveWorkSchedules,
+            canCreateWorkSchedulesByRole: workAccessState.canCreateWorkSchedulesByRole,
+            canApproveWorkSchedulesByRole: workAccessState.canApproveWorkSchedulesByRole,
+            canCreateWorkSchedulesByPermission: workAccessState.canCreateWorkSchedulesByPermission,
+            canApproveWorkSchedulesByPermission: workAccessState.canApproveWorkSchedulesByPermission,
+            canGrantWorkSchedulePermissions: workAccessState.canGrantWorkSchedulePermissions,
           },
         },
         message: 'Login successful',
@@ -238,6 +295,8 @@ export const getProfile = async (req, res, next) => {
     const connection = await pool.getConnection();
 
     try {
+      await ensureUsersMilitaryRankColumn(connection);
+      await ensureDutyScheduleAccessSchema(connection);
       const hasUserIdColumn = await hasOfficersUserIdColumn(connection);
       const hasDepartmentIdColumn = await hasOfficersDepartmentIdColumn(connection);
       const [rows] = hasUserIdColumn
@@ -246,11 +305,13 @@ export const getProfile = async (req, res, next) => {
              u.id,
              u.username,
              u.fullName,
+             u.militaryRank,
              u.email,
              u.role,
              u.avatar,
              u.status,
              o.id AS officerId,
+             o.officerTitle,
              o.position,
              o.department,
              o.phone,
@@ -266,11 +327,13 @@ export const getProfile = async (req, res, next) => {
              u.id,
              u.username,
              u.fullName,
+             u.militaryRank,
              u.email,
              u.role,
              u.avatar,
              u.status,
              NULL AS officerId,
+             NULL AS officerTitle,
              NULL AS position,
              NULL AS department,
              NULL AS phone,
@@ -293,7 +356,7 @@ export const getProfile = async (req, res, next) => {
 
       if (!profile.officerId) {
         const [fallbackOfficerRows] = await connection.execute(
-          `SELECT id, position, department, ${hasDepartmentIdColumn ? 'departmentId' : 'NULL AS departmentId'}, phone FROM officers
+          `SELECT id, position, department, ${hasDepartmentIdColumn ? 'departmentId' : 'NULL AS departmentId'}, phone, officerTitle FROM officers
            WHERE (email = ? AND ? IS NOT NULL AND ? <> '') OR fullName = ?
            LIMIT 1`,
           [profile.email || null, profile.email || null, profile.email || null, profile.fullName]
@@ -311,6 +374,7 @@ export const getProfile = async (req, res, next) => {
           profile = {
             ...profile,
             officerId: fallbackOfficer.id,
+            officerTitle: fallbackOfficer.officerTitle || '',
             position: fallbackOfficer.position,
             department: fallbackOfficer.department,
             departmentId: fallbackOfficer.departmentId || null,
@@ -319,9 +383,30 @@ export const getProfile = async (req, res, next) => {
         }
       }
 
+      const resolvedMilitaryRank = profile.officerTitle || profile.militaryRank || '';
+      const displayName = buildDisplayName(resolvedMilitaryRank, profile.fullName);
+
+      const accessState = await getDutyScheduleAccessState(connection, profile);
+      const workAccessState = await getWorkScheduleAccessState(connection, profile);
+
       res.json({
         success: true,
-        data: profile,
+        data: {
+          ...profile,
+          fullName: displayName,
+          militaryRank: resolvedMilitaryRank,
+          canManageDutySchedules: accessState.canManageDutySchedules,
+          canManageDutySchedulesByDepartment: accessState.canManageDutySchedulesByDepartment,
+          canManageDutySchedulesByPermission: accessState.canManageDutySchedulesByPermission,
+          canGrantDutySchedulePermissions: accessState.canGrantDutySchedulePermissions,
+          canCreateWorkSchedules: workAccessState.canCreateWorkSchedules,
+          canApproveWorkSchedules: workAccessState.canApproveWorkSchedules,
+          canCreateWorkSchedulesByRole: workAccessState.canCreateWorkSchedulesByRole,
+          canApproveWorkSchedulesByRole: workAccessState.canApproveWorkSchedulesByRole,
+          canCreateWorkSchedulesByPermission: workAccessState.canCreateWorkSchedulesByPermission,
+          canApproveWorkSchedulesByPermission: workAccessState.canApproveWorkSchedulesByPermission,
+          canGrantWorkSchedulePermissions: workAccessState.canGrantWorkSchedulePermissions,
+        },
       });
     } finally {
       connection.release();
@@ -344,6 +429,7 @@ export const createUserAccount = async (req, res, next) => {
   try {
     let {
       fullName,
+      militaryRank = '',
       email = null,
       phone = null,
       position = '',
@@ -381,6 +467,7 @@ export const createUserAccount = async (req, res, next) => {
 
     const connection = await pool.getConnection();
     try {
+      await ensureUsersMilitaryRankColumn(connection);
       await connection.beginTransaction();
       const hasUserIdColumn = await hasOfficersUserIdColumn(connection);
       const hasDepartmentIdColumn = await hasOfficersDepartmentIdColumn(connection);
@@ -435,9 +522,9 @@ export const createUserAccount = async (req, res, next) => {
       const passwordHash = await bcrypt.hash('123456', 10);
 
       const [result] = await connection.execute(
-        `INSERT INTO users (username, passwordHash, fullName, email, role, avatar, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [username, passwordHash, fullName, email, role, avatar, status]
+        `INSERT INTO users (username, passwordHash, fullName, militaryRank, email, role, avatar, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [username, passwordHash, fullName, militaryRank || null, email, role, avatar, status]
       );
 
       const [maxOfficerIdRows] = await connection.execute(
@@ -449,6 +536,7 @@ export const createUserAccount = async (req, res, next) => {
       const officerPosition = position || (role === 'manager' ? 'Quản lý' : 'Cán bộ');
       const officerDepartment = departmentRef.name;
       const split = splitTitleAndName(fullName);
+      const resolvedOfficerTitle = String(militaryRank || '').trim() || split.officerTitle;
 
       if (hasUserIdColumn) {
         if (hasDepartmentIdColumn) {
@@ -459,7 +547,7 @@ export const createUserAccount = async (req, res, next) => {
               newOfficerId,
               result.insertId,
               fullName,
-              split.officerTitle,
+              resolvedOfficerTitle,
               split.officerName,
               officerPosition,
               departmentRef.id,
@@ -475,19 +563,19 @@ export const createUserAccount = async (req, res, next) => {
           await connection.execute(
             `INSERT INTO officers (id, userId, fullName, officerTitle, officerName, position, department, departmentGroup, phone, email, role, status)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [newOfficerId, result.insertId, fullName, split.officerTitle, split.officerName, officerPosition, officerDepartment, departmentRef.departmentType || 'phong', phone, email, role, status]
+            [newOfficerId, result.insertId, fullName, resolvedOfficerTitle, split.officerName, officerPosition, officerDepartment, departmentRef.departmentType || 'phong', phone, email, role, status]
           );
         }
       } else {
         await connection.execute(
           `INSERT INTO officers (id, fullName, officerTitle, officerName, position, department, departmentGroup, phone, email, role, status)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [newOfficerId, fullName, split.officerTitle, split.officerName, officerPosition, officerDepartment, departmentRef.departmentType || 'phong', phone, email, role, status]
+          [newOfficerId, fullName, resolvedOfficerTitle, split.officerName, officerPosition, officerDepartment, departmentRef.departmentType || 'phong', phone, email, role, status]
         );
       }
 
       const [createdRows] = await connection.execute(
-        'SELECT id, username, fullName, email, role, avatar, status, createdAt FROM users WHERE id = ?',
+        'SELECT id, username, fullName, militaryRank, email, role, avatar, status, createdAt FROM users WHERE id = ?',
         [result.insertId]
       );
 

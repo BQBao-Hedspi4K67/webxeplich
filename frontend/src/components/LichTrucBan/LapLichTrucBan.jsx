@@ -46,6 +46,11 @@ const commanderEligible = (cb) => {
   return cb.vaiTro === 'Quản lý' || /(PT\s*Kh[oó]a|Ph[oó]\s*tr[uư][oở]ng\s*kh[oó]a|Tr[uư][oở]ng\s*ph[oò]ng)/i.test(position);
 };
 
+const directorEligible = (cb) => {
+  if (!cb) return false;
+  return cb.vaiTro === 'Lãnh đạo' || String(cb.donVi || '').trim() === 'Ban Giám đốc';
+};
+
 const emptyDayForm = (date, dutyType) => ({
   date,
   dutyType,
@@ -58,7 +63,12 @@ const emptyDayForm = (date, dutyType) => ({
 });
 
 const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayData = [], reloadData }) => {
-  const canEdit = user?.backendRole === 'admin' || user?.role === 'admin' || user?.role === 'Quản trị viên';
+  const canEdit = Boolean(user?.canManageDutySchedules) || user?.backendRole === 'admin' || user?.role === 'admin' || user?.role === 'Quản trị viên';
+  const canGrantPermission =
+    Boolean(user?.canGrantDutySchedulePermissions)
+    || user?.backendRole === 'admin'
+    || user?.role === 'Quản trị viên'
+    || String(user?.department || '').trim() === 'Phòng hành chính tổng hợp';
 
   const [data, setData] = useState(lichTrucBanData);
   const [weekOffset, setWeekOffset] = useState(0);
@@ -71,6 +81,13 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
   const [isAutoAssigning, setIsAutoAssigning] = useState(false);
   const [isWeekAutoScheduled, setIsWeekAutoScheduled] = useState(false);
   const [isLoadingScheduleStatus, setIsLoadingScheduleStatus] = useState(false);
+  const [permissionLoadingId, setPermissionLoadingId] = useState('');
+  const [permissionResult, setPermissionResult] = useState({ type: '', message: '' });
+  const [thongKePage, setThongKePage] = useState(1);
+  const [phanQuyenPage, setPhanQuyenPage] = useState(1);
+
+  const THONGKE_PAGE_SIZE = 8;
+  const PHANQUYEN_PAGE_SIZE = 8;
 
   useEffect(() => {
     setData(lichTrucBanData);
@@ -214,9 +231,36 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
       });
   }, [data, canBoData]);
 
+  const thongKeTotalPages = Math.max(1, Math.ceil(dutyStats.length / THONGKE_PAGE_SIZE));
+  const thongKePageSafe = Math.min(thongKePage, thongKeTotalPages);
+  const thongKeRows = useMemo(() => {
+    const start = (thongKePageSafe - 1) * THONGKE_PAGE_SIZE;
+    return dutyStats.slice(start, start + THONGKE_PAGE_SIZE);
+  }, [dutyStats, thongKePageSafe]);
+
+  const phanQuyenCandidates = useMemo(
+    () => canBoData.filter((item) => item.trangThai === 'active' && item.id !== user?.id),
+    [canBoData, user?.id]
+  );
+  const phanQuyenTotalPages = Math.max(1, Math.ceil(phanQuyenCandidates.length / PHANQUYEN_PAGE_SIZE));
+  const phanQuyenPageSafe = Math.min(phanQuyenPage, phanQuyenTotalPages);
+  const phanQuyenRows = useMemo(() => {
+    const start = (phanQuyenPageSafe - 1) * PHANQUYEN_PAGE_SIZE;
+    return phanQuyenCandidates.slice(start, start + PHANQUYEN_PAGE_SIZE);
+  }, [phanQuyenCandidates, phanQuyenPageSafe]);
+
+  useEffect(() => {
+    if (thongKePage > thongKeTotalPages) setThongKePage(thongKeTotalPages);
+  }, [thongKePage, thongKeTotalPages]);
+
+  useEffect(() => {
+    if (phanQuyenPage > phanQuyenTotalPages) setPhanQuyenPage(phanQuyenTotalPages);
+  }, [phanQuyenPage, phanQuyenTotalPages]);
+
   const activeOfficers = useMemo(() => canBoData.filter((x) => x.trangThai === 'active'), [canBoData]);
   const hbOfficerOptions = useMemo(() => activeOfficers.filter((x) => x.vaiTro === 'Cán bộ'), [activeOfficers]);
   const commanderOptions = useMemo(() => activeOfficers.filter(commanderEligible), [activeOfficers]);
+  const directorOptions = useMemo(() => activeOfficers.filter(directorEligible), [activeOfficers]);
   const driverOptions = useMemo(() => activeOfficers.filter((x) => x.donVi === 'Đội lái xe' && x.vaiTro === 'Cán bộ'), [activeOfficers]);
   const medicOptions = useMemo(() => activeOfficers.filter((x) => x.donVi === 'Đội bệnh xá' && x.vaiTro === 'Cán bộ'), [activeOfficers]);
 
@@ -271,7 +315,7 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
     if (item.viTri === LOCATION.HB && (item.vaiTroTruc || 'officer') === 'commander') return commanderOptions;
     if (item.viTri === LOCATION.DRIVER) return driverOptions;
     if (item.viTri === LOCATION.MEDIC) return medicOptions;
-    if (item.viTri === LOCATION.DIRECTOR) return commanderOptions;
+    if (item.viTri === LOCATION.DIRECTOR) return directorOptions;
     return hbOfficerOptions;
   };
 
@@ -306,6 +350,12 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
 
   const handleSaveSingle = async () => {
     if (!editItem || !singleOfficerId) return;
+
+    if ((editItem.viTri || LOCATION.DIRECTOR) === LOCATION.DIRECTOR && !directorOptions.some((x) => x.id === singleOfficerId)) {
+      alert('Trực ban Giám đốc chỉ được gán cho cán bộ Ban Giám đốc.');
+      return;
+    }
+
     try {
       await apiClient.dutySchedules.update(editItem.id, {
         officerId: singleOfficerId,
@@ -325,6 +375,28 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
       setDeleteConfirm(null);
     } catch (err) {
       alert(err?.message || 'Không thể xóa lịch trực ban.');
+    }
+  };
+
+  const handleToggleDutySchedulePermission = async (officer) => {
+    if (!officer?.id) return;
+    setPermissionResult({ type: '', message: '' });
+
+    try {
+      setPermissionLoadingId(officer.id);
+      await apiClient.officers.updateDutySchedulePermission(officer.id, !officer.canManageDutySchedulesByPermission);
+      if (reloadData) await reloadData();
+      setPermissionResult({
+        type: 'success',
+        message: `${!officer.canManageDutySchedulesByPermission ? 'Đã cấp' : 'Đã thu hồi'} quyền lịch trực cho ${officer.hoTenDayDu || officer.hoTen}.`,
+      });
+    } catch (err) {
+      setPermissionResult({
+        type: 'error',
+        message: err?.message || 'Không thể cập nhật quyền lịch trực.',
+      });
+    } finally {
+      setPermissionLoadingId('');
     }
   };
 
@@ -510,7 +582,7 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
           <table className="w-full min-w-[800px]">
             <thead>
               <tr>
-                <th className="table-th">Cán bộ</th>
+                <th className="table-th">Quân hàm + Họ và tên</th>
                 <th className="table-th">Chức vụ</th>
                 <th className="table-th">Đơn vị</th>
                 <th className="table-th text-center">Ngày thường</th>
@@ -527,7 +599,7 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
                   </td>
                 </tr>
               ) : (
-                dutyStats.map((stat, idx) => {
+                thongKeRows.map((stat, idx) => {
                   const total = stat.ngayThuong + stat.cuoiTuan + stat.ngayLe;
                   return (
                     <tr key={stat.id} className="hover:bg-slate-50/70 transition-colors">
@@ -575,6 +647,119 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
             </tbody>
           </table>
         </div>
+        {dutyStats.length > THONGKE_PAGE_SIZE && (
+          <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-slate-100 bg-white">
+            <button
+              className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 disabled:opacity-40"
+              onClick={() => setThongKePage((p) => Math.max(1, p - 1))}
+              disabled={thongKePageSafe <= 1}
+            >
+              Trước
+            </button>
+            <span className="text-sm text-slate-500">Trang {thongKePageSafe}/{thongKeTotalPages}</span>
+            <button
+              className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 disabled:opacity-40"
+              onClick={() => setThongKePage((p) => Math.min(thongKeTotalPages, p + 1))}
+              disabled={thongKePageSafe >= thongKeTotalPages}
+            >
+              Sau
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderPhanQuyen = () => {
+    if (!canGrantPermission) {
+      return (
+        <div className="card text-center py-10 text-slate-400">
+          Bạn không có quyền cấp quyền lập/sửa lịch trực.
+        </div>
+      );
+    }
+
+    return (
+      <div className="card-lg p-0 overflow-hidden">
+        <div className="p-4 border-b border-slate-100">
+          <h3 className="text-sm font-bold text-slate-700">Cấp quyền tạo/sửa lịch trực</h3>
+          <p className="text-xs text-slate-500 mt-1">Ban Giám đốc và Phòng hành chính tổng hợp có thể cấp hoặc thu hồi quyền cho cán bộ khác.</p>
+          {permissionResult.message && (
+            <div className={`text-sm rounded-xl px-3 py-2 mt-3 ${permissionResult.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+              {permissionResult.message}
+            </div>
+          )}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[960px]">
+            <thead>
+              <tr>
+                <th className="table-th">Quân hàm + Họ và tên</th>
+                <th className="table-th">Chức vụ</th>
+                <th className="table-th">Đơn vị</th>
+                <th className="table-th">Loại quyền</th>
+                <th className="table-th"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {phanQuyenRows.map((item) => {
+                  const hasDepartmentAccess = Boolean(item.canManageDutySchedulesByDepartment);
+                  const hasGrantedAccess = Boolean(item.canManageDutySchedulesByPermission);
+                  return (
+                    <tr key={item.id} className="hover:bg-slate-50/70">
+                      <td className="table-td font-semibold text-slate-800">{item.hoTenDayDu || item.hoTen}</td>
+                      <td className="table-td text-slate-600">{item.chucVu || 'Chưa cập nhật'}</td>
+                      <td className="table-td text-slate-600">{item.donVi || 'Chưa cập nhật'}</td>
+                      <td className="table-td">
+                        {hasDepartmentAccess ? (
+                          <span className="inline-flex px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-700">Theo đơn vị</span>
+                        ) : hasGrantedAccess ? (
+                          <span className="inline-flex px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-700">Được cấp riêng</span>
+                        ) : (
+                          <span className="inline-flex px-2 py-1 rounded-full text-xs bg-slate-100 text-slate-500">Chưa cấp</span>
+                        )}
+                      </td>
+                      <td className="table-td">
+                        <button
+                          type="button"
+                          disabled={permissionLoadingId === item.id || hasDepartmentAccess}
+                          onClick={() => handleToggleDutySchedulePermission(item)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${hasDepartmentAccess ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : hasGrantedAccess ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
+                        >
+                          {permissionLoadingId === item.id
+                            ? 'Đang lưu...'
+                            : hasDepartmentAccess
+                              ? 'Quyền theo đơn vị'
+                              : hasGrantedAccess
+                                ? 'Thu hồi quyền'
+                                : 'Cấp quyền'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
+        </div>
+        {phanQuyenCandidates.length > PHANQUYEN_PAGE_SIZE && (
+          <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-slate-100 bg-white">
+            <button
+              className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 disabled:opacity-40"
+              onClick={() => setPhanQuyenPage((p) => Math.max(1, p - 1))}
+              disabled={phanQuyenPageSafe <= 1}
+            >
+              Trước
+            </button>
+            <span className="text-sm text-slate-500">Trang {phanQuyenPageSafe}/{phanQuyenTotalPages}</span>
+            <button
+              className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 disabled:opacity-40"
+              onClick={() => setPhanQuyenPage((p) => Math.min(phanQuyenTotalPages, p + 1))}
+              disabled={phanQuyenPageSafe >= phanQuyenTotalPages}
+            >
+              Sau
+            </button>
+          </div>
+        )}
       </div>
     );
   };
@@ -600,11 +785,16 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
           <button onClick={() => setMode('thongke')} className={`px-3 py-2 rounded-xl text-sm font-medium ${mode === 'thongke' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>
             Thống kê
           </button>
+          {canGrantPermission && (
+            <button onClick={() => setMode('phanquyen')} className={`px-3 py-2 rounded-xl text-sm font-medium ${mode === 'phanquyen' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>
+              Phân quyền
+            </button>
+          )}
         </div>
       </div>
 
       <div className="flex items-center gap-3">
-        {mode !== 'trucle' && mode !== 'thongke' && (
+        {mode !== 'trucle' && mode !== 'thongke' && mode !== 'phanquyen' && (
           <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1">
             <button onClick={() => setWeekOffset((w) => w - 1)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><ChevronLeft size={16} /></button>
             <span className="px-3 text-sm font-semibold text-slate-700 min-w-[170px] text-center">{weekLabel}</span>
@@ -612,7 +802,7 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
           </div>
         )}
 
-        {canEdit && mode !== 'giamdoc' && mode !== 'thongke' && (
+        {canEdit && mode !== 'giamdoc' && mode !== 'thongke' && mode !== 'phanquyen' && (
           <button 
             onClick={handleAutoAssign} 
             disabled={isAutoAssigning || isWeekAutoScheduled || isLoadingScheduleStatus}
@@ -639,6 +829,7 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
       {mode === 'canbo' && renderDayTable(officerWeekData, 'officer_daily')}
       {mode === 'trucle' && renderHolidayList()}
       {mode === 'thongke' && renderThongKe()}
+      {mode === 'phanquyen' && renderPhanQuyen()}
 
       {mode === 'giamdoc' && (
         <div className="card">
@@ -737,6 +928,9 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
                   <option key={cb.id} value={cb.id}>{cb.hoTen} - {cb.chucVu || cb.donVi}</option>
                 ))}
               </select>
+              {(editItem.viTri || LOCATION.DIRECTOR) === LOCATION.DIRECTOR && (
+                <p className="text-xs text-slate-500 mt-2">Chỉ hiển thị cán bộ Ban Giám đốc.</p>
+              )}
             </div>
             <div className="flex gap-3 px-6 pb-6">
               <button onClick={() => { setEditItem(null); setSingleOfficerId(''); }} className="btn-secondary flex-1 justify-center">Hủy</button>

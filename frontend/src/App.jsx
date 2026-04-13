@@ -35,6 +35,21 @@ const OFFICER_UI_ROLE_ORDER = {
 
 const UNIT_OPTIONS = ['Ban Giám đốc', ...DEPARTMENTS, ...SCHOOLS];
 
+const MILITARY_RANK_OPTIONS = [
+  'Thiếu úy',
+  'Trung úy',
+  'Thượng úy',
+  'Đại úy',
+  'Thiếu tá',
+  'Trung tá',
+  'Thượng tá',
+  'Đại tá',
+  'Thiếu tướng',
+  'Trung tướng',
+  'Thượng tướng',
+  'Đại tướng',
+];
+
 const WORK_TYPE_FALLBACK_LABEL = {
   hop: 'Họp',
   hoiThao: 'Hội thảo',
@@ -77,6 +92,15 @@ const normalizeScheduleStatus = (status) => {
   if (s === 'done' || s === 'completed') return 'completed';
   if (s === 'active') return 'active';
   return 'upcoming';
+};
+
+const buildDisplayName = (militaryRank = '', fullName = '') => {
+  const rank = String(militaryRank || '').trim();
+  const name = String(fullName || '').trim();
+  if (!rank) return name;
+  if (!name) return rank;
+  if (name.toLowerCase().startsWith(rank.toLowerCase())) return name;
+  return `${rank} ${name}`;
 };
 
 const resolveOfficerId = (profile, officers = []) => {
@@ -127,12 +151,13 @@ const ROLE_BADGE = {
   'Cán bộ':        'bg-emerald-100 text-emerald-700',
 };
 
-const TaiKhoan = ({ user, reloadData, departmentData = [], onUserContactUpdated }) => {
+const TaiKhoan = ({ user, reloadData, canBoData = [], departmentData = [], onUserContactUpdated }) => {
   const canProvisionUser = ['Quản trị viên', 'Quản lý'].includes(user?.role);
   const accountDepartmentOptions = (departmentData || []).length
     ? departmentData.map((d) => ({ id: d.id, name: d.name }))
     : UNIT_OPTIONS.map((name, idx) => ({ id: idx + 1, name }));
   const [createForm, setCreateForm] = useState({
+    militaryRank: '',
     fullName: '',
     email: '',
     phone: '',
@@ -193,6 +218,7 @@ const TaiKhoan = ({ user, reloadData, departmentData = [], onUserContactUpdated 
       setCreateLoading(true);
       await apiClient.auth.createUser({
         fullName: createForm.fullName.trim(),
+        militaryRank: createForm.militaryRank.trim() || null,
         email: createForm.email.trim() || null,
         phone: createForm.phone.trim() || null,
         position: createForm.position.trim() || null,
@@ -209,6 +235,7 @@ const TaiKhoan = ({ user, reloadData, departmentData = [], onUserContactUpdated 
         message: 'Tạo tài khoản mới thành công. Username được sinh tự động, mật khẩu mặc định là 123456.',
       });
       setCreateForm({
+        militaryRank: '',
         fullName: '',
         email: '',
         phone: '',
@@ -302,6 +329,19 @@ const TaiKhoan = ({ user, reloadData, departmentData = [], onUserContactUpdated 
           <p className="text-xs text-slate-500 mb-4">Username được sinh tự động theo quy tắc tên viết tắt; mật khẩu mặc định luôn là 123456.</p>
           <form className="space-y-3" onSubmit={handleCreateUser}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Quân hàm</label>
+                <select
+                  className="input-field"
+                  value={createForm.militaryRank}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, militaryRank: e.target.value }))}
+                >
+                  <option value="">-- Chọn quân hàm --</option>
+                  {MILITARY_RANK_OPTIONS.map((rank) => (
+                    <option key={rank} value={rank}>{rank}</option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Họ và tên <span className="text-red-500">*</span></label>
                 <input
@@ -494,9 +534,9 @@ function App() {
       const mappedOfficers = (officersRes?.data || [])
         .map((o) => ({
           id: o.id,
-          hoTen: o.officerName || o.fullName,
+          hoTen: buildDisplayName(o.officerTitle, o.fullName || o.officerName),
           capBac: o.officerTitle || '',
-          hoTenDayDu: o.fullName,
+          hoTenDayDu: buildDisplayName(o.officerTitle, o.fullName || o.officerName),
           chucVu: o.position || '',
           donViId: o.departmentId || null,
           donVi: o.department || '',
@@ -505,6 +545,19 @@ function App() {
           vaiTro: OFFICER_ROLE_TO_UI[o.role] || 'Cán bộ',
           trangThai: o.status || 'active',
           denNgayHoc: o.studyUntil || '',
+          canManageDutySchedules: Boolean(o.canManageDutySchedules),
+          canManageDutySchedulesByDepartment: Boolean(o.canManageDutySchedulesByDepartment),
+          canManageDutySchedulesByPermission: Boolean(o.canManageDutySchedulesByPermission),
+          canCreateWorkSchedules: Boolean(o.canCreateWorkSchedules),
+          canApproveWorkSchedules: Boolean(o.canApproveWorkSchedules),
+          canCreateWorkSchedulesByRole: Boolean(o.canCreateWorkSchedulesByRole),
+          canApproveWorkSchedulesByRole: Boolean(o.canApproveWorkSchedulesByRole),
+          canCreateWorkSchedulesByPermission: Boolean(o.canCreateWorkSchedulesByPermission),
+          canApproveWorkSchedulesByPermission: Boolean(o.canApproveWorkSchedulesByPermission),
+          canGrantDutySchedulePermissions:
+            o.canGrantDutySchedulePermissions === undefined
+              ? undefined
+              : Boolean(o.canGrantDutySchedulePermissions),
           avatar: (o.fullName || '')
             .split(' ')
             .filter(Boolean)
@@ -659,6 +712,17 @@ function App() {
           position: profile.position || '',
           department: profile.department || '',
           departmentId: profile.departmentId || null,
+          canManageDutySchedules: Boolean(profile.canManageDutySchedules),
+          canManageDutySchedulesByDepartment: Boolean(profile.canManageDutySchedulesByDepartment),
+          canManageDutySchedulesByPermission: Boolean(profile.canManageDutySchedulesByPermission),
+          canGrantDutySchedulePermissions: Boolean(profile.canGrantDutySchedulePermissions),
+          canCreateWorkSchedules: Boolean(profile.canCreateWorkSchedules),
+          canApproveWorkSchedules: Boolean(profile.canApproveWorkSchedules),
+          canCreateWorkSchedulesByRole: Boolean(profile.canCreateWorkSchedulesByRole),
+          canApproveWorkSchedulesByRole: Boolean(profile.canApproveWorkSchedulesByRole),
+          canCreateWorkSchedulesByPermission: Boolean(profile.canCreateWorkSchedulesByPermission),
+          canApproveWorkSchedulesByPermission: Boolean(profile.canApproveWorkSchedulesByPermission),
+          canGrantWorkSchedulePermissions: Boolean(profile.canGrantWorkSchedulePermissions),
         });
 
         const loaded = await loadData();
@@ -670,6 +734,16 @@ function App() {
           id: officerId || prev.id,
           position: officerProfile?.chucVu || prev.position,
           department: officerProfile?.donVi || prev.department,
+          canManageDutySchedules: Boolean(officerProfile?.canManageDutySchedules ?? prev.canManageDutySchedules),
+          canManageDutySchedulesByDepartment: Boolean(officerProfile?.canManageDutySchedulesByDepartment ?? prev.canManageDutySchedulesByDepartment),
+          canManageDutySchedulesByPermission: Boolean(officerProfile?.canManageDutySchedulesByPermission ?? prev.canManageDutySchedulesByPermission),
+          canGrantDutySchedulePermissions: Boolean(officerProfile?.canGrantDutySchedulePermissions ?? prev.canGrantDutySchedulePermissions),
+          canCreateWorkSchedules: Boolean(officerProfile?.canCreateWorkSchedules ?? prev.canCreateWorkSchedules),
+          canApproveWorkSchedules: Boolean(officerProfile?.canApproveWorkSchedules ?? prev.canApproveWorkSchedules),
+          canCreateWorkSchedulesByRole: Boolean(officerProfile?.canCreateWorkSchedulesByRole ?? prev.canCreateWorkSchedulesByRole),
+          canApproveWorkSchedulesByRole: Boolean(officerProfile?.canApproveWorkSchedulesByRole ?? prev.canApproveWorkSchedulesByRole),
+          canCreateWorkSchedulesByPermission: Boolean(officerProfile?.canCreateWorkSchedulesByPermission ?? prev.canCreateWorkSchedulesByPermission),
+          canApproveWorkSchedulesByPermission: Boolean(officerProfile?.canApproveWorkSchedulesByPermission ?? prev.canApproveWorkSchedulesByPermission),
         }));
       } catch (e) {
         apiClient.clearAuthToken();
@@ -693,6 +767,17 @@ function App() {
       position: userData.position || '',
       department: userData.department || '',
       departmentId: userData.departmentId || null,
+      canManageDutySchedules: Boolean(userData.canManageDutySchedules),
+      canManageDutySchedulesByDepartment: Boolean(userData.canManageDutySchedulesByDepartment),
+      canManageDutySchedulesByPermission: Boolean(userData.canManageDutySchedulesByPermission),
+      canGrantDutySchedulePermissions: Boolean(userData.canGrantDutySchedulePermissions),
+      canCreateWorkSchedules: Boolean(userData.canCreateWorkSchedules),
+      canApproveWorkSchedules: Boolean(userData.canApproveWorkSchedules),
+      canCreateWorkSchedulesByRole: Boolean(userData.canCreateWorkSchedulesByRole),
+      canApproveWorkSchedulesByRole: Boolean(userData.canApproveWorkSchedulesByRole),
+      canCreateWorkSchedulesByPermission: Boolean(userData.canCreateWorkSchedulesByPermission),
+      canApproveWorkSchedulesByPermission: Boolean(userData.canApproveWorkSchedulesByPermission),
+      canGrantWorkSchedulePermissions: Boolean(userData.canGrantWorkSchedulePermissions),
     });
     setActivePage('dashboard');
     const loaded = await loadData();
@@ -704,6 +789,16 @@ function App() {
       id: officerId || prev.id,
       position: officerProfile?.chucVu || prev.position,
       department: officerProfile?.donVi || prev.department,
+      canManageDutySchedules: Boolean(officerProfile?.canManageDutySchedules ?? prev.canManageDutySchedules),
+      canManageDutySchedulesByDepartment: Boolean(officerProfile?.canManageDutySchedulesByDepartment ?? prev.canManageDutySchedulesByDepartment),
+      canManageDutySchedulesByPermission: Boolean(officerProfile?.canManageDutySchedulesByPermission ?? prev.canManageDutySchedulesByPermission),
+      canGrantDutySchedulePermissions: Boolean(officerProfile?.canGrantDutySchedulePermissions ?? prev.canGrantDutySchedulePermissions),
+      canCreateWorkSchedules: Boolean(officerProfile?.canCreateWorkSchedules ?? prev.canCreateWorkSchedules),
+      canApproveWorkSchedules: Boolean(officerProfile?.canApproveWorkSchedules ?? prev.canApproveWorkSchedules),
+      canCreateWorkSchedulesByRole: Boolean(officerProfile?.canCreateWorkSchedulesByRole ?? prev.canCreateWorkSchedulesByRole),
+      canApproveWorkSchedulesByRole: Boolean(officerProfile?.canApproveWorkSchedulesByRole ?? prev.canApproveWorkSchedulesByRole),
+      canCreateWorkSchedulesByPermission: Boolean(officerProfile?.canCreateWorkSchedulesByPermission ?? prev.canCreateWorkSchedulesByPermission),
+      canApproveWorkSchedulesByPermission: Boolean(officerProfile?.canApproveWorkSchedulesByPermission ?? prev.canApproveWorkSchedulesByPermission),
     }));
   };
 

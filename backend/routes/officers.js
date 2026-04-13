@@ -19,6 +19,12 @@ router.post('/', requireRole('admin', 'manager'), officersCtrl.createOfficer);
 // Update officer (admin, manager)
 router.put('/:id', requireRole('admin', 'manager'), officersCtrl.updateOfficer);
 
+// Grant/revoke duty schedule management permission
+router.put('/:id/duty-schedule-permission', officersCtrl.updateDutySchedulePermission);
+
+// Grant/revoke work schedule create/approve permissions
+router.put('/:id/work-schedule-permission', officersCtrl.updateWorkSchedulePermission);
+
 // Delete officer (admin, manager)
 router.delete('/:id', requireRole('admin', 'manager'), officersCtrl.deleteOfficer);
 

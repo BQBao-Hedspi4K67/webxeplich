@@ -53,12 +53,23 @@ const initialForm = {
 };
 
 const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], departmentData = [], holidayData = [], reloadData }) => {
-  const canCreate = Boolean(user?.role);
+  const canCreate = Boolean(
+    user?.canCreateWorkSchedules
+    || user?.backendRole === 'admin'
+    || user?.backendRole === 'manager'
+  );
   const canEdit = ['Quản trị viên', 'Quản lý'].includes(user?.role);
-  const canReview = user?.backendRole === 'admin' || user?.backendRole === 'manager';
+  const canReview = Boolean(
+    user?.canApproveWorkSchedules
+    || user?.backendRole === 'admin'
+  );
+  const canGrantPermission = Boolean(
+    user?.canGrantWorkSchedulePermissions
+    || user?.backendRole === 'admin'
+  );
   const [data, setData] = useState(lichCongTacData);
   const [officerOptions, setOfficerOptions] = useState(canBoData || []);
-  const [viewMode, setViewMode] = useState('month'); // 'week' | 'month'
+  const [viewMode, setViewMode] = useState('month'); // 'week' | 'month' | 'permission'
   const [weekOffset, setWeekOffset] = useState(0);
   const [monthOffset, setMonthOffset] = useState(0);
   const [showModal, setShowModal] = useState(false);
@@ -69,6 +80,12 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
   const [filterLoai, setFilterLoai] = useState('');
   const [filterDonVi, setFilterDonVi] = useState('');
   const [showBgdPicker, setShowBgdPicker] = useState(false);
+  const [permissionLoadingId, setPermissionLoadingId] = useState('');
+  const [permissionResult, setPermissionResult] = useState({ type: '', message: '' });
+  const [permissionPage, setPermissionPage] = useState(1);
+  const [permissionRowsState, setPermissionRowsState] = useState([]);
+
+  const PERMISSION_PAGE_SIZE = 8;
 
   useEffect(() => {
     setData(lichCongTacData);
@@ -76,6 +93,10 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
 
   useEffect(() => {
     setOfficerOptions(canBoData || []);
+  }, [canBoData]);
+
+  useEffect(() => {
+    setPermissionRowsState((canBoData || []).filter((item) => item.trangThai === 'active'));
   }, [canBoData]);
 
   useEffect(() => {
@@ -162,6 +183,17 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
   const banGiamDocMembers = officerOptions
     .filter((cb) => cb.vaiTro === 'Lãnh đạo' || cb.donVi === 'Ban Giám đốc')
     .slice(0, 4);
+
+  const getBgdMemberNames = (memberIds = []) => {
+    if (!Array.isArray(memberIds) || !memberIds.length) return [];
+    return banGiamDocMembers
+      .filter((cb) => memberIds.includes(cb.id))
+      .map((cb) => [cb.capBac, cb.hoTen].filter(Boolean).join(' '));
+  };
+
+  const handleConfirmBgdSelection = () => {
+    setShowBgdPicker(false);
+  };
 
   const getDayEvents = (dateStr) => weekData.filter(l => {
     const d = new Date(l.ngay).getDay();
@@ -283,27 +315,63 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
   };
 
   const canReviewSchedule = (schedule) => {
-    if (!canReview || schedule?.trangThaiDuyet !== 'pending') return false;
-    if (user?.backendRole === 'admin') return true;
-    if (user?.backendRole !== 'manager') return false;
+    return canReview && schedule?.trangThaiDuyet === 'pending';
+  };
 
-    const currentUserId = Number(user?.userId || 0) || null;
-    const creatorUserId = Number(schedule?.nguoiTaoUserId || 0) || null;
-    if (currentUserId && creatorUserId && currentUserId === creatorUserId) return true;
+  const permissionCandidates = permissionRowsState;
+  const permissionTotalPages = Math.max(1, Math.ceil(permissionCandidates.length / PERMISSION_PAGE_SIZE));
+  const permissionPageSafe = Math.min(permissionPage, permissionTotalPages);
+  const permissionRows = permissionCandidates.slice(
+    (permissionPageSafe - 1) * PERMISSION_PAGE_SIZE,
+    (permissionPageSafe - 1) * PERMISSION_PAGE_SIZE + PERMISSION_PAGE_SIZE
+  );
 
-    if (user?.id && schedule?.nguoiTaoOfficerId && String(user.id) === String(schedule.nguoiTaoOfficerId)) {
-      return true;
+  useEffect(() => {
+    if (permissionPage > permissionTotalPages) {
+      setPermissionPage(permissionTotalPages);
     }
+  }, [permissionPage, permissionTotalPages]);
 
-    const managerDepartmentId = Number(user?.departmentId || 0) || null;
-    const creatorDepartmentId = Number(schedule?.nguoiTaoDonViId || 0) || null;
-    if (managerDepartmentId && creatorDepartmentId && managerDepartmentId === creatorDepartmentId) {
-      return true;
+  const handleToggleWorkSchedulePermission = async (officer, field) => {
+    if (!officer?.id) return;
+
+    const currentCreate = Boolean(officer.canCreateWorkSchedulesByPermission);
+    const currentApprove = Boolean(officer.canApproveWorkSchedulesByPermission);
+    const nextCreate = field === 'create' ? !currentCreate : currentCreate;
+    const nextApprove = field === 'approve' ? !currentApprove : currentApprove;
+
+    setPermissionResult({ type: '', message: '' });
+
+    try {
+      setPermissionLoadingId(`${officer.id}:${field}`);
+      await apiClient.officers.updateWorkSchedulePermission(officer.id, {
+        canCreateWorkSchedules: nextCreate,
+        canApproveWorkSchedules: nextApprove,
+      });
+
+      setPermissionRowsState((prev) => prev.map((item) => {
+        if (item.id !== officer.id) return item;
+        return {
+          ...item,
+          canCreateWorkSchedulesByPermission: nextCreate,
+          canApproveWorkSchedulesByPermission: nextApprove,
+          canCreateWorkSchedules: Boolean(item.canCreateWorkSchedulesByRole) || nextCreate,
+          canApproveWorkSchedules: Boolean(item.canApproveWorkSchedulesByRole) || nextApprove,
+        };
+      }));
+
+      setPermissionResult({
+        type: 'success',
+        message: `Đã cập nhật quyền lịch công tác cho ${officer.hoTenDayDu || officer.hoTen}.`,
+      });
+    } catch (err) {
+      setPermissionResult({
+        type: 'error',
+        message: err?.message || 'Không thể cập nhật quyền lịch công tác.',
+      });
+    } finally {
+      setPermissionLoadingId('');
     }
-
-    const managerDepartmentName = String(user?.department || '').trim();
-    const creatorDepartmentName = String(schedule?.nguoiTaoDonVi || '').trim();
-    return Boolean(managerDepartmentName && creatorDepartmentName && managerDepartmentName === creatorDepartmentName);
   };
 
   return (
@@ -322,7 +390,13 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
             className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'month' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
             <CalendarDays size={14} className="inline mr-1.5" />Lịch tháng
           </button>
-          {canCreate && (
+          {canGrantPermission && (
+            <button onClick={() => setViewMode('permission')}
+              className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'permission' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+              Phân quyền
+            </button>
+          )}
+          {canCreate && viewMode !== 'permission' && (
             <button onClick={() => openAdd(3)} className="btn-primary">
               <Plus size={16} /> Thêm lịch
             </button>
@@ -594,6 +668,102 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
             </div>
           </div>
         </div>
+      ) : viewMode === 'permission' ? (
+        <div className="card-lg p-0 overflow-hidden">
+          <div className="p-4 border-b border-slate-100">
+            <h3 className="text-sm font-bold text-slate-700">Phân quyền lịch công tác</h3>
+            <p className="text-xs text-slate-500 mt-1">Cấp riêng quyền Tạo và Duyệt lịch công tác cho từng cán bộ.</p>
+            {permissionResult.message && (
+              <div className={`text-sm rounded-xl px-3 py-2 mt-3 ${permissionResult.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                {permissionResult.message}
+              </div>
+            )}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[980px]">
+              <thead>
+                <tr>
+                  <th className="table-th">Quân hàm + Họ và tên</th>
+                  <th className="table-th">Chức vụ</th>
+                  <th className="table-th">Đơn vị</th>
+                  <th className="table-th">Quyền tạo</th>
+                  <th className="table-th">Quyền duyệt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {permissionRows.map((item) => {
+                  const loadingCreate = permissionLoadingId === `${item.id}:create`;
+                  const loadingApprove = permissionLoadingId === `${item.id}:approve`;
+                  const hasCreateByRole = Boolean(item.canCreateWorkSchedulesByRole);
+                  const hasApproveByRole = Boolean(item.canApproveWorkSchedulesByRole);
+
+                  return (
+                    <tr key={item.id} className="hover:bg-slate-50/70">
+                      <td className="table-td font-semibold text-slate-800">{item.hoTenDayDu || item.hoTen}</td>
+                      <td className="table-td text-slate-600">{item.chucVu || 'Chưa cập nhật'}</td>
+                      <td className="table-td text-slate-600">{item.donVi || 'Chưa cập nhật'}</td>
+                      <td className="table-td">
+                        {hasCreateByRole ? (
+                          <span className="inline-flex px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-700">Theo vai trò</span>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={loadingCreate || loadingApprove}
+                            onClick={() => handleToggleWorkSchedulePermission(item, 'create')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${(item.canCreateWorkSchedulesByPermission ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'bg-emerald-600 text-white hover:bg-emerald-700')} disabled:opacity-50`}
+                          >
+                            {loadingCreate
+                              ? 'Đang lưu...'
+                              : item.canCreateWorkSchedulesByPermission
+                                ? 'Thu hồi'
+                                : 'Cấp quyền'}
+                          </button>
+                        )}
+                      </td>
+                      <td className="table-td">
+                        {hasApproveByRole ? (
+                          <span className="inline-flex px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-700">Theo vai trò</span>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={loadingApprove || loadingCreate}
+                            onClick={() => handleToggleWorkSchedulePermission(item, 'approve')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${(item.canApproveWorkSchedulesByPermission ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'bg-emerald-600 text-white hover:bg-emerald-700')} disabled:opacity-50`}
+                          >
+                            {loadingApprove
+                              ? 'Đang lưu...'
+                              : item.canApproveWorkSchedulesByPermission
+                                ? 'Thu hồi'
+                                : 'Cấp quyền'}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {permissionCandidates.length > PERMISSION_PAGE_SIZE && (
+            <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-slate-100 bg-white">
+              <button
+                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 disabled:opacity-40"
+                onClick={() => setPermissionPage((p) => Math.max(1, p - 1))}
+                disabled={permissionPageSafe <= 1}
+              >
+                Trước
+              </button>
+              <span className="text-sm text-slate-500">Trang {permissionPageSafe}/{permissionTotalPages}</span>
+              <button
+                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 disabled:opacity-40"
+                onClick={() => setPermissionPage((p) => Math.min(permissionTotalPages, p + 1))}
+                disabled={permissionPageSafe >= permissionTotalPages}
+              >
+                Sau
+              </button>
+            </div>
+          )}
+        </div>
       ) : null}
 
       {/* Legend */}
@@ -654,35 +824,48 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                 <div className="border border-slate-200 rounded-xl p-3 space-y-2 max-h-44 overflow-y-auto bg-slate-50/40">
                   {participantUnits.map((unit) => {
                     const checked = (form.thanhPhanThamGia || []).includes(unit);
+                    const isBoardUnit = unit === 'Ban Giám đốc';
                     return (
-                      <label key={unit} className="flex items-center gap-2 text-sm text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={(e) => {
-                            const next = e.target.checked
-                              ? [...(form.thanhPhanThamGia || []), unit]
-                              : (form.thanhPhanThamGia || []).filter((x) => x !== unit);
-                            setForm({ ...form, thanhPhanThamGia: next, bgdMemberIds: unit === 'Ban Giám đốc' && !e.target.checked ? [] : form.bgdMemberIds });
-                            if (unit === 'Ban Giám đốc' && e.target.checked) {
-                              setShowBgdPicker(true);
-                            }
-                          }}
-                        />
-                        <span>{unit}</span>
-                      </label>
+                      <div key={unit} className="space-y-2">
+                        <label className="flex items-center gap-2 text-sm text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              const next = e.target.checked
+                                ? [...(form.thanhPhanThamGia || []), unit]
+                                : (form.thanhPhanThamGia || []).filter((x) => x !== unit);
+                              setForm({ ...form, thanhPhanThamGia: next, bgdMemberIds: isBoardUnit && !e.target.checked ? [] : form.bgdMemberIds });
+                              if (isBoardUnit && e.target.checked) {
+                                setShowBgdPicker(true);
+                              }
+                            }}
+                          />
+                          <span>{unit}</span>
+                        </label>
+
+                        {isBoardUnit && checked && (
+                          <div className="ml-6 space-y-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowBgdPicker(true)}
+                              className="px-3 py-1.5 text-xs rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200"
+                            >
+                              Chọn thành viên Ban Giám đốc ({(form.bgdMemberIds || []).length}/4)
+                            </button>
+                            <div className="text-xs text-slate-600">
+                              <span className="font-semibold">Thành viên Ban Giám đốc tham gia:</span>{' '}
+                              {(() => {
+                                const selectedNames = getBgdMemberNames(form.bgdMemberIds || []);
+                                return selectedNames.length ? selectedNames.join(', ') : 'Chưa chọn';
+                              })()}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
-                {(form.thanhPhanThamGia || []).includes('Ban Giám đốc') && (
-                  <button
-                    type="button"
-                    onClick={() => setShowBgdPicker(true)}
-                    className="mt-2 px-3 py-1.5 text-xs rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200"
-                  >
-                    Chọn thành viên Ban Giám đốc ({(form.bgdMemberIds || []).length}/4)
-                  </button>
-                )}
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Ghi chú</label>
@@ -727,6 +910,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
               })}
             </div>
             <div className="mt-4 flex justify-end gap-2">
+              <button onClick={handleConfirmBgdSelection} className="btn-primary">OK</button>
               <button onClick={() => setShowBgdPicker(false)} className="btn-secondary">Đóng</button>
             </div>
           </div>

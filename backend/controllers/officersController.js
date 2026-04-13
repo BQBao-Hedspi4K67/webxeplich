@@ -1,6 +1,14 @@
 import pool from '../config/database.js';
 import { OFFICER_ROLES, USER_STATUS } from '../config/constants.js';
 import { logActivity } from '../utils/activityLogger.js';
+import {
+  ensureDutyScheduleAccessSchema,
+  canGrantDutySchedulePermissions,
+} from '../utils/dutyScheduleAccess.js';
+import {
+  ensureWorkScheduleAccessSchema,
+  canGrantWorkSchedulePermissions,
+} from '../utils/workScheduleAccess.js';
 
 const USER_ROLE_TO_OFFICER_ROLE = {
   admin: 'leader',
@@ -89,14 +97,14 @@ const syncUsersToOfficers = async (connection) => {
   // Backfill old user accounts that exist in users but not in officers.
   const [missingUsers] = hasUserIdColumn
     ? await connection.execute(
-      `SELECT u.id as userId, u.fullName, u.email, u.role, u.status
+      `SELECT u.id as userId, u.fullName, u.militaryRank, u.email, u.role, u.status
        FROM users u
        LEFT JOIN officers o ON o.userId = u.id
        WHERE u.role IN ('admin', 'manager', 'officer')
          AND o.id IS NULL`
     )
     : await connection.execute(
-      `SELECT u.id as userId, u.fullName, u.email, u.role, u.status
+      `SELECT u.id as userId, u.fullName, u.militaryRank, u.email, u.role, u.status
        FROM users u
        LEFT JOIN officers o ON ((u.email IS NOT NULL AND u.email <> '' AND o.email = u.email) OR o.fullName = u.fullName)
        WHERE u.role IN ('admin', 'manager', 'officer')
@@ -113,6 +121,8 @@ const syncUsersToOfficers = async (connection) => {
   for (const u of missingUsers) {
     const officerId = `CB${String(nextNum).padStart(3, '0')}`;
     const officerRole = USER_ROLE_TO_OFFICER_ROLE[u.role] || 'officer';
+    const split = splitTitleAndName(u.fullName);
+    const resolvedOfficerTitle = String(u.militaryRank || '').trim() || '';
     if (hasUserIdColumn) {
       await connection.execute(
         `INSERT INTO officers (id, userId, fullName, officerTitle, officerName, position, department, phone, email, role, status)
@@ -121,8 +131,8 @@ const syncUsersToOfficers = async (connection) => {
           officerId,
           u.userId,
           u.fullName,
-          splitTitleAndName(u.fullName).officerTitle,
-          splitTitleAndName(u.fullName).officerName,
+          resolvedOfficerTitle,
+          split.officerName,
           buildDefaultPosition(officerRole),
           buildDefaultDepartment(officerRole),
           null,
@@ -138,8 +148,8 @@ const syncUsersToOfficers = async (connection) => {
         [
           officerId,
           u.fullName,
-          splitTitleAndName(u.fullName).officerTitle,
-          splitTitleAndName(u.fullName).officerName,
+          resolvedOfficerTitle,
+          split.officerName,
           buildDefaultPosition(officerRole),
           buildDefaultDepartment(officerRole),
           null,
@@ -163,6 +173,8 @@ export const getOfficers = async (req, res, next) => {
 
     try {
       await syncUsersToOfficers(connection);
+      await ensureDutyScheduleAccessSchema(connection);
+      await ensureWorkScheduleAccessSchema(connection);
       const requesterOfficer = await resolveRequesterOfficer(connection, req.user || {});
       const hasDepartmentIdColumn = await hasOfficersDepartmentIdColumn(connection);
 
@@ -228,15 +240,51 @@ export const getOfficers = async (req, res, next) => {
 
       // Get paginated data
       const [officers] = await connection.execute(
-        `SELECT * FROM officers ${whereClause}
+        `SELECT o.*,
+                COALESCE(dsp.canManageDutySchedules, 0) AS canManageDutySchedulesByPermission,
+                COALESCE(wsp.canCreateWorkSchedules, 0) AS canCreateWorkSchedulesByPermission,
+                COALESCE(wsp.canApproveWorkSchedules, 0) AS canApproveWorkSchedulesByPermission,
+                CASE
+                  WHEN o.department = 'Ban Giám đốc' OR o.department = 'Phòng hành chính tổng hợp' THEN 1
+                  ELSE 0
+                END AS canManageDutySchedulesByDepartment,
+                CASE
+                  WHEN o.role = 'leader' OR o.role = 'manager' THEN 1
+                  ELSE 0
+                END AS canCreateWorkSchedulesByRole,
+                CASE
+                  WHEN o.role = 'leader' THEN 1
+                  ELSE 0
+                END AS canApproveWorkSchedulesByRole,
+                CASE
+                  WHEN (o.department = 'Ban Giám đốc' OR o.department = 'Phòng hành chính tổng hợp')
+                       OR COALESCE(dsp.canManageDutySchedules, 0) = 1
+                  THEN 1 ELSE 0
+                END AS canManageDutySchedules,
+                CASE
+                  WHEN o.role IN ('leader', 'manager') OR COALESCE(wsp.canCreateWorkSchedules, 0) = 1
+                  THEN 1 ELSE 0
+                END AS canCreateWorkSchedules,
+                CASE
+                  WHEN o.role = 'leader' OR COALESCE(wsp.canApproveWorkSchedules, 0) = 1
+                  THEN 1 ELSE 0
+                END AS canApproveWorkSchedules,
+                dsp.grantedAt AS dutySchedulePermissionGrantedAt,
+                dsp.grantedByUserId AS dutySchedulePermissionGrantedByUserId,
+                wsp.grantedAt AS workSchedulePermissionGrantedAt,
+                wsp.grantedByUserId AS workSchedulePermissionGrantedByUserId
+         FROM officers o
+         LEFT JOIN duty_schedule_permissions dsp ON dsp.officerId = o.id
+         LEFT JOIN work_schedule_permissions wsp ON wsp.officerId = o.id
+         ${whereClause}
          ORDER BY
-           CASE role
+           CASE o.role
              WHEN 'leader' THEN 1
              WHEN 'manager' THEN 2
              WHEN 'officer' THEN 3
              ELSE 4
            END,
-           id ASC
+           o.id ASC
          LIMIT ${parseInt(limit)} OFFSET ${offset}`,
         params
       );
@@ -266,8 +314,46 @@ export const getOfficerById = async (req, res, next) => {
     const connection = await pool.getConnection();
 
     try {
+      await ensureDutyScheduleAccessSchema(connection);
+      await ensureWorkScheduleAccessSchema(connection);
       const [rows] = await connection.execute(
-        'SELECT * FROM officers WHERE id = ?',
+        `SELECT o.*,
+                COALESCE(dsp.canManageDutySchedules, 0) AS canManageDutySchedulesByPermission,
+                COALESCE(wsp.canCreateWorkSchedules, 0) AS canCreateWorkSchedulesByPermission,
+                COALESCE(wsp.canApproveWorkSchedules, 0) AS canApproveWorkSchedulesByPermission,
+                CASE
+                  WHEN o.department = 'Ban Giám đốc' OR o.department = 'Phòng hành chính tổng hợp' THEN 1
+                  ELSE 0
+                END AS canManageDutySchedulesByDepartment,
+                CASE
+                  WHEN o.role = 'leader' OR o.role = 'manager' THEN 1
+                  ELSE 0
+                END AS canCreateWorkSchedulesByRole,
+                CASE
+                  WHEN o.role = 'leader' THEN 1
+                  ELSE 0
+                END AS canApproveWorkSchedulesByRole,
+                CASE
+                  WHEN (o.department = 'Ban Giám đốc' OR o.department = 'Phòng hành chính tổng hợp')
+                       OR COALESCE(dsp.canManageDutySchedules, 0) = 1
+                  THEN 1 ELSE 0
+                END AS canManageDutySchedules,
+                CASE
+                  WHEN o.role IN ('leader', 'manager') OR COALESCE(wsp.canCreateWorkSchedules, 0) = 1
+                  THEN 1 ELSE 0
+                END AS canCreateWorkSchedules,
+                CASE
+                  WHEN o.role = 'leader' OR COALESCE(wsp.canApproveWorkSchedules, 0) = 1
+                  THEN 1 ELSE 0
+                END AS canApproveWorkSchedules,
+                dsp.grantedAt AS dutySchedulePermissionGrantedAt,
+                dsp.grantedByUserId AS dutySchedulePermissionGrantedByUserId,
+                wsp.grantedAt AS workSchedulePermissionGrantedAt,
+                wsp.grantedByUserId AS workSchedulePermissionGrantedByUserId
+         FROM officers o
+         LEFT JOIN duty_schedule_permissions dsp ON dsp.officerId = o.id
+         LEFT JOIN work_schedule_permissions wsp ON wsp.officerId = o.id
+         WHERE o.id = ?`,
         [id]
       );
 
@@ -282,6 +368,154 @@ export const getOfficerById = async (req, res, next) => {
       res.json({
         success: true,
         data: rows[0],
+      });
+    } finally {
+      connection.release();
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const updateDutySchedulePermission = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const enabled = Boolean(req.body?.enabled);
+    const connection = await pool.getConnection();
+
+    try {
+      await ensureDutyScheduleAccessSchema(connection);
+
+      const allowed = await canGrantDutySchedulePermissions(connection, req.user || {});
+      if (!allowed) {
+        return res.status(403).json({ success: false, error: 'Insufficient permissions', code: 'FORBIDDEN' });
+      }
+
+      const [officerRows] = await connection.execute(
+        'SELECT id, fullName FROM officers WHERE id = ? LIMIT 1',
+        [id]
+      );
+      if (!officerRows.length) {
+        return res.status(404).json({ success: false, error: 'Officer not found', code: 'OFFICER_NOT_FOUND' });
+      }
+
+      if (enabled) {
+        await connection.execute(
+          `INSERT INTO duty_schedule_permissions (officerId, canManageDutySchedules, grantedByUserId)
+           VALUES (?, 1, ?)
+           ON DUPLICATE KEY UPDATE
+             canManageDutySchedules = VALUES(canManageDutySchedules),
+             grantedByUserId = VALUES(grantedByUserId),
+             grantedAt = CURRENT_TIMESTAMP,
+             updatedAt = CURRENT_TIMESTAMP`,
+          [id, req.user?.id || null]
+        );
+      } else {
+        await connection.execute(
+          'DELETE FROM duty_schedule_permissions WHERE officerId = ?',
+          [id]
+        );
+      }
+
+      await logActivity({
+        actorUserId: req.user?.id,
+        actorUsername: req.user?.username,
+        actorRole: req.user?.role,
+        module: 'lichtrucban',
+        action: enabled ? 'grant_permission' : 'revoke_permission',
+        entityType: 'duty_schedule_permission',
+        entityId: id,
+        summary: `${enabled ? 'Cấp' : 'Thu hồi'} quyền lịch trực cho ${officerRows[0].fullName}`,
+      });
+
+      return res.json({
+        success: true,
+        data: {
+          officerId: id,
+          canManageDutySchedulesByPermission: enabled,
+        },
+        message: enabled ? 'Đã cấp quyền lập/sửa lịch trực.' : 'Đã thu hồi quyền lập/sửa lịch trực.',
+      });
+    } finally {
+      connection.release();
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const updateWorkSchedulePermission = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const enabled = req.body?.enabled;
+    const canCreateWorkSchedules = req.body?.canCreateWorkSchedules;
+    const canApproveWorkSchedules = req.body?.canApproveWorkSchedules;
+
+    const nextCanCreate = canCreateWorkSchedules === undefined
+      ? Boolean(enabled)
+      : Boolean(canCreateWorkSchedules);
+    const nextCanApprove = canApproveWorkSchedules === undefined
+      ? Boolean(enabled)
+      : Boolean(canApproveWorkSchedules);
+
+    const connection = await pool.getConnection();
+
+    try {
+      await ensureWorkScheduleAccessSchema(connection);
+
+      const allowed = await canGrantWorkSchedulePermissions(connection, req.user || {});
+      if (!allowed) {
+        return res.status(403).json({ success: false, error: 'Insufficient permissions', code: 'FORBIDDEN' });
+      }
+
+      const [officerRows] = await connection.execute(
+        'SELECT id, fullName FROM officers WHERE id = ? LIMIT 1',
+        [id]
+      );
+      if (!officerRows.length) {
+        return res.status(404).json({ success: false, error: 'Officer not found', code: 'OFFICER_NOT_FOUND' });
+      }
+
+      if (nextCanCreate || nextCanApprove) {
+        await connection.execute(
+          `INSERT INTO work_schedule_permissions (officerId, canCreateWorkSchedules, canApproveWorkSchedules, grantedByUserId)
+           VALUES (?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             canCreateWorkSchedules = VALUES(canCreateWorkSchedules),
+             canApproveWorkSchedules = VALUES(canApproveWorkSchedules),
+             grantedByUserId = VALUES(grantedByUserId),
+             grantedAt = CURRENT_TIMESTAMP,
+             updatedAt = CURRENT_TIMESTAMP`,
+          [id, nextCanCreate ? 1 : 0, nextCanApprove ? 1 : 0, req.user?.id || null]
+        );
+      } else {
+        await connection.execute(
+          'DELETE FROM work_schedule_permissions WHERE officerId = ?',
+          [id]
+        );
+      }
+
+      await logActivity({
+        actorUserId: req.user?.id,
+        actorUsername: req.user?.username,
+        actorRole: req.user?.role,
+        module: 'lichcongtac',
+        action: nextCanCreate || nextCanApprove ? 'grant_permission' : 'revoke_permission',
+        entityType: 'work_schedule_permission',
+        entityId: id,
+        summary: `${nextCanCreate || nextCanApprove ? 'Cấp' : 'Thu hồi'} quyền lịch công tác cho ${officerRows[0].fullName}`,
+      });
+
+      return res.json({
+        success: true,
+        data: {
+          officerId: id,
+          canCreateWorkSchedulesByPermission: nextCanCreate,
+          canApproveWorkSchedulesByPermission: nextCanApprove,
+        },
+        message: nextCanCreate || nextCanApprove
+          ? 'Đã cập nhật quyền lịch công tác.'
+          : 'Đã thu hồi quyền lịch công tác.',
       });
     } finally {
       connection.release();

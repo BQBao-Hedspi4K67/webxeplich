@@ -17,6 +17,7 @@ CREATE TABLE users (
   username VARCHAR(50) UNIQUE NOT NULL,
   passwordHash VARCHAR(255) NOT NULL,
   fullName VARCHAR(100) NOT NULL,
+  militaryRank VARCHAR(100) NULL,
   email VARCHAR(100) UNIQUE,
   role ENUM('admin', 'manager', 'officer') DEFAULT 'officer' NOT NULL,
   avatar VARCHAR(10),
@@ -53,6 +54,36 @@ CREATE TABLE officers (
   INDEX idx_department_group (departmentGroup),
   INDEX idx_status (status),
   INDEX idx_role (role)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- ========== TABLE: duty_schedule_permissions ==========
+-- Quyen lap/sua lich truc cap rieng cho tung can bo
+CREATE TABLE duty_schedule_permissions (
+  officerId VARCHAR(10) PRIMARY KEY,
+  canManageDutySchedules TINYINT(1) NOT NULL DEFAULT 1,
+  grantedByUserId INT NULL,
+  grantedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (officerId) REFERENCES officers(id) ON DELETE CASCADE,
+  FOREIGN KEY (grantedByUserId) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_canManageDutySchedules (canManageDutySchedules),
+  INDEX idx_grantedByUserId (grantedByUserId)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- ========== TABLE: work_schedule_permissions ==========
+-- Quyen tao/duyet lich cong tac cap rieng cho tung can bo
+CREATE TABLE work_schedule_permissions (
+  officerId VARCHAR(10) PRIMARY KEY,
+  canCreateWorkSchedules TINYINT(1) NOT NULL DEFAULT 1,
+  canApproveWorkSchedules TINYINT(1) NOT NULL DEFAULT 1,
+  grantedByUserId INT NULL,
+  grantedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (officerId) REFERENCES officers(id) ON DELETE CASCADE,
+  FOREIGN KEY (grantedByUserId) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_canCreateWorkSchedules (canCreateWorkSchedules),
+  INDEX idx_canApproveWorkSchedules (canApproveWorkSchedules),
+  INDEX idx_work_schedule_grantedByUserId (grantedByUserId)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ========== TABLE: departments ==========
@@ -350,6 +381,24 @@ INSERT INTO officers (id, userId, fullName, officerTitle, officerName, position,
 ('CB029', 29, 'Thiếu úy Nguyễn Minh Phúc', 'Thiếu úy', 'Nguyễn Minh Phúc', 'Cán bộ lái xe', 'Đội lái xe', 'doi', '0911110029', 'nmphuc@hvktcnan.edu.vn', 'officer', 'active', NULL),
 ('CB030', 30, 'Thượng úy Trần Quốc Việt', 'Thượng úy', 'Trần Quốc Việt', 'Cán bộ quân y', 'Đội bệnh xá', 'doi', '0911110030', 'tqviet@hvktcnan.edu.vn', 'officer', 'active', NULL),
 ('CB031', 31, 'Thiếu úy Lê Thị Hạnh', 'Thiếu úy', 'Lê Thị Hạnh', 'Cán bộ quân y', 'Đội bệnh xá', 'doi', '0911110031', 'lthanh@hvktcnan.edu.vn', 'officer', 'active', NULL);
+
+-- Chuan hoa du lieu ten: tach quan ham khoi fullName neu du lieu cu dang gop chung
+UPDATE officers
+SET fullName = TRIM(REPLACE(fullName, CONCAT(officerTitle, ' '), ''))
+WHERE officerTitle IS NOT NULL
+  AND officerTitle <> ''
+  AND fullName LIKE CONCAT(officerTitle, ' %');
+
+UPDATE users u
+LEFT JOIN officers o ON o.userId = u.id
+SET
+  u.militaryRank = COALESCE(NULLIF(u.militaryRank, ''), o.officerTitle),
+  u.fullName = CASE
+    WHEN COALESCE(NULLIF(u.militaryRank, ''), o.officerTitle) IS NOT NULL
+         AND u.fullName LIKE CONCAT(COALESCE(NULLIF(u.militaryRank, ''), o.officerTitle), ' %')
+      THEN TRIM(REPLACE(u.fullName, CONCAT(COALESCE(NULLIF(u.militaryRank, ''), o.officerTitle), ' '), ''))
+    ELSE u.fullName
+  END;
 
 -- ========== DEPARTMENTS ==========
 INSERT INTO departments (name, departmentType, headOfficerId, isActive) VALUES

@@ -439,10 +439,10 @@ export const getExportPreview = async (req, res, next) => {
       if (type === 'congtac' || type === 'both') {
         const [workRows] = await connection.execute(
           `SELECT ws.id, ws.title, ws.date, ws.startTime, ws.endTime, ws.location,
-                  ro.fullName AS responsibleOfficerName,
-                  o1.fullName AS officer1Name,
-                  o2.fullName AS officer2Name,
-                  cmd.fullName AS commanderOfficerName
+                  CONCAT_WS(' ', NULLIF(ro.officerTitle, ''), ro.fullName) AS responsibleOfficerName,
+                  CONCAT_WS(' ', NULLIF(o1.officerTitle, ''), o1.fullName) AS officer1Name,
+                  CONCAT_WS(' ', NULLIF(o2.officerTitle, ''), o2.fullName) AS officer2Name,
+                  CONCAT_WS(' ', NULLIF(cmd.officerTitle, ''), cmd.fullName) AS commanderOfficerName
            FROM work_schedules ws
            LEFT JOIN officers ro ON ro.id = ws.responsibleOfficerId
            LEFT JOIN officers o1 ON o1.id = ws.officer1Id
@@ -473,7 +473,7 @@ export const getExportPreview = async (req, res, next) => {
                   ds.slotNo,
                   ds.assignmentGroup,
                     ds.officerId,
-                    o.fullName AS officerName
+                    CONCAT_WS(' ', NULLIF(o.officerTitle, ''), o.fullName) AS officerName
              FROM duty_schedules ds
              LEFT JOIN officers o ON ds.officerId = o.id
              WHERE (
@@ -498,7 +498,7 @@ export const getExportPreview = async (req, res, next) => {
                   ds.slotNo,
                   ds.assignmentGroup,
                     ds.officerId,
-                    o.fullName AS officerName
+                    CONCAT_WS(' ', NULLIF(o.officerTitle, ''), o.fullName) AS officerName
              FROM duty_schedules ds
              LEFT JOIN officers o ON ds.officerId = o.id
              WHERE ${selector.where}
@@ -556,10 +556,10 @@ export const downloadExport = async (req, res, next) => {
              ws.endTime,
              ws.title,
              ws.location,
-             ro.fullName AS responsibleOfficerName,
-             o1.fullName AS officer1Name,
-             o2.fullName AS officer2Name,
-             cmd.fullName AS commanderOfficerName
+             CONCAT_WS(' ', NULLIF(ro.officerTitle, ''), ro.fullName) AS responsibleOfficerName,
+             CONCAT_WS(' ', NULLIF(o1.officerTitle, ''), o1.fullName) AS officer1Name,
+             CONCAT_WS(' ', NULLIF(o2.officerTitle, ''), o2.fullName) AS officer2Name,
+             CONCAT_WS(' ', NULLIF(cmd.officerTitle, ''), cmd.fullName) AS commanderOfficerName
            FROM work_schedules ws
            LEFT JOIN officers ro ON ro.id = ws.responsibleOfficerId
            LEFT JOIN officers o1 ON o1.id = ws.officer1Id
@@ -588,7 +588,7 @@ export const downloadExport = async (req, res, next) => {
               ds.slotNo,
               ds.assignmentGroup,
                ds.officerId,
-               COALESCE(o.fullName, ds.officerId) AS officerName
+               COALESCE(CONCAT_WS(' ', NULLIF(o.officerTitle, ''), o.fullName), ds.officerId) AS officerName
              FROM duty_schedules ds
              LEFT JOIN officers o ON o.id = ds.officerId
              WHERE (
@@ -614,7 +614,7 @@ export const downloadExport = async (req, res, next) => {
               ds.slotNo,
               ds.assignmentGroup,
                ds.officerId,
-               COALESCE(o.fullName, ds.officerId) AS officerName
+               COALESCE(CONCAT_WS(' ', NULLIF(o.officerTitle, ''), o.fullName), ds.officerId) AS officerName
              FROM duty_schedules ds
              LEFT JOIN officers o ON o.id = ds.officerId
              WHERE ${selector.where}`,
