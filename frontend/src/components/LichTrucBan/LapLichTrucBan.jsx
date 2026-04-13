@@ -683,7 +683,7 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
       <div className="card-lg p-0 overflow-hidden">
         <div className="p-4 border-b border-slate-100">
           <h3 className="text-sm font-bold text-slate-700">Cấp quyền tạo/sửa lịch trực</h3>
-          <p className="text-xs text-slate-500 mt-1">Ban Giám đốc và Phòng hành chính tổng hợp có thể cấp hoặc thu hồi quyền cho cán bộ khác.</p>
+          
           {permissionResult.message && (
             <div className={`text-sm rounded-xl px-3 py-2 mt-3 ${permissionResult.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
               {permissionResult.message}
