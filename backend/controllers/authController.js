@@ -607,7 +607,6 @@ export const createUserAccount = async (req, res, next) => {
 export const updateMyContact = async (req, res, next) => {
   try {
     const { phone = null, email = null } = req.body || {};
-
     const normalizedPhone = phone === null ? null : String(phone).trim();
     const normalizedEmail = email === null ? null : String(email).trim().toLowerCase();
 
@@ -654,10 +653,92 @@ export const updateMyContact = async (req, res, next) => {
       return res.json({
         success: true,
         data: {
+          username: req.user.username,
           phone: normalizedPhone || null,
           email: normalizedEmail || null,
         },
         message: 'Cập nhật thông tin liên hệ thành công.',
+      });
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const changeMyPassword = async (req, res, next) => {
+  try {
+    const { currentPassword = '', newPassword = '' } = req.body || {};
+
+    const normalizedCurrentPassword = String(currentPassword || '').trim();
+    const normalizedNewPassword = String(newPassword || '').trim();
+
+    if (!normalizedCurrentPassword || !normalizedNewPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Current password and new password are required',
+        code: 'MISSING_PASSWORD_FIELDS',
+      });
+    }
+
+    if (normalizedNewPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: 'Mật khẩu mới phải có ít nhất 6 ký tự',
+        code: 'PASSWORD_TOO_SHORT',
+      });
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [rows] = await connection.execute(
+        'SELECT id, passwordHash FROM users WHERE id = ? LIMIT 1',
+        [req.user.id]
+      );
+
+      if (!rows.length) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found',
+          code: 'USER_NOT_FOUND',
+        });
+      }
+
+      const user = rows[0];
+      const isMatch = await bcrypt.compare(normalizedCurrentPassword, user.passwordHash);
+      if (!isMatch) {
+        return res.status(400).json({
+          success: false,
+          error: 'Mật khẩu hiện tại không đúng',
+          code: 'INVALID_CURRENT_PASSWORD',
+        });
+      }
+
+      const isSameAsOld = await bcrypt.compare(normalizedNewPassword, user.passwordHash);
+      if (isSameAsOld) {
+        return res.status(400).json({
+          success: false,
+          error: 'Mật khẩu mới phải khác mật khẩu hiện tại',
+          code: 'PASSWORD_NOT_CHANGED',
+        });
+      }
+
+      const newPasswordHash = await bcrypt.hash(normalizedNewPassword, 10);
+      await connection.execute(
+        'UPDATE users SET passwordHash = ? WHERE id = ?',
+        [newPasswordHash, req.user.id]
+      );
+
+      await connection.commit();
+      return res.json({
+        success: true,
+        message: 'Đổi mật khẩu thành công.',
       });
     } catch (error) {
       await connection.rollback();

@@ -85,6 +85,7 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
   const [permissionResult, setPermissionResult] = useState({ type: '', message: '' });
   const [thongKePage, setThongKePage] = useState(1);
   const [phanQuyenPage, setPhanQuyenPage] = useState(1);
+  const [selectedHolidayGroup, setSelectedHolidayGroup] = useState('all');
 
   const THONGKE_PAGE_SIZE = 8;
   const PHANQUYEN_PAGE_SIZE = 8;
@@ -150,11 +151,45 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
   );
 
   const holidayDates = useMemo(
-    () => holidayEntries.map((h) => toDateOnly(h.ngay)).filter(Boolean),
+    () => Array.from(new Set(holidayEntries.map((h) => toDateOnly(h.ngay)).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b)),
     [holidayEntries]
   );
 
   const holidayDatesSet = useMemo(() => new Set(holidayDates), [holidayDates]);
+
+  const holidayGroups = useMemo(() => {
+    const groups = {};
+
+    holidayEntries.forEach((holiday) => {
+      const date = toDateOnly(holiday.ngay);
+      if (!date) return;
+
+      const groupName = String(holiday.ten || '').trim() || `Ngày lễ ${date}`;
+      if (!groups[groupName]) groups[groupName] = [];
+      groups[groupName].push(date);
+    });
+
+    return Object.entries(groups)
+      .map(([name, dates]) => {
+        const uniqueDates = Array.from(new Set(dates)).sort((a, b) => a.localeCompare(b));
+        return {
+          key: name,
+          label: name,
+          dates: uniqueDates,
+          startDate: uniqueDates[0],
+          endDate: uniqueDates[uniqueDates.length - 1],
+        };
+      })
+      .sort((a, b) => String(a.startDate || '').localeCompare(String(b.startDate || '')));
+  }, [holidayEntries]);
+
+  const visibleHolidayDates = useMemo(() => {
+    if (selectedHolidayGroup === 'all') return holidayDates;
+
+    const selectedGroup = holidayGroups.find((group) => group.key === selectedHolidayGroup);
+    return selectedGroup?.dates || [];
+  }, [holidayDates, holidayGroups, selectedHolidayGroup]);
 
   const weekLabel = `Tuần ${formatDDMM(weekDates[0])}-${formatDDMM(weekDates[6])}`;
 
@@ -256,6 +291,17 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
   useEffect(() => {
     if (phanQuyenPage > phanQuyenTotalPages) setPhanQuyenPage(phanQuyenTotalPages);
   }, [phanQuyenPage, phanQuyenTotalPages]);
+
+  useEffect(() => {
+    if (!holidayDates.length) {
+      setSelectedHolidayGroup('all');
+      return;
+    }
+
+    if (selectedHolidayGroup !== 'all' && !holidayGroups.some((group) => group.key === selectedHolidayGroup)) {
+      setSelectedHolidayGroup('all');
+    }
+  }, [holidayDates, holidayGroups, selectedHolidayGroup]);
 
   const activeOfficers = useMemo(() => canBoData.filter((x) => x.trangThai === 'active'), [canBoData]);
   const hbOfficerOptions = useMemo(() => activeOfficers.filter((x) => x.vaiTro === 'Cán bộ'), [activeOfficers]);
@@ -513,7 +559,25 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
 
     return (
       <div className="space-y-4">
-        {holidayDates.map((date) => {
+        <div className="card-lg p-4">
+          <div className="flex flex-col md:flex-row md:items-center gap-3">
+            <label className="text-sm font-semibold text-slate-700">Chọn ngày lễ</label>
+            <select
+              className="input-field md:max-w-md"
+              value={selectedHolidayGroup}
+              onChange={(e) => setSelectedHolidayGroup(e.target.value)}
+            >
+              <option value="all">Tất cả ngày lễ</option>
+              {holidayGroups.map((group) => (
+                <option key={`holiday-filter-${group.key}`} value={group.key}>
+                  {group.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {visibleHolidayDates.map((date) => {
           const holidayName = holidayMap[date] || 'Ngày lễ';
           const dayItems = holidayDutyData.filter((x) => x.ngay === date);
           const slot1 = getSlot(dayItems, LOCATION.HB, 'officer', 1);

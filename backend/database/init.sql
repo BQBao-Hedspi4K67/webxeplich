@@ -30,7 +30,7 @@ CREATE TABLE users (
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ========== TABLE: officers ==========
--- Danh sach can bo trong hoc vien (tach Chuc vu + Ten)
+-- Danh sách cán bộ trong học viện (tách Chức vụ + Tên)
 CREATE TABLE officers (
   id VARCHAR(10) PRIMARY KEY,
   userId INT UNIQUE NULL,
@@ -57,7 +57,7 @@ CREATE TABLE officers (
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ========== TABLE: duty_schedule_permissions ==========
--- Quyen lap/sua lich truc cap rieng cho tung can bo
+-- Quyền lập/sửa lịch trực cấp riêng cho từng cán bộ
 CREATE TABLE duty_schedule_permissions (
   officerId VARCHAR(10) PRIMARY KEY,
   canManageDutySchedules TINYINT(1) NOT NULL DEFAULT 1,
@@ -71,7 +71,7 @@ CREATE TABLE duty_schedule_permissions (
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ========== TABLE: work_schedule_permissions ==========
--- Quyen tao/duyet lich cong tac cap rieng cho tung can bo
+-- Quyền tạo/duyệt lịch công tác cấp riêng cho từng cán bộ
 CREATE TABLE work_schedule_permissions (
   officerId VARCHAR(10) PRIMARY KEY,
   canCreateWorkSchedules TINYINT(1) NOT NULL DEFAULT 1,
@@ -87,7 +87,7 @@ CREATE TABLE work_schedule_permissions (
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ========== TABLE: departments ==========
--- Danh muc phong ban/khoa do Giam doc quan ly
+-- Danh mục phòng ban/khoa do Giám đốc quản lý
 CREATE TABLE departments (
   id INT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(150) NOT NULL UNIQUE,
@@ -107,7 +107,7 @@ ADD CONSTRAINT fk_officers_department
 FOREIGN KEY (departmentId) REFERENCES departments(id) ON DELETE SET NULL;
 
 -- ========== TABLE: holidays ==========
--- Lich nghi le/ky niem de hien thi tren lich thang
+-- Lịch nghỉ lễ/kỷ niệm để hiển thị trên lịch tháng
 CREATE TABLE holidays (
   id INT PRIMARY KEY AUTO_INCREMENT,
   holidayDate DATE NOT NULL,
@@ -122,7 +122,7 @@ CREATE TABLE holidays (
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ========== TABLE: work_schedules ==========
--- Lich cong tac theo tuan (quan ly them, ban giam doc phe duyet)
+-- Lịch công tác theo tuần (quản lý thêm, ban giám đốc phê duyệt)
 CREATE TABLE work_schedules (
   id VARCHAR(20) PRIMARY KEY,
   title VARCHAR(200) NOT NULL,
@@ -168,7 +168,7 @@ CREATE TABLE work_schedules (
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ========== TABLE: duty_schedules ==========
--- Lich truc ban (2 loai: giam doc tuan + can bo nguyen ngay)
+-- Lịch trực ban (2 loại: giám đốc tuần + cán bộ nguyên ngày)
 CREATE TABLE duty_schedules (
   id VARCHAR(20) PRIMARY KEY,
   officerId VARCHAR(10) NOT NULL,
@@ -196,7 +196,7 @@ CREATE TABLE duty_schedules (
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ========== TABLE: leave_requests ==========
--- Yeu cau xin nghi tu can bo (khong phu thuoc ca truc)
+-- Yêu cầu xin nghỉ từ cán bộ (không phụ thuộc ca trực)
 CREATE TABLE leave_requests (
   id INT PRIMARY KEY AUTO_INCREMENT,
   officerId VARCHAR(10) NOT NULL,
@@ -219,7 +219,7 @@ CREATE TABLE leave_requests (
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ========== TABLE: notifications ==========
--- Thong bao he thong (chi schema ban dau, du lieu tao tu su kien runtime)
+-- Thông báo hệ thống (chỉ schema ban đầu, dữ liệu tạo từ sự kiện runtime)
 CREATE TABLE notifications (
   id INT PRIMARY KEY AUTO_INCREMENT,
   title VARCHAR(255) NOT NULL,
@@ -271,7 +271,7 @@ CREATE TABLE activity_logs (
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ========== TABLE: export_logs ==========
--- Lich su xuat/in lich
+-- Lịch sử xuất/in lịch
 CREATE TABLE export_logs (
   id INT PRIMARY KEY AUTO_INCREMENT,
   userId INT,
@@ -287,7 +287,7 @@ CREATE TABLE export_logs (
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ========== TABLE: auto_schedule_logs ==========
--- Luu log auto schedule de tranh xep lich 2 lan cho 1 tuan
+-- Lưu log auto schedule để tránh xếp lịch 2 lần cho 1 tuần
 CREATE TABLE auto_schedule_logs (
   id INT PRIMARY KEY AUTO_INCREMENT,
   weekStartDate DATE NOT NULL,
@@ -306,7 +306,7 @@ CREATE TABLE auto_schedule_logs (
 -- Chi GIU schema-only cho 2 bang sau:
 --   1) leave_requests
 --   2) notification_reads
--- Cac bang con lai van co du lieu mau de demo.
+-- Các bảng còn lại vẫn có dữ liệu mẫu để demo.
 
 -- ========== USERS ==========
 -- Mat khau mac dinh cho tat ca tai khoan: 123456
@@ -664,66 +664,66 @@ INSERT INTO duty_schedules (id, officerId, dutyType, date, endDate, weekStartDat
 ('TBCB108', 'CB006', 'officer_daily', '2026-04-07', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekday', ''),
 ('TBCB109', 'CB028', 'officer_daily', '2026-04-07', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekday', ''),
 ('TBCB110', 'CB027', 'officer_daily', '2026-04-07', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekday', ''),
-('TBCB111', 'CB020', 'officer_daily', '2026-04-08', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB112', 'CB024', 'officer_daily', '2026-04-08', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB113', 'CB010', 'officer_daily', '2026-04-08', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB114', 'CB029', 'officer_daily', '2026-04-08', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB115', 'CB031', 'officer_daily', '2026-04-08', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB116', 'CB016', 'officer_daily', '2026-04-09', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB117', 'CB019', 'officer_daily', '2026-04-09', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB118', 'CB008', 'officer_daily', '2026-04-09', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB119', 'CB026', 'officer_daily', '2026-04-09', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB120', 'CB030', 'officer_daily', '2026-04-09', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB121', 'CB022', 'officer_daily', '2026-04-10', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB122', 'CB021', 'officer_daily', '2026-04-10', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB123', 'CB011', 'officer_daily', '2026-04-10', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB124', 'CB028', 'officer_daily', '2026-04-10', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB125', 'CB031', 'officer_daily', '2026-04-10', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB126', 'CB020', 'officer_daily', '2026-04-11', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekend', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB127', 'CB012', 'officer_daily', '2026-04-11', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekend', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB128', 'CB010', 'officer_daily', '2026-04-11', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekend', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB129', 'CB026', 'officer_daily', '2026-04-11', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekend', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB130', 'CB027', 'officer_daily', '2026-04-11', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekend', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB131', 'CB015', 'officer_daily', '2026-04-12', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekend', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB132', 'CB016', 'officer_daily', '2026-04-12', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekend', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB133', 'CB005', 'officer_daily', '2026-04-12', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekend', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB134', 'CB028', 'officer_daily', '2026-04-12', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekend', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB135', 'CB031', 'officer_daily', '2026-04-12', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekend', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB136', 'CB019', 'officer_daily', '2026-04-13', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB137', 'CB017', 'officer_daily', '2026-04-13', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB138', 'CB009', 'officer_daily', '2026-04-13', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB139', 'CB029', 'officer_daily', '2026-04-13', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB140', 'CB030', 'officer_daily', '2026-04-13', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB141', 'CB024', 'officer_daily', '2026-04-14', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB142', 'CB025', 'officer_daily', '2026-04-14', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB143', 'CB007', 'officer_daily', '2026-04-14', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB144', 'CB026', 'officer_daily', '2026-04-14', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB145', 'CB027', 'officer_daily', '2026-04-14', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB146', 'CB021', 'officer_daily', '2026-04-15', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB147', 'CB023', 'officer_daily', '2026-04-15', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB148', 'CB008', 'officer_daily', '2026-04-15', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB149', 'CB028', 'officer_daily', '2026-04-15', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB150', 'CB031', 'officer_daily', '2026-04-15', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB151', 'CB015', 'officer_daily', '2026-04-16', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB152', 'CB012', 'officer_daily', '2026-04-16', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB153', 'CB011', 'officer_daily', '2026-04-16', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB154', 'CB029', 'officer_daily', '2026-04-16', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB155', 'CB030', 'officer_daily', '2026-04-16', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB156', 'CB023', 'officer_daily', '2026-04-17', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB157', 'CB020', 'officer_daily', '2026-04-17', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB158', 'CB009', 'officer_daily', '2026-04-17', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB159', 'CB026', 'officer_daily', '2026-04-17', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB160', 'CB027', 'officer_daily', '2026-04-17', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekday', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB161', 'CB019', 'officer_daily', '2026-04-18', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekend', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB162', 'CB015', 'officer_daily', '2026-04-18', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekend', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB163', 'CB008', 'officer_daily', '2026-04-18', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekend', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB164', 'CB029', 'officer_daily', '2026-04-18', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekend', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB165', 'CB030', 'officer_daily', '2026-04-18', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekend', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB166', 'CB021', 'officer_daily', '2026-04-19', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekend', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB167', 'CB023', 'officer_daily', '2026-04-19', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekend', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB168', 'CB009', 'officer_daily', '2026-04-19', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekend', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB169', 'CB028', 'officer_daily', '2026-04-19', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekend', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)'),
-('TBCB170', 'CB031', 'officer_daily', '2026-04-19', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekend', 'Auto xep theo vong cong bang (ngay thuong/cuoi tuan tach rieng)');
+('TBCB111', 'CB020', 'officer_daily', '2026-04-08', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB112', 'CB024', 'officer_daily', '2026-04-08', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB113', 'CB010', 'officer_daily', '2026-04-08', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB114', 'CB029', 'officer_daily', '2026-04-08', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB115', 'CB031', 'officer_daily', '2026-04-08', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB116', 'CB016', 'officer_daily', '2026-04-09', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB117', 'CB019', 'officer_daily', '2026-04-09', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB118', 'CB008', 'officer_daily', '2026-04-09', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB119', 'CB026', 'officer_daily', '2026-04-09', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB120', 'CB030', 'officer_daily', '2026-04-09', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB121', 'CB022', 'officer_daily', '2026-04-10', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB122', 'CB021', 'officer_daily', '2026-04-10', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB123', 'CB011', 'officer_daily', '2026-04-10', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB124', 'CB028', 'officer_daily', '2026-04-10', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB125', 'CB031', 'officer_daily', '2026-04-10', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB126', 'CB020', 'officer_daily', '2026-04-11', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekend', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB127', 'CB012', 'officer_daily', '2026-04-11', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekend', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB128', 'CB010', 'officer_daily', '2026-04-11', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekend', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB129', 'CB026', 'officer_daily', '2026-04-11', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekend', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB130', 'CB027', 'officer_daily', '2026-04-11', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekend', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB131', 'CB015', 'officer_daily', '2026-04-12', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekend', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB132', 'CB016', 'officer_daily', '2026-04-12', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekend', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB133', 'CB005', 'officer_daily', '2026-04-12', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekend', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB134', 'CB028', 'officer_daily', '2026-04-12', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekend', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB135', 'CB031', 'officer_daily', '2026-04-12', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekend', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB136', 'CB019', 'officer_daily', '2026-04-13', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB137', 'CB017', 'officer_daily', '2026-04-13', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB138', 'CB009', 'officer_daily', '2026-04-13', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB139', 'CB029', 'officer_daily', '2026-04-13', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB140', 'CB030', 'officer_daily', '2026-04-13', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB141', 'CB024', 'officer_daily', '2026-04-14', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB142', 'CB025', 'officer_daily', '2026-04-14', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB143', 'CB007', 'officer_daily', '2026-04-14', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB144', 'CB026', 'officer_daily', '2026-04-14', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB145', 'CB027', 'officer_daily', '2026-04-14', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB146', 'CB021', 'officer_daily', '2026-04-15', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB147', 'CB023', 'officer_daily', '2026-04-15', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB148', 'CB008', 'officer_daily', '2026-04-15', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB149', 'CB028', 'officer_daily', '2026-04-15', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB150', 'CB031', 'officer_daily', '2026-04-15', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB151', 'CB015', 'officer_daily', '2026-04-16', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB152', 'CB012', 'officer_daily', '2026-04-16', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB153', 'CB011', 'officer_daily', '2026-04-16', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB154', 'CB029', 'officer_daily', '2026-04-16', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB155', 'CB030', 'officer_daily', '2026-04-16', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB156', 'CB023', 'officer_daily', '2026-04-17', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB157', 'CB020', 'officer_daily', '2026-04-17', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB158', 'CB009', 'officer_daily', '2026-04-17', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB159', 'CB026', 'officer_daily', '2026-04-17', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB160', 'CB027', 'officer_daily', '2026-04-17', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekday', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB161', 'CB019', 'officer_daily', '2026-04-18', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekend', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB162', 'CB015', 'officer_daily', '2026-04-18', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekend', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB163', 'CB008', 'officer_daily', '2026-04-18', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekend', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB164', 'CB029', 'officer_daily', '2026-04-18', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekend', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB165', 'CB030', 'officer_daily', '2026-04-18', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekend', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB166', 'CB021', 'officer_daily', '2026-04-19', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 1, 'weekend', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB167', 'CB023', 'officer_daily', '2026-04-19', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'officer', 2, 'weekend', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB168', 'CB009', 'officer_daily', '2026-04-19', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Nhà hiệu bộ', 'commander', 1, 'weekend', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB169', 'CB028', 'officer_daily', '2026-04-19', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Lái xe', 'officer', 1, 'weekend', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)'),
+('TBCB170', 'CB031', 'officer_daily', '2026-04-19', NULL, NULL, 'nguyenday', '00:00', '23:59', 'Bệnh xá', 'officer', 1, 'weekend', 'Tự động xếp theo vòng công bằng (ngày thường/cuối tuần tách riêng)');
 
 -- ========== ACTIVITY LOGS ==========
 INSERT INTO activity_logs (actorUserId, actorUsername, actorRole, module, action, entityType, entityId, summary, metadata) VALUES
@@ -732,83 +732,83 @@ INSERT INTO activity_logs (actorUserId, actorUsername, actorRole, module, action
 (8, 'hmduc', 'manager', 'lichcongtac', 'create', 'work_schedule', 'LCT003', 'Tạo lịch công tác LCT003', JSON_OBJECT('note', 'Khởi tạo lịch')),
 (2, 'nvcan', 'admin', 'lichcongtac', 'update', 'work_schedule', 'LCT004', 'Cập nhật lịch công tác LCT004', JSON_OBJECT('note', 'Điều chỉnh lịch')),
 (1, 'lmthao', 'admin', 'lichtrucban', 'update', 'duty_schedule', 'TBGD015', 'Cập nhật lịch trực ban tuần 15', JSON_OBJECT('note', 'Điều chỉnh lịch')),
-(1, 'lmthao', 'admin', 'lichtrucban', 'update', 'duty_schedule', 'TBCB109', 'Cap nhat lich truc ban TBCB109', NULL),
-(1, 'lmthao', 'admin', 'lichtrucban', 'create', 'duty_schedule', 'TBCB111,TBCB112,TBCB113,TBCB114,TBCB115,TBCB116,TB', 'Auto xep officer_daily (25 lich)', NULL),
-(1, 'lmthao', 'admin', 'lichtrucban', 'create', 'duty_schedule', 'TBCB136,TBCB137,TBCB138,TBCB139,TBCB140,TBCB141,TB', 'Auto xep officer_daily (35 lich)', NULL),
-(12, 'vtlong', 'officer', 'lichcongtac', 'create', 'work_schedule', 'LCT006', 'Them moi lich cong tac LCT006 - a', NULL),
-(5, 'tvson', 'manager', 'lichcongtac', 'approve', 'work_schedule', 'LCT006', 'Duyet lich cong tac LCT006', NULL),
-(5, 'tvson', 'manager', 'lichcongtac', 'create', 'work_schedule', 'LCT007', 'Them moi lich cong tac LCT007 - a', NULL),
-(5, 'tvson', 'manager', 'lichcongtac', 'approve', 'work_schedule', 'LCT007', 'Duyet lich cong tac LCT007', NULL);
+(1, 'lmthao', 'admin', 'lichtrucban', 'update', 'duty_schedule', 'TBCB109', 'Cập nhật lịch trực ban TBCB109', NULL),
+(1, 'lmthao', 'admin', 'lichtrucban', 'create', 'duty_schedule', 'TBCB111,TBCB112,TBCB113,TBCB114,TBCB115,TBCB116,TB', 'Tự động xếp officer_daily (25 lịch)', NULL),
+(1, 'lmthao', 'admin', 'lichtrucban', 'create', 'duty_schedule', 'TBCB136,TBCB137,TBCB138,TBCB139,TBCB140,TBCB141,TB', 'Tự động xếp officer_daily (35 lịch)', NULL),
+(12, 'vtlong', 'officer', 'lichcongtac', 'create', 'work_schedule', 'LCT006', 'Thêm mới lịch công tác LCT006 - a', NULL),
+(5, 'tvson', 'manager', 'lichcongtac', 'approve', 'work_schedule', 'LCT006', 'Duyệt lịch công tác LCT006', NULL),
+(5, 'tvson', 'manager', 'lichcongtac', 'create', 'work_schedule', 'LCT007', 'Thêm mới lịch công tác LCT007 - a', NULL),
+(5, 'tvson', 'manager', 'lichcongtac', 'approve', 'work_schedule', 'LCT007', 'Duyệt lịch công tác LCT007', NULL);
 
 -- ========== NOTIFICATIONS ==========
 INSERT INTO notifications (title, content, type, module, entityType, entityId, targetUserId, targetRole, isActive) VALUES
-('Lich truc ban cua ban vua duoc cap nhat', 'Lich TBCB109 vao ngay 2026-04-07', 'info', 'lichtrucban', 'duty_schedule', 'TBCB109', 27, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-08 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB111', 20, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-08 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB112', 24, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-08 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB113', 10, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-08 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB114', 28, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-08 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB115', 31, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-09 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB116', 16, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-09 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB117', 19, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-09 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB118', 8, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-09 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB119', 26, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-09 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB120', 30, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-10 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB121', 22, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-10 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB122', 21, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-10 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB123', 11, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-10 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB124', 27, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-10 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB125', 31, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-11 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB126', 20, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-11 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB127', 12, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-11 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB128', 10, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-11 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB129', 26, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-11 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB130', 29, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-12 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB131', 15, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-12 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB132', 16, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-12 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB133', 5, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-12 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB134', 27, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-12 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB135', 31, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-13 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB136', 19, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-13 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB137', 17, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-13 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB138', 9, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-13 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB139', 28, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-13 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB140', 30, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-14 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB141', 24, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-14 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB142', 25, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-14 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB143', 7, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-14 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB144', 26, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-14 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB145', 29, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-15 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB146', 21, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-15 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB147', 23, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-15 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB148', 8, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-15 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB149', 27, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-15 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB150', 31, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-16 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB151', 15, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-16 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB152', 12, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-16 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB153', 11, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-16 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB154', 28, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-16 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB155', 30, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-17 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB156', 23, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-17 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB157', 20, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-17 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB158', 9, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-17 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB159', 26, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-17 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB160', 29, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-18 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB161', 19, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-18 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB162', 15, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-18 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB163', 8, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-18 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB164', 28, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-18 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB165', 30, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-19 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB166', 21, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-19 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB167', 23, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-19 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB168', 9, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-19 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB169', 27, NULL, 1),
-('Ban duoc phan cong lich truc ban', '2026-04-19 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB170', 31, NULL, 1),
-('Co lich cong tac cho duyet', 'a (2026-04-02)', 'warning', 'lichcongtac', 'work_schedule', 'LCT006', NULL, 'admin', 1),
-('Lich cong tac da duoc duyet', 'a (2026-04-02)', 'success', 'lichcongtac', 'work_schedule', 'LCT006', 12, NULL, 1),
-('Lich cong tac da duoc duyet', 'a (2026-04-02)', 'success', 'lichcongtac', 'work_schedule', 'LCT006', 17, NULL, 1),
-('Co lich cong tac cho duyet', 'a (2026-04-02)', 'warning', 'lichcongtac', 'work_schedule', 'LCT007', NULL, 'admin', 1),
-('Lich cong tac da duoc duyet', 'a (2026-04-02)', 'success', 'lichcongtac', 'work_schedule', 'LCT007', 5, NULL, 1),
-('Lich cong tac da duoc duyet', 'a (2026-04-02)', 'success', 'lichcongtac', 'work_schedule', 'LCT007', 19, NULL, 1);
+('Lịch trực ban của bạn vừa được cập nhật', 'Lịch TBCB109 vào ngày 2026-04-07', 'info', 'lichtrucban', 'duty_schedule', 'TBCB109', 27, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-08 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB111', 20, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-08 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB112', 24, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-08 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB113', 10, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-08 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB114', 28, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-08 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB115', 31, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-09 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB116', 16, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-09 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB117', 19, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-09 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB118', 8, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-09 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB119', 26, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-09 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB120', 30, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-10 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB121', 22, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-10 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB122', 21, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-10 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB123', 11, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-10 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB124', 27, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-10 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB125', 31, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-11 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB126', 20, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-11 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB127', 12, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-11 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB128', 10, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-11 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB129', 26, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-11 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB130', 29, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-12 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB131', 15, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-12 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB132', 16, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-12 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB133', 5, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-12 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB134', 27, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-12 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB135', 31, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-13 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB136', 19, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-13 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB137', 17, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-13 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB138', 9, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-13 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB139', 28, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-13 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB140', 30, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-14 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB141', 24, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-14 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB142', 25, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-14 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB143', 7, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-14 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB144', 26, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-14 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB145', 29, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-15 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB146', 21, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-15 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB147', 23, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-15 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB148', 8, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-15 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB149', 27, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-15 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB150', 31, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-16 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB151', 15, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-16 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB152', 12, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-16 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB153', 11, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-16 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB154', 28, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-16 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB155', 30, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-17 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB156', 23, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-17 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB157', 20, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-17 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB158', 9, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-17 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB159', 26, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-17 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB160', 29, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-18 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB161', 19, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-18 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB162', 15, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-18 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB163', 8, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-18 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB164', 28, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-18 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB165', 30, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-19 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB166', 21, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-19 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB167', 23, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-19 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB168', 9, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-19 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB169', 27, NULL, 1),
+('Bạn được phân công lịch trực ban', '2026-04-19 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB170', 31, NULL, 1),
+('Có lịch công tác chờ duyệt', 'a (2026-04-02)', 'warning', 'lichcongtac', 'work_schedule', 'LCT006', NULL, 'admin', 1),
+('Lịch công tác đã được duyệt', 'a (2026-04-02)', 'success', 'lichcongtac', 'work_schedule', 'LCT006', 12, NULL, 1),
+('Lịch công tác đã được duyệt', 'a (2026-04-02)', 'success', 'lichcongtac', 'work_schedule', 'LCT006', 17, NULL, 1),
+('Có lịch công tác chờ duyệt', 'a (2026-04-02)', 'warning', 'lichcongtac', 'work_schedule', 'LCT007', NULL, 'admin', 1),
+('Lịch công tác đã được duyệt', 'a (2026-04-02)', 'success', 'lichcongtac', 'work_schedule', 'LCT007', 5, NULL, 1),
+('Lịch công tác đã được duyệt', 'a (2026-04-02)', 'success', 'lichcongtac', 'work_schedule', 'LCT007', 19, NULL, 1);
 
 -- ========== EXPORT LOGS ==========
 INSERT INTO export_logs (userId, username, role, exportType, exportScope, exportFormat, itemCount) VALUES

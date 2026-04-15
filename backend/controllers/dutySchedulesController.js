@@ -419,7 +419,7 @@ const notifyDutyAssignments = async (connection, rows) => {
   for (const row of rows) {
     const targetUserId = await resolveUserIdByOfficerId(connection, row.officerId);
     await createUserNotification(connection, {
-      title: 'Ban duoc phan cong lich truc ban',
+      title: 'Bạn được phân công lịch trực ban',
       content: `${row.date} - ${row.location}`,
       type: 'info',
       module: 'lichtrucban',
@@ -1248,8 +1248,8 @@ export const updateDutySchedule = async (req, res, next) => {
       await ensureNotificationTargetingSchema(connection);
       const targetUserId = await resolveUserIdByOfficerId(connection, nextOfficerId);
       await createUserNotification(connection, {
-        title: 'Lich truc ban cua ban vua duoc cap nhat',
-        content: `Lich ${id} vao ngay ${nextDate}`,
+        title: 'Lịch trực ban của bạn vừa được cập nhật',
+        content: `Lịch ${id} vào ngày ${nextDate}`,
         type: 'info',
         module: 'lichtrucban',
         entityType: 'duty_schedule',

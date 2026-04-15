@@ -3,6 +3,7 @@ import { Bell, Search, ChevronDown, Settings, LogOut, User, X } from 'lucide-rea
 
 const pageTitles = {
   dashboard: 'Dashboard',
+  thongbao: 'Thông báo',
   canbo: 'Quản lý cán bộ',
   lichcongtac: 'Lập lịch công tác tuần',
   lichtrucan: 'Lập lịch trực ban',
@@ -118,7 +119,13 @@ const Topbar = ({ activePage, user, onLogout, onNavigate, notificationsData = []
               ))}
             </div>
             <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50/50">
-              <button className="text-xs text-blue-600 hover:text-blue-700 font-medium w-full text-center">
+              <button
+                onClick={() => {
+                  if (onNavigate) onNavigate('thongbao');
+                  setShowNotif(false);
+                }}
+                className="text-xs text-blue-600 hover:text-blue-700 font-medium w-full text-center"
+              >
                 Xem tất cả thông báo →
               </button>
             </div>

@@ -9,6 +9,10 @@ import {
   ensureWorkScheduleAccessSchema,
   canGrantWorkSchedulePermissions,
 } from '../utils/workScheduleAccess.js';
+import {
+  createUserNotification,
+  resolveUserIdByOfficerId,
+} from '../utils/notificationTargeting.js';
 
 const USER_ROLE_TO_OFFICER_ROLE = {
   admin: 'leader',
@@ -399,6 +403,12 @@ export const updateDutySchedulePermission = async (req, res, next) => {
         return res.status(404).json({ success: false, error: 'Officer not found', code: 'OFFICER_NOT_FOUND' });
       }
 
+      const [currentPermissionRows] = await connection.execute(
+        'SELECT canManageDutySchedules FROM duty_schedule_permissions WHERE officerId = ? LIMIT 1',
+        [id]
+      );
+      const hadPermission = Boolean(currentPermissionRows[0]?.canManageDutySchedules);
+
       if (enabled) {
         await connection.execute(
           `INSERT INTO duty_schedule_permissions (officerId, canManageDutySchedules, grantedByUserId)
@@ -410,6 +420,19 @@ export const updateDutySchedulePermission = async (req, res, next) => {
              updatedAt = CURRENT_TIMESTAMP`,
           [id, req.user?.id || null]
         );
+
+        if (!hadPermission) {
+          const targetUserId = await resolveUserIdByOfficerId(connection, id);
+          await createUserNotification(connection, {
+            title: 'Bạn vừa được cấp quyền lịch trực ban',
+            content: 'Bạn đã được cấp quyền lập/sửa lịch trực ban. Vui lòng đăng nhập lại nếu chưa thấy quyền mới.',
+            type: 'success',
+            module: 'lichtrucban',
+            entityType: 'duty_schedule_permission',
+            entityId: id,
+            targetUserId,
+          });
+        }
       } else {
         await connection.execute(
           'DELETE FROM duty_schedule_permissions WHERE officerId = ?',
@@ -476,6 +499,19 @@ export const updateWorkSchedulePermission = async (req, res, next) => {
         return res.status(404).json({ success: false, error: 'Officer not found', code: 'OFFICER_NOT_FOUND' });
       }
 
+      const [currentPermissionRows] = await connection.execute(
+        `SELECT
+           COALESCE(canCreateWorkSchedules, 0) AS canCreateWorkSchedules,
+           COALESCE(canApproveWorkSchedules, 0) AS canApproveWorkSchedules
+         FROM work_schedule_permissions
+         WHERE officerId = ?
+         LIMIT 1`,
+        [id]
+      );
+      const hadCreatePermission = Boolean(currentPermissionRows[0]?.canCreateWorkSchedules);
+      const hadApprovePermission = Boolean(currentPermissionRows[0]?.canApproveWorkSchedules);
+      const hadAnyPermission = hadCreatePermission || hadApprovePermission;
+
       if (nextCanCreate || nextCanApprove) {
         await connection.execute(
           `INSERT INTO work_schedule_permissions (officerId, canCreateWorkSchedules, canApproveWorkSchedules, grantedByUserId)
@@ -488,6 +524,23 @@ export const updateWorkSchedulePermission = async (req, res, next) => {
              updatedAt = CURRENT_TIMESTAMP`,
           [id, nextCanCreate ? 1 : 0, nextCanApprove ? 1 : 0, req.user?.id || null]
         );
+
+        if (!hadAnyPermission) {
+          const targetUserId = await resolveUserIdByOfficerId(connection, id);
+          const grantedLabels = [];
+          if (nextCanCreate) grantedLabels.push('tạo lịch công tác');
+          if (nextCanApprove) grantedLabels.push('duyệt lịch công tác');
+
+          await createUserNotification(connection, {
+            title: 'Bạn vừa được cấp quyền lịch công tác',
+            content: `Bạn đã được cấp quyền ${grantedLabels.join(' và ')}. Vui lòng đăng nhập lại nếu chưa thấy quyền mới.`,
+            type: 'success',
+            module: 'lichcongtac',
+            entityType: 'work_schedule_permission',
+            entityId: id,
+            targetUserId,
+          });
+        }
       } else {
         await connection.execute(
           'DELETE FROM work_schedule_permissions WHERE officerId = ?',

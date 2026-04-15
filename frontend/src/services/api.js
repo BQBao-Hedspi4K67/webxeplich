@@ -175,6 +175,8 @@ const apiClient = {
 
     updateMyContact: (data) => apiClient.put('/auth/profile/contact', data),
 
+    changeMyPassword: (data) => apiClient.put('/auth/profile/password', data),
+
     createUser: (data) => apiClient.post('/auth/users', data),
   },
 

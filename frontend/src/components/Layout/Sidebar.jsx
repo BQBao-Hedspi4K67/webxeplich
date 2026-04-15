@@ -3,11 +3,12 @@ import {
   LayoutDashboard, Users, CalendarDays, ClipboardList, Building2,
   Search, Printer, Settings, ChevronRight,
   MessageSquareQuote, FileText, CalendarCheck,
-  CalendarRange, LogOut, ChevronLeft
+  CalendarRange, LogOut, ChevronLeft, Bell
 } from 'lucide-react';
 
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
+  { id: 'thongbao', label: 'Thông báo', icon: Bell, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'canbo', label: 'Quản lý cán bộ', icon: Users, badge: null, roles: ['Quản trị viên', 'Quản lý'] },
   { id: 'lichcongtac', label: 'Lập lịch công tác', icon: CalendarDays, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'lichtrucan', label: 'Lập lịch trực ban', icon: ClipboardList, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },

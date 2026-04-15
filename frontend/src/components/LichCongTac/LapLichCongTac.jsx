@@ -526,6 +526,25 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                 
                 return (
                   <div key={dayIdx} className={`relative col-span-1 border-r border-slate-100 last:border-r-0 ${isToday ? 'bg-blue-50/30' : 'bg-white'}`}>
+                    {canCreate && (
+                      <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openAdd(dayIdx);
+                          }}
+                          className={`pointer-events-auto inline-flex items-center justify-center w-12 h-12 rounded-full border-2 shadow-md transition-all hover:scale-105 ${isToday
+                            ? 'border-blue-300 bg-white text-blue-600 hover:bg-blue-50'
+                            : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800'
+                          }`}
+                          title={`Thêm lịch ngày ${formatDDMM(weekDates[dayIdx])}`}
+                          aria-label={`Thêm lịch ngày ${formatDDMM(weekDates[dayIdx])}`}
+                        >
+                          <Plus size={22} strokeWidth={2.5} />
+                        </button>
+                      </div>
+                    )}
                     {/* Hour grid lines */}
                     {HOURS.map((hour, hi) => (
                       <div key={hi} className="h-16 border-b border-slate-50 relative" />

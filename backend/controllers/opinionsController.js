@@ -266,8 +266,8 @@ export const createOpinion = async (req, res, next) => {
 
       await ensureNotificationTargetingSchema(connection);
       await createRoleNotification(connection, {
-        title: 'Co don xin nghi cho duyet',
-        content: `Can bo ${officerId} vua gui don xin nghi truc ngay ${leaveDateOnly}.`,
+        title: 'Có đơn xin nghỉ để duyệt',
+        content: `Cán bộ ${officerId} vừa gửi đơn xin nghỉ trực ngày ${leaveDateOnly}.`,
         type: 'info',
         module: 'leave_request',
         entityType: 'leave_request',
@@ -315,8 +315,8 @@ export const createOpinion = async (req, res, next) => {
         if (managerOfficerId) {
           const managerUserId = await resolveUserIdByOfficerId(connection, managerOfficerId);
           await createUserNotification(connection, {
-            title: 'Co don xin nghi cho duyet',
-            content: `Can bo ${officerId} vua gui don xin nghi truc ngay ${leaveDateOnly}.`,
+            title: 'Có đơn xin nghỉ để duyệt',
+            content: `Cán bộ ${officerId} vừa gửi đơn xin nghỉ trực ngày ${leaveDateOnly}.`,
             type: 'info',
             module: 'leave_request',
             entityType: 'leave_request',
@@ -487,11 +487,11 @@ export const updateOpinionStatus = async (req, res, next) => {
       await ensureNotificationTargetingSchema(connection);
       const submitterUserId = await resolveUserIdByOfficerId(connection, leaveRequest.officerId);
       await createUserNotification(connection, {
-        title: status === 'approved' ? 'Don xin nghi da duoc duyet' : 'Don xin nghi bi tu choi',
+        title: status === 'approved' ? 'Đơn xin nghỉ đã được duyệt' : 'Đơn xin nghỉ bị từ chối',
         content:
           status === 'approved'
-            ? `Don xin nghi #${id} da duoc phe duyet.`
-            : `Don xin nghi #${id} da bi tu choi.`,
+            ? `Đơn xin nghỉ #${id} đã được phê duyệt.`
+            : `Đơn xin nghỉ #${id} đã bị từ chối.`,
         type: status === 'approved' ? 'success' : 'warning',
         module: 'leave_request',
         entityType: 'leave_request',

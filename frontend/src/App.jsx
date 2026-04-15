@@ -12,6 +12,7 @@ import QuanLyNgayLe from './components/NgayLe/QuanLyNgayLe';
 import QuanLyPhongBan from './components/PhongBan/QuanLyPhongBan';
 import YKienPhanHoi from './components/YKien/YKienPhanHoi';
 import BangQuyTrinh from './components/QuyTrinh/BangQuyTrinh';
+import TatCaThongBao from './components/ThongBao/TatCaThongBao';
 import { DEPARTMENTS, SCHOOLS } from './data/uiConstants';
 import apiClient from './services/api';
 
@@ -175,10 +176,17 @@ const TaiKhoan = ({ user, reloadData, canBoData = [], departmentData = [], onUse
     email: user?.email || '',
     phone: user?.phone || '',
   });
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmNewPassword: '',
+  });
   const [createLoading, setCreateLoading] = useState(false);
   const [contactLoading, setContactLoading] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
   const [createResult, setCreateResult] = useState({ type: '', message: '' });
   const [contactResult, setContactResult] = useState({ type: '', message: '' });
+  const [passwordResult, setPasswordResult] = useState({ type: '', message: '' });
 
   useEffect(() => {
     setContactForm({
@@ -292,6 +300,60 @@ const TaiKhoan = ({ user, reloadData, canBoData = [], departmentData = [], onUse
     }
   };
 
+  const handleChangeMyPassword = async (e) => {
+    e.preventDefault();
+    setPasswordResult({ type: '', message: '' });
+
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmNewPassword) {
+      setPasswordResult({
+        type: 'error',
+        message: 'Vui lòng nhập đầy đủ thông tin mật khẩu.',
+      });
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      setPasswordResult({
+        type: 'error',
+        message: 'Mật khẩu mới phải có ít nhất 6 ký tự.',
+      });
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
+      setPasswordResult({
+        type: 'error',
+        message: 'Mật khẩu xác nhận không khớp.',
+      });
+      return;
+    }
+
+    try {
+      setPasswordLoading(true);
+      await apiClient.auth.changeMyPassword({
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      });
+
+      setPasswordForm({
+        currentPassword: '',
+        newPassword: '',
+        confirmNewPassword: '',
+      });
+      setPasswordResult({
+        type: 'success',
+        message: 'Đổi mật khẩu thành công.',
+      });
+    } catch (err) {
+      setPasswordResult({
+        type: 'error',
+        message: err?.message || 'Không thể đổi mật khẩu.',
+      });
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-5">
       <div>
@@ -308,20 +370,53 @@ const TaiKhoan = ({ user, reloadData, canBoData = [], departmentData = [], onUse
             <span className={'badge mt-1 ' + badgeClass}>&#x25CF; {user?.role}</span>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { label: 'Tên đăng nhập', value: info.username },
-            { label: 'Vai trò', value: user?.role },
-            { label: 'Đơn vị', value: info.donVi },
-            { label: 'Email', value: info.email },
-            { label: 'Số điện thoại', value: info.phone },
-          ].map((f, i) => (
-            <div key={i} className="p-3 bg-slate-50 rounded-xl">
-              <div className="text-xs text-slate-400 mb-0.5">{f.label}</div>
-              <div className="text-sm font-semibold text-slate-800">{f.value}</div>
+        <form className="space-y-3" onSubmit={handleUpdateMyContact}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Tên đăng nhập</label>
+              <input className="input-field bg-slate-100" value={info.username} readOnly />
             </div>
-          ))}
-        </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Vai trò</label>
+              <input className="input-field bg-slate-100" value={user?.role || ''} readOnly />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đơn vị</label>
+              <input className="input-field bg-slate-100" value={info.donVi || ''} readOnly />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Email</label>
+              <input
+                type="email"
+                className="input-field"
+                value={contactForm.email}
+                onChange={(e) => setContactForm((prev) => ({ ...prev, email: e.target.value }))}
+                placeholder="user@domain.com"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Số điện thoại</label>
+              <input
+                className="input-field"
+                value={contactForm.phone}
+                onChange={(e) => setContactForm((prev) => ({ ...prev, phone: e.target.value }))}
+                placeholder="VD: 0901234567"
+              />
+            </div>
+          </div>
+
+          {contactResult.message && (
+            <div className={`text-sm rounded-xl px-3 py-2 ${contactResult.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+              {contactResult.message}
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <button type="submit" disabled={contactLoading} className="btn-primary">
+              {contactLoading ? 'Đang lưu...' : 'Lưu thông tin'}
+            </button>
+          </div>
+        </form>
       </div>
       {canProvisionUser && (
         <div className="card">
@@ -437,42 +532,52 @@ const TaiKhoan = ({ user, reloadData, canBoData = [], departmentData = [], onUse
           </form>
         </div>
       )}
-
       <div className="card">
-        <h4 className="text-sm font-bold text-slate-700 mb-1">Cập nhật thông tin liên hệ của tôi</h4>
-        <p className="text-xs text-slate-500 mb-4">Bạn có thể tự cập nhật số điện thoại và email cá nhân tại đây.</p>
-        <form className="space-y-3" onSubmit={handleUpdateMyContact}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <h4 className="text-sm font-bold text-slate-700 mb-1">Đổi mật khẩu</h4>
+        <p className="text-xs text-slate-500 mb-4">Người dùng có thể tự đổi mật khẩu bất kỳ lúc nào.</p>
+        <form className="space-y-3" onSubmit={handleChangeMyPassword}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
-              <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Email</label>
+              <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Mật khẩu hiện tại</label>
               <input
-                type="email"
+                type="password"
                 className="input-field"
-                value={contactForm.email}
-                onChange={(e) => setContactForm((prev) => ({ ...prev, email: e.target.value }))}
-                placeholder="user@domain.com"
+                value={passwordForm.currentPassword}
+                onChange={(e) => setPasswordForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
+                placeholder="Nhập mật khẩu hiện tại"
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Số điện thoại</label>
+              <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Mật khẩu mới</label>
               <input
+                type="password"
                 className="input-field"
-                value={contactForm.phone}
-                onChange={(e) => setContactForm((prev) => ({ ...prev, phone: e.target.value }))}
-                placeholder="VD: 0901234567"
+                value={passwordForm.newPassword}
+                onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
+                placeholder="Tối thiểu 6 ký tự"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Xác nhận mật khẩu mới</label>
+              <input
+                type="password"
+                className="input-field"
+                value={passwordForm.confirmNewPassword}
+                onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmNewPassword: e.target.value }))}
+                placeholder="Nhập lại mật khẩu mới"
               />
             </div>
           </div>
 
-          {contactResult.message && (
-            <div className={`text-sm rounded-xl px-3 py-2 ${contactResult.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-              {contactResult.message}
+          {passwordResult.message && (
+            <div className={`text-sm rounded-xl px-3 py-2 ${passwordResult.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+              {passwordResult.message}
             </div>
           )}
 
           <div className="flex justify-end">
-            <button type="submit" disabled={contactLoading} className="btn-primary">
-              {contactLoading ? 'Đang lưu...' : 'Lưu thông tin liên hệ'}
+            <button type="submit" disabled={passwordLoading} className="btn-primary">
+              {passwordLoading ? 'Đang đổi...' : 'Đổi mật khẩu'}
             </button>
           </div>
         </form>
@@ -482,6 +587,7 @@ const TaiKhoan = ({ user, reloadData, canBoData = [], departmentData = [], onUse
 };
 const PAGE_COMPONENTS = {
   dashboard: Dashboard,
+  thongbao: TatCaThongBao,
   canbo: QuanLyCanBo,
   lichcongtac: LapLichCongTac,
   lichtrucan: LapLichTrucBan,
@@ -496,9 +602,9 @@ const PAGE_COMPONENTS = {
 };
 
 const PAGE_ACCESS = {
-  'Quản trị viên': ['dashboard', 'canbo', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ngayle', 'phongban', 'ykien', 'quytrinh', 'taikhoan'],
-  'Quản lý': ['dashboard', 'canbo', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ngayle', 'ykien', 'quytrinh', 'taikhoan'],
-  'Cán bộ': ['dashboard', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ykien', 'quytrinh', 'taikhoan'],
+  'Quản trị viên': ['dashboard', 'thongbao', 'canbo', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ngayle', 'phongban', 'ykien', 'quytrinh', 'taikhoan'],
+  'Quản lý': ['dashboard', 'thongbao', 'canbo', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ngayle', 'ykien', 'quytrinh', 'taikhoan'],
+  'Cán bộ': ['dashboard', 'thongbao', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ykien', 'quytrinh', 'taikhoan'],
 };
 
 function App() {
@@ -524,7 +630,7 @@ function App() {
         apiClient.workSchedules.list(1, 500),
         apiClient.dutySchedules.list(1, 500),
         apiClient.leaveRequests.list(1, 500),
-        apiClient.notifications.list(30),
+        apiClient.notifications.list('all'),
         apiClient.dashboard.getOverview(),
         apiClient.exports.history(20),
         apiClient.holidays.list(),
@@ -822,9 +928,10 @@ function App() {
 
   const pageProps = {
     user,
-    onUserContactUpdated: ({ email, phone }) => {
+    onUserContactUpdated: ({ username, email, phone }) => {
       setUser((prev) => ({
         ...prev,
+        username: username ?? prev.username,
         email: email ?? '',
         phone: phone ?? '',
       }));
@@ -840,6 +947,14 @@ function App() {
     thongKeTheoThang,
     hoatDongGanDay,
     xuatLichHistory,
+    onMarkNotificationRead: async (id) => {
+      await apiClient.notifications.markRead(id);
+      await loadData();
+    },
+    onMarkAllNotificationsRead: async () => {
+      await apiClient.notifications.markAllRead();
+      await loadData();
+    },
     reloadData: loadData,
   };
 

@@ -18,6 +18,8 @@ export const getNotifications = async (req, res, next) => {
     const { limit = 20, onlyUnread = '' } = req.query;
     const userId = req.user.id;
     const userRole = String(req.user.role || 'officer').toLowerCase();
+    const rawLimit = String(limit || '').trim().toLowerCase();
+    const fetchAll = rawLimit === 'all';
     const lim = Math.max(1, Math.min(parseInt(limit, 10) || 20, 100));
 
     const connection = await pool.getConnection();
@@ -28,6 +30,8 @@ export const getNotifications = async (req, res, next) => {
       if (String(onlyUnread) === 'true') {
         unreadClause = 'AND nr.notificationId IS NULL';
       }
+
+      const limitClause = fetchAll ? '' : `LIMIT ${lim}`;
 
       const [rows] = await connection.execute(
         `SELECT n.id, n.title, n.content, n.type, n.createdAt, nr.readAt
@@ -41,7 +45,7 @@ export const getNotifications = async (req, res, next) => {
            )
            ${unreadClause}
          ORDER BY n.createdAt DESC
-         LIMIT ${lim}`,
+         ${limitClause}`,
         [userId, userId, userRole]
       );
 
@@ -78,7 +82,7 @@ export const markNotificationAsRead = async (req, res, next) => {
         [id, userId]
       );
 
-      res.json({ success: true, message: 'Notification marked as read' });
+      res.json({ success: true, message: 'Đã đánh dấu thông báo là đã đọc' });
     } finally {
       connection.release();
     }
@@ -109,7 +113,7 @@ export const markAllNotificationsAsRead = async (req, res, next) => {
         [userId, userId, userRole]
       );
 
-      res.json({ success: true, message: 'All notifications marked as read' });
+      res.json({ success: true, message: 'Đã đánh dấu tất cả thông báo là đã đọc' });
     } finally {
       connection.release();
     }

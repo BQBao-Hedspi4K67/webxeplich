@@ -380,7 +380,7 @@ export const createWorkSchedule = async (req, res, next) => {
 
       if (approvalStatus === 'pending') {
         await createRoleNotification(connection, {
-          title: 'Co lich cong tac cho duyet',
+          title: 'Có lịch công tác chờ duyệt',
           content: `${title} (${date})`,
           type: 'warning',
           module: 'lichcongtac',
@@ -402,7 +402,7 @@ export const createWorkSchedule = async (req, res, next) => {
         for (const row of approverRows) {
           if (!row.userId) continue;
           await createUserNotification(connection, {
-            title: 'Co lich cong tac cho duyet',
+            title: 'Có lịch công tác chờ duyệt',
             content: `${title} (${date})`,
             type: 'warning',
             module: 'lichcongtac',
@@ -414,7 +414,7 @@ export const createWorkSchedule = async (req, res, next) => {
       } else {
         const targetUserId = await resolveUserIdByOfficerId(connection, resolvedResponsibleOfficerId);
         await createUserNotification(connection, {
-          title: 'Ban duoc phan cong lich cong tac moi',
+          title: 'Bạn được phân công lịch công tác mới',
           content: `${title} (${date})`,
           type: 'info',
           module: 'lichcongtac',
@@ -524,7 +524,7 @@ export const approveWorkSchedule = async (req, res, next) => {
 
       for (const targetUserId of notifiedUserIds) {
         await createUserNotification(connection, {
-          title: approvalStatus === 'approved' ? 'Lich cong tac da duoc duyet' : 'Lich cong tac khong duoc duyet va da bi xoa',
+          title: approvalStatus === 'approved' ? 'Lịch công tác đã được duyệt' : 'Lịch công tác không được duyệt và đã bị xóa',
           content: `${schedule.title} (${schedule.date})`,
           type: approvalStatus === 'approved' ? 'success' : 'warning',
           module: 'lichcongtac',
