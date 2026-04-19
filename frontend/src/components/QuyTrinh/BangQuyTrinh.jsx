@@ -45,10 +45,17 @@ const tabRules = [
   },
   {
     tab: 'Đơn xin nghỉ',
-    chucNang: 'Cán bộ có thể gửi đơn xin nghỉ cho bất kỳ ngày nào kèm lý do, quản lý/Ban giám đốc duyệt.',
-    admin: 'Duyệt / Từ chối / Phản hồi',
-    quanly: 'Duyệt / Từ chối / Phản hồi',
+    chucNang: 'Cán bộ gửi đơn xin nghỉ; quản lý/ban giám đốc duyệt đơn ngay tại tab này.',
+    admin: 'Duyệt đơn nghỉ',
+    quanly: 'Duyệt đơn nghỉ',
     canbo: 'Gửi đơn xin nghỉ',
+  },
+  {
+    tab: 'Phê duyệt lịch công tác',
+    chucNang: 'Quản lý/ban giám đốc duyệt hoặc từ chối các lịch công tác đang chờ duyệt ngay trong tab Lập lịch công tác.',
+    admin: 'Duyệt',
+    quanly: 'Duyệt (nếu có quyền)',
+    canbo: 'Không hiển thị',
   },
   {
     tab: 'Quản trị tài khoản',

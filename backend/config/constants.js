@@ -35,6 +35,7 @@ export const WORK_TYPES = [
   'hop',
   'hoiThao',
   'tiepkhach',
+  'congtac',
   'khaoSat',
   'dienTap',
   'sinhHoat',
@@ -50,6 +51,7 @@ export const LEAVE_REQUEST_STATUS = {
 
 export const USER_STATUS = {
   ACTIVE: 'active',
+  ON_BUSINESS_TRIP: 'on_business_trip',
   INACTIVE: 'inactive',
   STUDYING: 'studying',
 };

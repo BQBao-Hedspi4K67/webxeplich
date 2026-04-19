@@ -46,9 +46,68 @@ const Topbar = ({ activePage, user, onLogout, onNavigate, notificationsData = []
     }
   };
 
-  const markOneRead = async (id, alreadyRead) => {
-    if (alreadyRead || !onMarkRead) return;
-    await onMarkRead(id);
+  const resolvePageFromNotification = (notification) => {
+    const moduleKey = String(notification?.module || '').toLowerCase();
+    const entityTypeKey = String(notification?.entityType || '').toLowerCase();
+    const text = `${String(notification?.tieuDe || '')} ${String(notification?.noiDung || '')}`.toLowerCase();
+
+    // Ưu tiên đưa các thông báo cần phê duyệt sang tab Đơn xin nghỉ và phê duyệt lịch công tác.
+    if (/(cho duyet|chờ duyệt|duyet lich cong tac|duyệt lịch công tác)/.test(text)) {
+      return 'ykien';
+    }
+
+    const moduleToPage = {
+      lichcongtac: 'lichcongtac',
+      lichtrucban: 'lichtrucan',
+      leave_request: 'ykien',
+      ykien: 'ykien',
+      canbo: 'canbo',
+      phongban: 'phongban',
+      ngayle: 'ngayle',
+      xuat: 'xuat',
+    };
+
+    const entityToPage = {
+      work_schedule: 'lichcongtac',
+      work_schedule_permission: 'lichcongtac',
+      duty_schedule: 'lichtrucan',
+      duty_schedule_permission: 'lichtrucan',
+      leave_request: 'ykien',
+      officer: 'canbo',
+      department: 'phongban',
+      holiday: 'ngayle',
+      export_log: 'xuat',
+    };
+
+    const keywordRules = [
+      { pattern: /(xin nghi|xin nghỉ|don xin nghi|đơn xin nghỉ|cho duyet|chờ duyệt)/, page: 'ykien' },
+      { pattern: /(lich truc|lịch trực|truc ban|trực ban)/, page: 'lichtrucan' },
+      { pattern: /(lich cong tac|lịch công tác|cho duyet lich|duyet lich)/, page: 'lichcongtac' },
+      { pattern: /(can bo|cán bộ|phan quyen|phân quyền)/, page: 'canbo' },
+      { pattern: /(phong ban|phòng ban|don vi|đơn vị)/, page: 'phongban' },
+      { pattern: /(ngay le|ngày lễ|ky niem|kỷ niệm)/, page: 'ngayle' },
+      { pattern: /(xuat|xuất|in lich|in lịch|pdf|excel)/, page: 'xuat' },
+    ];
+
+    if (moduleToPage[moduleKey]) return moduleToPage[moduleKey];
+    if (entityToPage[entityTypeKey]) return entityToPage[entityTypeKey];
+
+    const matched = keywordRules.find((rule) => rule.pattern.test(text));
+    return matched?.page || 'dashboard';
+  };
+
+  const openNotification = async (notification) => {
+    if (!notification) return;
+
+    if (!notification.daDoc && onMarkRead) {
+      await onMarkRead(notification.id);
+    }
+
+    if (onNavigate) {
+      onNavigate(resolvePageFromNotification(notification));
+    }
+
+    setShowNotif(false);
   };
 
   const loaiColors = { success: 'bg-emerald-100 text-emerald-600', warning: 'bg-amber-100 text-amber-600', info: 'bg-blue-100 text-blue-600' };
@@ -103,7 +162,7 @@ const Topbar = ({ activePage, user, onLogout, onNavigate, notificationsData = []
               {notifications.map(n => (
                 <div
                   key={n.id}
-                  onClick={() => markOneRead(n.id, n.daDoc)}
+                  onClick={() => openNotification(n)}
                   className={`flex gap-3 px-4 py-3 hover:bg-slate-50 transition-colors cursor-pointer ${!n.daDoc ? 'bg-blue-50/50' : ''}`}
                 >
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold mt-0.5 ${loaiColors[n.loai]}`}>

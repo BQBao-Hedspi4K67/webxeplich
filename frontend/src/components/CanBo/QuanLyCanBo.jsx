@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Search, Filter, Edit2, Trash2, Eye, X, UserCheck, Users, Phone, Mail, Building2, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
+import { Search, Filter, Edit2, Trash2, Eye, X, UserCheck, Users, Phone, Mail, Building2, ChevronLeft, ChevronRight, ChevronDown, Plus } from 'lucide-react';
 import apiClient from '../../services/api';
 import { DEPARTMENTS, SCHOOLS } from '../../data/uiConstants';
 
@@ -11,7 +11,34 @@ const ROLES_COLORS = {
 
 const AVATAR_COLORS = ['bg-blue-500', 'bg-indigo-500', 'bg-purple-500', 'bg-pink-500', 'bg-emerald-500', 'bg-teal-500', 'bg-amber-500', 'bg-red-500'];
 
-const initialForm = { hoTen: '', capBac: '', chucVu: '', donVi: '', donViId: '', soDienThoai: '', email: '', vaiTro: 'Cán bộ', trangThai: 'active', denNgayHoc: '' };
+const initialForm = {
+  hoTen: '',
+  capBac: '',
+  chucVu: '',
+  donVi: '',
+  donViId: '',
+  soDienThoai: '',
+  email: '',
+  vaiTro: 'Cán bộ',
+  trangThai: 'active',
+  denNgayHoc: '',
+  tuNgayCongTac: '',
+  denNgayCongTac: '',
+};
+
+const OFFICER_STATUS_LABELS = {
+  active: 'Đang làm',
+  on_business_trip: 'Đang đi công tác',
+  inactive: 'Tạm nghỉ',
+  studying: 'Đang học',
+};
+
+const OFFICER_STATUS_STYLES = {
+  active: { badge: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
+  on_business_trip: { badge: 'bg-cyan-100 text-cyan-700', dot: 'bg-cyan-500' },
+  inactive: { badge: 'bg-slate-100 text-slate-500', dot: 'bg-slate-400' },
+  studying: { badge: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500' },
+};
 
 const UI_ROLE_TO_BACKEND = {
   'Lãnh đạo': 'leader',
@@ -21,6 +48,20 @@ const UI_ROLE_TO_BACKEND = {
 
 const TITLE_OPTIONS = ['Thiếu tướng', 'Đại tá', 'Thượng tá', 'Trung tá', 'Thiếu tá', 'Đại úy', 'Thượng úy', 'Trung úy'];
 const POSITION_OPTIONS = ['Giám đốc Học viện', 'Phó Giám đốc', 'Trưởng phòng', 'Phó trưởng phòng', 'Giảng viên', 'Cán bộ'];
+const ACCOUNT_RANK_OPTIONS = ['Thiếu úy', 'Trung úy', 'Thượng úy', 'Đại úy', 'Thiếu tá', 'Trung tá', 'Thượng tá', 'Đại tá', 'Thiếu tướng', 'Trung tướng', 'Thượng tướng', 'Đại tướng'];
+const initialCreateForm = {
+  militaryRank: '',
+  fullName: '',
+  email: '',
+  phone: '',
+  position: '',
+  departmentId: '',
+  department: '',
+  role: 'officer',
+  status: 'active',
+  businessTripStartDate: '',
+  businessTripEndDate: '',
+};
 
 const DEFAULT_UNIT_OPTIONS = ['Ban Giám đốc', ...DEPARTMENTS, ...SCHOOLS];
 
@@ -28,6 +69,9 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
   const isAdmin = user?.role === 'Quản trị viên';
   const isManager = user?.role === 'Quản lý';
   const canEdit = ['Quản trị viên', 'Quản lý'].includes(user?.role);
+  const canProvisionUser = ['Quản trị viên', 'Quản lý'].includes(user?.role);
+  const canGrantDutyPermission = Boolean(user?.canGrantDutySchedulePermissions);
+  const canGrantWorkPermission = Boolean(user?.canGrantWorkSchedulePermissions);
   const unitOptions = (departmentData || []).length
     ? departmentData.map((d) => ({ id: d.id, name: d.name }))
     : DEFAULT_UNIT_OPTIONS.map((name, idx) => ({ id: idx + 1, name }));
@@ -45,6 +89,10 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [showDeptdropdown, setShowDeptDropdown] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createForm, setCreateForm] = useState(initialCreateForm);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createResult, setCreateResult] = useState({ type: '', message: '' });
   const deptDropdownRef = useRef(null);
   const perPage = 8;
 
@@ -99,16 +147,90 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
 
   const openEdit = (cb) => {
     const unit = unitOptions.find((x) => x.name === cb.donVi);
-    setForm({ ...cb, donViId: cb.donViId || unit?.id || '' });
+    setForm({
+      ...cb,
+      donViId: cb.donViId || unit?.id || '',
+      canManageDutySchedulesByPermission: Boolean(cb.canManageDutySchedules),
+      canCreateWorkSchedulesByPermission: Boolean(cb.canCreateWorkSchedules),
+      canApproveWorkSchedulesByPermission: Boolean(cb.canApproveWorkSchedules),
+      tuNgayCongTac: cb.tuNgayCongTac || '',
+      denNgayCongTac: cb.denNgayCongTac || '',
+    });
     setEditItem(cb.id);
     setShowModal(true);
   };
 
+  const openCreateAccount = () => {
+    const managerUnit = unitOptions.find((x) => x.name === user?.department);
+    setCreateForm({
+      ...initialCreateForm,
+      departmentId: isManager ? String(managerUnit?.id || '') : '',
+      department: isManager ? (managerUnit?.name || user?.department || '') : '',
+      role: isManager ? 'officer' : 'officer',
+    });
+    setCreateResult({ type: '', message: '' });
+    setShowCreateModal(true);
+  };
+
+  const handleCreateAccount = async () => {
+    setCreateResult({ type: '', message: '' });
+
+    if (!createForm.fullName.trim() || !createForm.departmentId) {
+      setCreateResult({
+        type: 'error',
+        message: 'Vui lòng nhập đầy đủ: họ tên, đơn vị.',
+      });
+      return;
+    }
+
+    if (createForm.status === 'on_business_trip' && (!createForm.businessTripStartDate || !createForm.businessTripEndDate)) {
+      setCreateResult({
+        type: 'error',
+        message: 'Vui lòng nhập từ ngày và đến ngày khi chọn trạng thái đang đi công tác.',
+      });
+      return;
+    }
+
+    try {
+      setCreateLoading(true);
+      await apiClient.auth.createUser({
+        fullName: createForm.fullName.trim(),
+        militaryRank: createForm.militaryRank.trim() || null,
+        email: createForm.email.trim() || null,
+        phone: createForm.phone.trim() || null,
+        position: createForm.position.trim() || null,
+        departmentId: Number(createForm.departmentId),
+        department: createForm.department,
+        role: isManager ? 'officer' : createForm.role,
+        status: createForm.status,
+        businessTripStartDate: createForm.status === 'on_business_trip' ? createForm.businessTripStartDate : null,
+        businessTripEndDate: createForm.status === 'on_business_trip' ? createForm.businessTripEndDate : null,
+      });
+
+      if (reloadData) await reloadData();
+
+      setCreateResult({
+        type: 'success',
+        message: 'Tạo cán bộ và tài khoản nội bộ thành công. Username sinh tự động theo quy tắc mới, mật khẩu mặc định là 123456.',
+      });
+      setTimeout(() => {
+        setShowCreateModal(false);
+        setCreateForm(initialCreateForm);
+      }, 600);
+    } catch (err) {
+      setCreateResult({
+        type: 'error',
+        message: err?.message || 'Không thể tạo tài khoản nội bộ.',
+      });
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!form.hoTen || !form.chucVu || !form.donVi) return;
-
-    if (!editItem) {
-      alert('Chức năng thêm cán bộ tại màn này đã được tắt. Vui lòng tạo tài khoản ở mục Quản trị tài khoản.');
+    if (form.trangThai === 'on_business_trip' && (!form.tuNgayCongTac || !form.denNgayCongTac)) {
+      alert('Vui lòng nhập từ ngày và đến ngày công tác.');
       return;
     }
 
@@ -124,10 +246,26 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
       role: UI_ROLE_TO_BACKEND[form.vaiTro] || 'officer',
       status: form.trangThai,
       studyUntil: form.trangThai === 'studying' ? (form.denNgayHoc || null) : null,
+      businessTripStartDate: form.trangThai === 'on_business_trip' ? (form.tuNgayCongTac || null) : null,
+      businessTripEndDate: form.trangThai === 'on_business_trip' ? (form.denNgayCongTac || null) : null,
     };
 
     try {
       await apiClient.officers.update(editItem, payload);
+
+      if (canGrantDutyPermission) {
+        await apiClient.officers.updateDutySchedulePermission(
+          editItem,
+          Boolean(form.canManageDutySchedulesByPermission)
+        );
+      }
+
+      if (canGrantWorkPermission) {
+        await apiClient.officers.updateWorkSchedulePermission(editItem, {
+          canCreateWorkSchedules: Boolean(form.canCreateWorkSchedulesByPermission),
+          canApproveWorkSchedules: Boolean(form.canApproveWorkSchedulesByPermission),
+        });
+      }
 
       if (reloadData) await reloadData();
       setShowModal(false);
@@ -263,8 +401,10 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
             <select value={filterTrangThai} onChange={e => { setFilterTrangThai(e.target.value); setCurrentPage(1); }}
               className="input-field !w-auto !py-2 text-sm">
               <option value="">Tất cả trạng thái</option>
-              <option value="active">Đang công tác</option>
+              <option value="active">Đang làm</option>
+              <option value="on_business_trip">Đang đi công tác</option>
               <option value="inactive">Tạm nghỉ</option>
+              <option value="studying">Đang học</option>
             </select>
             {!isManager && !isAdmin && (
               <select value={filterDonVi} onChange={e => { setFilterDonVi(e.target.value); setCurrentPage(1); }}
@@ -272,6 +412,11 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
                 <option value="">Tất cả phòng/đơn vị</option>
                 {unitOptions.map((x) => <option key={x.id} value={x.name}>{x.name}</option>)}
               </select>
+            )}
+            {canProvisionUser && (
+              <button onClick={openCreateAccount} className="btn-primary !py-2 !px-3 text-sm">
+                <Plus size={14} /> Thêm cán bộ
+              </button>
             )}
           </div>
           <span className="text-xs text-slate-400 ml-auto">{filtered.length} kết quả</span>
@@ -305,7 +450,7 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
                       </div>
                     </td>
                     <td className="table-td">
-                      <span className="text-sm text-slate-700">{cb.chucVu}</span>
+                      <span className="text-sm text-slate-700 whitespace-nowrap">{cb.chucVu}</span>
                     </td>
                     <td className="table-td">
                       <div className="flex items-center gap-1.5">
@@ -324,15 +469,15 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
                       </div>
                     </td>
                     <td className="table-td">
-                      <span className={`badge ${roleColor.bg} ${roleColor.text}`}>
+                      <span className={`badge inline-flex items-center whitespace-nowrap ${roleColor.bg} ${roleColor.text}`}>
                         <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${roleColor.dot}`} />
                         {cb.vaiTro}
                       </span>
                     </td>
                     <td className="table-td">
-                      <span className={`badge ${cb.trangThai === 'active' ? 'bg-emerald-100 text-emerald-700' : cb.trangThai === 'studying' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${cb.trangThai === 'active' ? 'bg-emerald-500' : cb.trangThai === 'studying' ? 'bg-blue-500' : 'bg-slate-400'}`} />
-                        {cb.trangThai === 'active' ? 'Đang công tác' : cb.trangThai === 'studying' ? 'Đang học' : 'Tạm nghỉ'}
+                      <span className={`badge inline-flex items-center whitespace-nowrap ${(OFFICER_STATUS_STYLES[cb.trangThai] || OFFICER_STATUS_STYLES.inactive).badge}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${(OFFICER_STATUS_STYLES[cb.trangThai] || OFFICER_STATUS_STYLES.inactive).dot}`} />
+                        {OFFICER_STATUS_LABELS[cb.trangThai] || OFFICER_STATUS_LABELS.inactive}
                       </span>
                     </td>
                     <td className="table-td">
@@ -393,6 +538,157 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
           </div>
         )}
       </div>
+
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in-up">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div>
+                <h3 className="text-base font-bold text-slate-800">Tạo tài khoản nội bộ</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Nhập thông tin cán bộ để tạo tài khoản (mật khẩu mặc định: 123456).</p>
+              </div>
+              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600 p-1">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Quân hàm</label>
+                  <select
+                    className="input-field"
+                    value={createForm.militaryRank}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, militaryRank: e.target.value }))}
+                  >
+                    <option value="">-- Chọn quân hàm --</option>
+                    {ACCOUNT_RANK_OPTIONS.map((rank) => (
+                      <option key={rank} value={rank}>{rank}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Họ và tên <span className="text-red-500">*</span></label>
+                  <input
+                    className="input-field"
+                    value={createForm.fullName}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, fullName: e.target.value }))}
+                    placeholder="Nguyễn Văn A"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Email</label>
+                  <input
+                    type="email"
+                    className="input-field"
+                    value={createForm.email}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, email: e.target.value }))}
+                    placeholder="user@domain.com"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Số điện thoại</label>
+                  <input
+                    className="input-field"
+                    value={createForm.phone}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, phone: e.target.value }))}
+                    placeholder="VD: 0901234567"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Chức vụ</label>
+                  <input
+                    className="input-field"
+                    value={createForm.position}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, position: e.target.value }))}
+                    placeholder="VD: Cán bộ phụ trách"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đơn vị <span className="text-red-500">*</span></label>
+                  <select
+                    className="input-field"
+                    value={createForm.departmentId}
+                    onChange={(e) => {
+                      const selected = unitOptions.find((x) => String(x.id) === e.target.value);
+                      setCreateForm((prev) => ({
+                        ...prev,
+                        departmentId: e.target.value,
+                        department: selected?.name || '',
+                      }));
+                    }}
+                    disabled={isManager}
+                  >
+                    <option value="">-- Chọn đơn vị --</option>
+                    {unitOptions.map((unit) => (
+                      <option key={unit.id} value={unit.id}>{unit.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Vai trò</label>
+                  <select
+                    className="input-field"
+                    value={createForm.role}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, role: e.target.value }))}
+                    disabled={isManager}
+                  >
+                    <option value="officer">Cán bộ</option>
+                    {!isManager && <option value="manager">Quản lý</option>}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Trạng thái</label>
+                  <select
+                    className="input-field"
+                    value={createForm.status}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, status: e.target.value }))}
+                  >
+                    <option value="active">Đang làm</option>
+                    <option value="on_business_trip">Đang đi công tác</option>
+                    <option value="inactive">Tạm nghỉ</option>
+                    <option value="studying">Đang học</option>
+                  </select>
+                </div>
+              </div>
+
+              {createForm.status === 'on_business_trip' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Từ ngày công tác</label>
+                    <input
+                      type="date"
+                      className="input-field"
+                      value={createForm.businessTripStartDate}
+                      onChange={(e) => setCreateForm((prev) => ({ ...prev, businessTripStartDate: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đến ngày công tác</label>
+                    <input
+                      type="date"
+                      className="input-field"
+                      value={createForm.businessTripEndDate}
+                      onChange={(e) => setCreateForm((prev) => ({ ...prev, businessTripEndDate: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {createResult.message && (
+                <div className={`text-sm rounded-xl px-3 py-2 ${createResult.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                  {createResult.message}
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3 px-6 pb-6">
+              <button onClick={() => setShowCreateModal(false)} className="btn-secondary flex-1 justify-center">Hủy</button>
+              <button onClick={handleCreateAccount} disabled={createLoading} className="btn-primary flex-1 justify-center">
+                {createLoading ? 'Đang tạo...' : 'Tạo tài khoản'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add/Edit Modal */}
       {showModal && (
@@ -466,16 +762,67 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
                   <div>
                     <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Trạng thái</label>
                     <select className="input-field" value={form.trangThai} onChange={e => setForm({...form, trangThai: e.target.value})}>
-                      <option value="active">Đang công tác</option>
+                      <option value="active">Đang làm</option>
+                      <option value="on_business_trip">Đang đi công tác</option>
                       <option value="inactive">Tạm nghỉ</option>
                       <option value="studying">Đang học</option>
                     </select>
                   </div>
                 </div>
+                {(canGrantDutyPermission || canGrantWorkPermission) && (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                    <h4 className="text-xs font-bold text-slate-700">Phân quyền lịch</h4>
+                    {canGrantDutyPermission && (
+                      <label className="flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(form.canManageDutySchedulesByPermission)}
+                          onChange={(e) => setForm({ ...form, canManageDutySchedulesByPermission: e.target.checked })}
+                          className="w-4 h-4 rounded border-slate-300 text-blue-600"
+                        />
+                        Cấp quyền lập/sửa lịch trực ban
+                      </label>
+                    )}
+                    {canGrantWorkPermission && (
+                      <>
+                        <label className="flex items-center gap-2 text-sm text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(form.canCreateWorkSchedulesByPermission)}
+                            onChange={(e) => setForm({ ...form, canCreateWorkSchedulesByPermission: e.target.checked })}
+                            className="w-4 h-4 rounded border-slate-300 text-blue-600"
+                          />
+                          Cấp quyền tạo lịch công tác
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(form.canApproveWorkSchedulesByPermission)}
+                            onChange={(e) => setForm({ ...form, canApproveWorkSchedulesByPermission: e.target.checked })}
+                            className="w-4 h-4 rounded border-slate-300 text-blue-600"
+                          />
+                          Cấp quyền duyệt lịch công tác
+                        </label>
+                      </>
+                    )}
+                  </div>
+                )}
                 {form.trangThai === 'studying' && (
                   <div>
                     <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đang học đến ngày</label>
                     <input type="date" className="input-field" value={form.denNgayHoc || ''} onChange={e => setForm({...form, denNgayHoc: e.target.value})} />
+                  </div>
+                )}
+                {form.trangThai === 'on_business_trip' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Từ ngày công tác</label>
+                      <input type="date" className="input-field" value={form.tuNgayCongTac || ''} onChange={e => setForm({...form, tuNgayCongTac: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đến ngày công tác</label>
+                      <input type="date" className="input-field" value={form.denNgayCongTac || ''} onChange={e => setForm({...form, denNgayCongTac: e.target.value})} />
+                    </div>
                   </div>
                 )}
               </div>
@@ -504,11 +851,16 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
                 <div>
                   <h4 className="text-lg font-bold text-slate-800">{viewItem.hoTen}</h4>
                   <p className="text-sm text-slate-500">{viewItem.chucVu}</p>
-                  <span className={`badge mt-1 ${viewItem.trangThai === 'active' ? 'bg-emerald-100 text-emerald-700' : viewItem.trangThai === 'studying' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
-                    {viewItem.trangThai === 'active' ? '● Đang công tác' : viewItem.trangThai === 'studying' ? '● Đang học' : '● Tạm nghỉ'}
+                  <span className={`badge mt-1 ${(OFFICER_STATUS_STYLES[viewItem.trangThai] || OFFICER_STATUS_STYLES.inactive).badge}`}>
+                    {`● ${OFFICER_STATUS_LABELS[viewItem.trangThai] || OFFICER_STATUS_LABELS.inactive}`}
                   </span>
                 </div>
               </div>
+              {viewItem.trangThai === 'on_business_trip' && (
+                <div className="mb-4 p-3 bg-cyan-50 rounded-xl border border-cyan-100 text-sm text-cyan-700">
+                  Thời gian công tác: {viewItem.tuNgayCongTac || 'Chưa cập nhật'} - {viewItem.denNgayCongTac || 'Chưa cập nhật'}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 {[
                   { label: 'Mã cán bộ', value: viewItem.id, icon: '🪪' },

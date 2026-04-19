@@ -62,6 +62,9 @@ const emptyDayForm = (date, dutyType) => ({
   notes: '',
 });
 
+const MODE_STORAGE_KEY = 'lap-lich-truc-ban-mode';
+const WEEK_OFFSET_STORAGE_KEY = 'lap-lich-truc-ban-week-offset';
+
 const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayData = [], reloadData }) => {
   const canEdit = Boolean(user?.canManageDutySchedules) || user?.backendRole === 'admin' || user?.role === 'admin' || user?.role === 'Quản trị viên';
   const canGrantPermission =
@@ -71,8 +74,16 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
     || String(user?.department || '').trim() === 'Phòng hành chính tổng hợp';
 
   const [data, setData] = useState(lichTrucBanData);
-  const [weekOffset, setWeekOffset] = useState(0);
-  const [mode, setMode] = useState('canbo');
+  const [weekOffset, setWeekOffset] = useState(() => {
+    if (typeof window === 'undefined') return 0;
+    const savedWeekOffset = Number(window.localStorage.getItem(WEEK_OFFSET_STORAGE_KEY));
+    return Number.isFinite(savedWeekOffset) ? savedWeekOffset : 0;
+  });
+  const [mode, setMode] = useState(() => {
+    if (typeof window === 'undefined') return 'canbo';
+    const savedMode = window.localStorage.getItem(MODE_STORAGE_KEY);
+    return ['canbo', 'trucle', 'giamdoc', 'thongke'].includes(savedMode) ? savedMode : 'canbo';
+  });
   const [showDayModal, setShowDayModal] = useState(false);
   const [dayForm, setDayForm] = useState(emptyDayForm(toDateOnly(new Date()), 'officer_daily'));
   const [editItem, setEditItem] = useState(null);
@@ -93,6 +104,18 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
   useEffect(() => {
     setData(lichTrucBanData);
   }, [lichTrucBanData]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(MODE_STORAGE_KEY, mode);
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(WEEK_OFFSET_STORAGE_KEY, String(weekOffset));
+    }
+  }, [weekOffset]);
 
   useEffect(() => {
     const checkAutoScheduledStatus = async () => {
@@ -201,6 +224,11 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
   const holidayDutyData = useMemo(
     () => data.filter((x) => x.loaiTruc === 'holiday_daily' && holidayDatesSet.has(x.ngay)),
     [data, holidayDatesSet]
+  );
+
+  const officerWeekDisplayData = useMemo(
+    () => [...officerWeekData, ...holidayDutyData],
+    [officerWeekData, holidayDutyData]
   );
 
   const directorWeekData = useMemo(
@@ -486,23 +514,27 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
     return (
       <div className="card-lg p-0 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1080px]">
+          <table className="w-full min-w-[900px]">
             <thead>
               <tr>
-                <th className="table-th">Ngày</th>
-                <th className="table-th">HB - Cán bộ 1</th>
-                <th className="table-th">HB - Cán bộ 2</th>
-                <th className="table-th">HB - Chỉ huy</th>
-                <th className="table-th">Lái xe</th>
-                <th className="table-th">Bệnh xá</th>
-                <th className="table-th"></th>
+                <th className="table-th px-2 py-2.5">Ngày</th>
+                <th className="table-th px-2 py-2.5">HB - Cán bộ 1</th>
+                <th className="table-th px-2 py-2.5">HB - Cán bộ 2</th>
+                <th className="table-th px-2 py-2.5">HB - Chỉ huy</th>
+                <th className="table-th px-2 py-2.5">Lái xe</th>
+                <th className="table-th px-2 py-2.5">Bệnh xá</th>
+                <th className="table-th px-2 py-2.5 sticky right-0 z-20 bg-slate-50 text-center w-[76px]">Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {weekDates.map((date, idx) => {
                 const holidayName = holidayMap[date] || '';
                 const isHoliday = Boolean(holidayName);
-                const dayItems = sourceRows.filter((x) => x.ngay === date);
+                const dayItems = sourceRows.filter((x) => {
+                  if (x.ngay !== date) return false;
+                  if (isHoliday) return x.loaiTruc === 'holiday_daily';
+                  return x.loaiTruc === 'officer_daily';
+                });
                 const slot1 = getSlot(dayItems, LOCATION.HB, 'officer', 1);
                 const slot2 = getSlot(dayItems, LOCATION.HB, 'officer', 2);
                 const slotCommander = getSlot(dayItems, LOCATION.HB, 'commander', 1);
@@ -510,32 +542,36 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
                 const slotMedic = getSlot(dayItems, LOCATION.MEDIC, 'officer', 1);
 
                 const blocked = dutyType === 'officer_daily' && isHoliday;
+                const assignDutyType = blocked ? 'holiday_daily' : dutyType;
 
                 return (
-                  <tr key={`${dutyType}-${date}`} className="hover:bg-slate-50/70">
-                    <td className="table-td">
+                  <tr key={`${dutyType}-${date}`} className="group hover:bg-slate-50/70">
+                    <td className="table-td px-2 py-2">
                       <div className="font-semibold text-slate-700 whitespace-nowrap inline-block">{WEEK_DAYS[idx]}</div>
                       <div className="text-xs text-slate-400 whitespace-nowrap inline ml-2">{formatDDMM(date)}</div>
                       {holidayName && <div className="text-[11px] text-red-600 font-semibold mt-1">{holidayName}</div>}
                     </td>
-                    <td className="table-td">{renderDutyCell(slot1)}</td>
-                    <td className="table-td">{renderDutyCell(slot2)}</td>
-                    <td className="table-td">{renderDutyCell(slotCommander)}</td>
-                    <td className="table-td">{renderDutyCell(slotDriver)}</td>
-                    <td className="table-td">{renderDutyCell(slotMedic)}</td>
-                    <td className="table-td">
-                      {canEdit && !blocked && (
+                    <td className="table-td px-2 py-2">{renderDutyCell(slot1)}</td>
+                    <td className="table-td px-2 py-2">{renderDutyCell(slot2)}</td>
+                    <td className="table-td px-2 py-2">{renderDutyCell(slotCommander)}</td>
+                    <td className="table-td px-2 py-2">{renderDutyCell(slotDriver)}</td>
+                    <td className="table-td px-2 py-2">{renderDutyCell(slotMedic)}</td>
+                    <td className="table-td px-2 py-2 sticky right-0 z-10 bg-white group-hover:bg-slate-50/95 text-center">
+                      {canEdit && (
                         <button
-                          onClick={() => openDayAssign(date, dutyType)}
-                          className="inline-flex items-center justify-center w-7 h-7 mr-6 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700"
-                          title="Thiết lập ngày"
-                          aria-label="Thiết lập ngày"
+                          onClick={() => openDayAssign(date, assignDutyType)}
+                          className={`inline-flex items-center justify-center w-8 h-8 rounded-lg ${blocked
+                            ? 'bg-amber-50 text-amber-600 hover:bg-amber-100 hover:text-amber-700'
+                            : 'bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700'
+                          }`}
+                          title={blocked ? 'Sửa trực lễ' : 'Thiết lập ngày'}
+                          aria-label={blocked ? 'Sửa trực lễ' : 'Thiết lập ngày'}
                         >
                           <Edit2 size={12} />
                         </button>
                       )}
-                      {blocked && (
-                        <span className="text-xs text-amber-600 font-semibold">Ngày lễ - dùng tab Trực lễ</span>
+                      {blocked && dayItems.length === 0 && (
+                        <span className="text-xs text-amber-600 font-semibold">Chưa có trực lễ</span>
                       )}
                     </td>
                   </tr>
@@ -592,7 +628,7 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
                 <div>
                   <div className="text-sm font-semibold text-red-600">{holidayName}</div>
                   <h3 className="text-lg font-bold text-slate-800">{formatDDMM(date)}</h3>
-                  <p className="text-xs text-slate-500 mt-1">Chỉ hiển thị các ngày lễ thật sự, không bao gồm chào cờ đầu tuần.</p>
+                  
                 </div>
                 {canEdit && (
                   <button
@@ -849,16 +885,11 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
           <button onClick={() => setMode('thongke')} className={`px-3 py-2 rounded-xl text-sm font-medium ${mode === 'thongke' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>
             Thống kê
           </button>
-          {canGrantPermission && (
-            <button onClick={() => setMode('phanquyen')} className={`px-3 py-2 rounded-xl text-sm font-medium ${mode === 'phanquyen' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>
-              Phân quyền
-            </button>
-          )}
         </div>
       </div>
 
       <div className="flex items-center gap-3">
-        {mode !== 'trucle' && mode !== 'thongke' && mode !== 'phanquyen' && (
+        {mode !== 'trucle' && mode !== 'thongke' && (
           <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1">
             <button onClick={() => setWeekOffset((w) => w - 1)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><ChevronLeft size={16} /></button>
             <span className="px-3 text-sm font-semibold text-slate-700 min-w-[170px] text-center">{weekLabel}</span>
@@ -866,7 +897,7 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
           </div>
         )}
 
-        {canEdit && mode !== 'giamdoc' && mode !== 'thongke' && mode !== 'phanquyen' && (
+        {canEdit && mode !== 'giamdoc' && mode !== 'thongke' && (
           <button 
             onClick={handleAutoAssign} 
             disabled={isAutoAssigning || isWeekAutoScheduled || isLoadingScheduleStatus}
@@ -890,10 +921,9 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
         )}
       </div>
 
-      {mode === 'canbo' && renderDayTable(officerWeekData, 'officer_daily')}
+      {mode === 'canbo' && renderDayTable(officerWeekDisplayData, 'officer_daily')}
       {mode === 'trucle' && renderHolidayList()}
       {mode === 'thongke' && renderThongKe()}
-      {mode === 'phanquyen' && renderPhanQuyen()}
 
       {mode === 'giamdoc' && (
         <div className="card">

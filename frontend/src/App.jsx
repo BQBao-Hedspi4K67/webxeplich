@@ -13,7 +13,6 @@ import QuanLyPhongBan from './components/PhongBan/QuanLyPhongBan';
 import YKienPhanHoi from './components/YKien/YKienPhanHoi';
 import BangQuyTrinh from './components/QuyTrinh/BangQuyTrinh';
 import TatCaThongBao from './components/ThongBao/TatCaThongBao';
-import { DEPARTMENTS, SCHOOLS } from './data/uiConstants';
 import apiClient from './services/api';
 
 const BACKEND_TO_UI_ROLE = {
@@ -34,27 +33,11 @@ const OFFICER_UI_ROLE_ORDER = {
   'Cán bộ': 3,
 };
 
-const UNIT_OPTIONS = ['Ban Giám đốc', ...DEPARTMENTS, ...SCHOOLS];
-
-const MILITARY_RANK_OPTIONS = [
-  'Thiếu úy',
-  'Trung úy',
-  'Thượng úy',
-  'Đại úy',
-  'Thiếu tá',
-  'Trung tá',
-  'Thượng tá',
-  'Đại tá',
-  'Thiếu tướng',
-  'Trung tướng',
-  'Thượng tướng',
-  'Đại tướng',
-];
-
 const WORK_TYPE_FALLBACK_LABEL = {
   hop: 'Họp',
   hoiThao: 'Hội thảo',
   tiepkhach: 'Tiếp khách',
+  congtac: 'Công tác',
   khaoSat: 'Khảo sát',
   dienTap: 'Diễn tập',
   sinhHoat: 'Sinh hoạt',
@@ -152,22 +135,7 @@ const ROLE_BADGE = {
   'Cán bộ':        'bg-emerald-100 text-emerald-700',
 };
 
-const TaiKhoan = ({ user, reloadData, canBoData = [], departmentData = [], onUserContactUpdated }) => {
-  const canProvisionUser = ['Quản trị viên', 'Quản lý'].includes(user?.role);
-  const accountDepartmentOptions = (departmentData || []).length
-    ? departmentData.map((d) => ({ id: d.id, name: d.name }))
-    : UNIT_OPTIONS.map((name, idx) => ({ id: idx + 1, name }));
-  const [createForm, setCreateForm] = useState({
-    militaryRank: '',
-    fullName: '',
-    email: '',
-    phone: '',
-    position: '',
-    departmentId: '',
-    department: '',
-    role: 'officer',
-    status: 'active',
-  });
+const TaiKhoan = ({ user, onUserContactUpdated }) => {
   const [contactForm, setContactForm] = useState({
     email: user?.email || '',
     phone: user?.phone || '',
@@ -181,10 +149,8 @@ const TaiKhoan = ({ user, reloadData, canBoData = [], departmentData = [], onUse
     newPassword: '',
     confirmNewPassword: '',
   });
-  const [createLoading, setCreateLoading] = useState(false);
   const [contactLoading, setContactLoading] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
-  const [createResult, setCreateResult] = useState({ type: '', message: '' });
   const [contactResult, setContactResult] = useState({ type: '', message: '' });
   const [passwordResult, setPasswordResult] = useState({ type: '', message: '' });
 
@@ -209,59 +175,6 @@ const TaiKhoan = ({ user, reloadData, canBoData = [], departmentData = [], onUse
     username: user?.username || 'unknown',
   };
   const badgeClass = ROLE_BADGE[user?.role] || 'bg-slate-100 text-slate-600';
-
-  const handleCreateUser = async (e) => {
-    e.preventDefault();
-    setCreateResult({ type: '', message: '' });
-
-    if (!createForm.fullName || !createForm.departmentId) {
-      setCreateResult({
-        type: 'error',
-        message: 'Vui lòng nhập đầy đủ: họ tên, đơn vị.',
-      });
-      return;
-    }
-
-    try {
-      setCreateLoading(true);
-      await apiClient.auth.createUser({
-        fullName: createForm.fullName.trim(),
-        militaryRank: createForm.militaryRank.trim() || null,
-        email: createForm.email.trim() || null,
-        phone: createForm.phone.trim() || null,
-        position: createForm.position.trim() || null,
-        departmentId: Number(createForm.departmentId),
-        department: createForm.department,
-        role: createForm.role,
-        status: createForm.status,
-      });
-
-      if (reloadData) await reloadData();
-
-      setCreateResult({
-        type: 'success',
-        message: 'Tạo tài khoản mới thành công. Username được sinh tự động, mật khẩu mặc định là 123456.',
-      });
-      setCreateForm({
-        militaryRank: '',
-        fullName: '',
-        email: '',
-        phone: '',
-        position: '',
-        departmentId: '',
-        department: '',
-        role: 'officer',
-        status: 'active',
-      });
-    } catch (err) {
-      setCreateResult({
-        type: 'error',
-        message: err?.message || 'Không thể tạo tài khoản mới.',
-      });
-    } finally {
-      setCreateLoading(false);
-    }
-  };
 
   const handleUpdateMyContact = async (e) => {
     e.preventDefault();
@@ -418,120 +331,6 @@ const TaiKhoan = ({ user, reloadData, canBoData = [], departmentData = [], onUse
           </div>
         </form>
       </div>
-      {canProvisionUser && (
-        <div className="card">
-          <h4 className="text-sm font-bold text-slate-700 mb-1">Tạo tài khoản nội bộ</h4>
-          <p className="text-xs text-slate-500 mb-4">Username được sinh tự động theo quy tắc tên viết tắt; mật khẩu mặc định luôn là 123456.</p>
-          <form className="space-y-3" onSubmit={handleCreateUser}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Quân hàm</label>
-                <select
-                  className="input-field"
-                  value={createForm.militaryRank}
-                  onChange={(e) => setCreateForm((prev) => ({ ...prev, militaryRank: e.target.value }))}
-                >
-                  <option value="">-- Chọn quân hàm --</option>
-                  {MILITARY_RANK_OPTIONS.map((rank) => (
-                    <option key={rank} value={rank}>{rank}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Họ và tên <span className="text-red-500">*</span></label>
-                <input
-                  className="input-field"
-                  value={createForm.fullName}
-                  onChange={(e) => setCreateForm((prev) => ({ ...prev, fullName: e.target.value }))}
-                  placeholder="Nguyễn Văn A"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Email</label>
-                <input
-                  type="email"
-                  className="input-field"
-                  value={createForm.email}
-                  onChange={(e) => setCreateForm((prev) => ({ ...prev, email: e.target.value }))}
-                  placeholder="user@domain.com"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Số điện thoại</label>
-                <input
-                  className="input-field"
-                  value={createForm.phone}
-                  onChange={(e) => setCreateForm((prev) => ({ ...prev, phone: e.target.value }))}
-                  placeholder="VD: 0901234567"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Chức vụ</label>
-                <input
-                  className="input-field"
-                  value={createForm.position}
-                  onChange={(e) => setCreateForm((prev) => ({ ...prev, position: e.target.value }))}
-                  placeholder="VD: Cán bộ phụ trách"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đơn vị <span className="text-red-500">*</span></label>
-                <select
-                  className="input-field"
-                  value={createForm.departmentId}
-                  onChange={(e) => {
-                    const selected = accountDepartmentOptions.find((x) => String(x.id) === e.target.value);
-                    setCreateForm((prev) => ({
-                      ...prev,
-                      departmentId: e.target.value,
-                      department: selected?.name || '',
-                    }));
-                  }}
-                >
-                  <option value="">-- Chọn đơn vị --</option>
-                  {accountDepartmentOptions.map((unit) => (
-                    <option key={unit.id} value={unit.id}>{unit.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Vai trò</label>
-                <select
-                  className="input-field"
-                  value={createForm.role}
-                  onChange={(e) => setCreateForm((prev) => ({ ...prev, role: e.target.value }))}
-                >
-                  <option value="officer">Cán bộ</option>
-                  <option value="manager">Quản lý</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Trạng thái</label>
-                <select
-                  className="input-field"
-                  value={createForm.status}
-                  onChange={(e) => setCreateForm((prev) => ({ ...prev, status: e.target.value }))}
-                >
-                  <option value="active">Hoạt động</option>
-                  <option value="inactive">Tạm khóa</option>
-                </select>
-              </div>
-            </div>
-
-            {createResult.message && (
-              <div className={`text-sm rounded-xl px-3 py-2 ${createResult.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-                {createResult.message}
-              </div>
-            )}
-
-            <div className="flex justify-end">
-              <button type="submit" disabled={createLoading} className="btn-primary">
-                {createLoading ? 'Đang tạo...' : 'Tạo tài khoản'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
       <div className="card">
         <h4 className="text-sm font-bold text-slate-700 mb-1">Đổi mật khẩu</h4>
         <p className="text-xs text-slate-500 mb-4">Người dùng có thể tự đổi mật khẩu bất kỳ lúc nào.</p>
@@ -651,6 +450,8 @@ function App() {
           vaiTro: OFFICER_ROLE_TO_UI[o.role] || 'Cán bộ',
           trangThai: o.status || 'active',
           denNgayHoc: o.studyUntil || '',
+          tuNgayCongTac: o.businessTripStartDate || '',
+          denNgayCongTac: o.businessTripEndDate || '',
           canManageDutySchedules: Boolean(o.canManageDutySchedules),
           canManageDutySchedulesByDepartment: Boolean(o.canManageDutySchedulesByDepartment),
           canManageDutySchedulesByPermission: Boolean(o.canManageDutySchedulesByPermission),

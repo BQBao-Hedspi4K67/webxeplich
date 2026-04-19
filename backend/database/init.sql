@@ -3,6 +3,11 @@
 -- Date: April 2026
 -- Encoding: UTF-8
 
+SET NAMES utf8mb4;
+SET character_set_client = utf8mb4;
+SET character_set_results = utf8mb4;
+SET character_set_connection = utf8mb4;
+
 -- Drop existing database if exists (be careful in production!)
 DROP DATABASE IF EXISTS hvktcnan_schedule;
 
@@ -44,8 +49,10 @@ CREATE TABLE officers (
   phone VARCHAR(20),
   email VARCHAR(100),
   role ENUM('leader', 'manager', 'officer') DEFAULT 'officer',
-  status ENUM('active', 'inactive', 'studying') DEFAULT 'active',
+  status ENUM('active', 'on_business_trip', 'inactive', 'studying') DEFAULT 'active',
   studyUntil DATE NULL,
+  businessTripStartDate DATE NULL,
+  businessTripEndDate DATE NULL,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (userId) REFERENCES users(id) ON DELETE SET NULL,
@@ -57,7 +64,7 @@ CREATE TABLE officers (
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ========== TABLE: duty_schedule_permissions ==========
--- Quyền lập/sửa lịch trực cấp riêng cho từng cán bộ
+-- Quyền lập/sửa lịch trực cấp riêng cho từng cán bộ (chỉ Giám đốc và Trưởng/Phó phòng Hành chính tổng hợp được cấp/thu hồi)
 CREATE TABLE duty_schedule_permissions (
   officerId VARCHAR(10) PRIMARY KEY,
   canManageDutySchedules TINYINT(1) NOT NULL DEFAULT 1,
@@ -71,7 +78,7 @@ CREATE TABLE duty_schedule_permissions (
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ========== TABLE: work_schedule_permissions ==========
--- Quyền tạo/duyệt lịch công tác cấp riêng cho từng cán bộ
+-- Quyền tạo/duyệt lịch công tác cấp riêng cho từng cán bộ (chỉ Giám đốc và Trưởng/Phó phòng Hành chính tổng hợp được cấp/thu hồi)
 CREATE TABLE work_schedule_permissions (
   officerId VARCHAR(10) PRIMARY KEY,
   canCreateWorkSchedules TINYINT(1) NOT NULL DEFAULT 1,
@@ -168,7 +175,7 @@ CREATE TABLE work_schedules (
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ========== TABLE: duty_schedules ==========
--- Lịch trực ban (2 loại: giám đốc tuần + cán bộ nguyên ngày)
+-- Lịch trực ban (2 loại: giám đốc tuần + trực cán bộ)
 CREATE TABLE duty_schedules (
   id VARCHAR(20) PRIMARY KEY,
   officerId VARCHAR(10) NOT NULL,
@@ -529,42 +536,76 @@ SET
     ELSE u.fullName
   END;
 
--- Chuan hoa username theo quy tac viet tat tu ho ten (vd: Bui Quoc Bao -> bqbao)
+-- Chuan hoa username theo quy tac: ten + chu cai dau cua ho/ten dem (vd: Le Minh Thao -> thaolm)
 UPDATE users
 SET username = CASE id
-  WHEN 1 THEN 'lmthao'
-  WHEN 2 THEN 'nvcan'
-  WHEN 3 THEN 'nmcuong'
-  WHEN 4 THEN 'ptthang'
-  WHEN 5 THEN 'tvson'
-  WHEN 6 THEN 'ltmai'
-  WHEN 7 THEN 'pqhuy'
-  WHEN 8 THEN 'hmduc'
-  WHEN 9 THEN 'ntlan'
-  WHEN 10 THEN 'bvnam'
-  WHEN 11 THEN 'dthuong'
-  WHEN 12 THEN 'vtlong'
-  WHEN 13 THEN 'tdanh'
-  WHEN 14 THEN 'ngbao'
-  WHEN 15 THEN 'ltkiet'
-  WHEN 16 THEN 'phdat'
-  WHEN 17 THEN 'bhnam'
-  WHEN 18 THEN 'hvtuan'
-  WHEN 19 THEN 'dmquan'
-  WHEN 20 THEN 'tavu'
-  WHEN 21 THEN 'ntyen'
-  WHEN 22 THEN 'dnha'
-  WHEN 23 THEN 'nqbinh'
-  WHEN 24 THEN 'tmchi'
-  WHEN 25 THEN 'lhnam'
-  WHEN 26 THEN 'pqhung'
-  WHEN 27 THEN 'nvkhoa'
-  WHEN 28 THEN 'lvtam'
-  WHEN 29 THEN 'nmphuc'
-  WHEN 30 THEN 'tqviet'
-  WHEN 31 THEN 'lthanh'
+  WHEN 1 THEN 'thaolm'
+  WHEN 2 THEN 'cannv'
+  WHEN 3 THEN 'cuongnm'
+  WHEN 4 THEN 'hangptt'
+  WHEN 5 THEN 'sontv'
+  WHEN 6 THEN 'mailt'
+  WHEN 7 THEN 'huypq'
+  WHEN 8 THEN 'duchm'
+  WHEN 9 THEN 'lannt'
+  WHEN 10 THEN 'nambv'
+  WHEN 11 THEN 'huongdt'
+  WHEN 12 THEN 'longvt'
+  WHEN 13 THEN 'anhtd'
+  WHEN 14 THEN 'baong'
+  WHEN 15 THEN 'kietlt'
+  WHEN 16 THEN 'datph'
+  WHEN 17 THEN 'nambh'
+  WHEN 18 THEN 'tuanhv'
+  WHEN 19 THEN 'quandm'
+  WHEN 20 THEN 'vuta'
+  WHEN 21 THEN 'yennt'
+  WHEN 22 THEN 'hadn'
+  WHEN 23 THEN 'binhnq'
+  WHEN 24 THEN 'chitm'
+  WHEN 25 THEN 'namlh'
+  WHEN 26 THEN 'hungpq'
+  WHEN 27 THEN 'khoanv'
+  WHEN 28 THEN 'tamlv'
+  WHEN 29 THEN 'phucnm'
+  WHEN 30 THEN 'viettq'
+  WHEN 31 THEN 'hanhlt'
   ELSE username
 END;
+
+-- Seed quyền mặc định theo vai trò
+-- 1) Lịch trực ban: admin + manager
+INSERT INTO duty_schedule_permissions (officerId, canManageDutySchedules, grantedByUserId)
+SELECT o.id, 1, 1
+FROM officers o
+JOIN users u ON u.id = o.userId
+WHERE u.role IN ('admin', 'manager')
+ON DUPLICATE KEY UPDATE
+  canManageDutySchedules = VALUES(canManageDutySchedules),
+  grantedByUserId = VALUES(grantedByUserId),
+  updatedAt = CURRENT_TIMESTAMP;
+
+-- 2) Lịch công tác:
+--    - Quyền tạo: admin + manager
+--    - Quyền duyệt: admin + manager thuộc Phòng hành chính tổng hợp
+INSERT INTO work_schedule_permissions (officerId, canCreateWorkSchedules, canApproveWorkSchedules, grantedByUserId)
+SELECT
+  o.id,
+  CASE WHEN u.role IN ('admin', 'manager') THEN 1 ELSE 0 END,
+  CASE
+    WHEN u.role = 'admin' THEN 1
+    WHEN u.role = 'manager' AND o.department = 'Phòng hành chính tổng hợp' THEN 1
+    ELSE 0
+  END,
+  1
+FROM officers o
+JOIN users u ON u.id = o.userId
+WHERE u.role IN ('admin', 'manager')
+ON DUPLICATE KEY UPDATE
+  canCreateWorkSchedules = VALUES(canCreateWorkSchedules),
+  canApproveWorkSchedules = VALUES(canApproveWorkSchedules),
+  grantedByUserId = VALUES(grantedByUserId),
+  updatedAt = CURRENT_TIMESTAMP;
 
 -- ========== DEPARTMENTS ==========
 INSERT INTO departments (name, departmentType, headOfficerId, isActive) VALUES
@@ -727,18 +768,18 @@ INSERT INTO duty_schedules (id, officerId, dutyType, date, endDate, weekStartDat
 
 -- ========== ACTIVITY LOGS ==========
 INSERT INTO activity_logs (actorUserId, actorUsername, actorRole, module, action, entityType, entityId, summary, metadata) VALUES
-(1, 'lmthao', 'admin', 'lichcongtac', 'create', 'work_schedule', 'LCT001', 'Tạo lịch công tác LCT001', JSON_OBJECT('note', 'Khởi tạo lịch')),
-(7, 'pqhuy', 'manager', 'lichcongtac', 'create', 'work_schedule', 'LCT002', 'Tạo lịch công tác LCT002', JSON_OBJECT('note', 'Khởi tạo lịch')),
-(8, 'hmduc', 'manager', 'lichcongtac', 'create', 'work_schedule', 'LCT003', 'Tạo lịch công tác LCT003', JSON_OBJECT('note', 'Khởi tạo lịch')),
-(2, 'nvcan', 'admin', 'lichcongtac', 'update', 'work_schedule', 'LCT004', 'Cập nhật lịch công tác LCT004', JSON_OBJECT('note', 'Điều chỉnh lịch')),
-(1, 'lmthao', 'admin', 'lichtrucban', 'update', 'duty_schedule', 'TBGD015', 'Cập nhật lịch trực ban tuần 15', JSON_OBJECT('note', 'Điều chỉnh lịch')),
-(1, 'lmthao', 'admin', 'lichtrucban', 'update', 'duty_schedule', 'TBCB109', 'Cập nhật lịch trực ban TBCB109', NULL),
-(1, 'lmthao', 'admin', 'lichtrucban', 'create', 'duty_schedule', 'TBCB111,TBCB112,TBCB113,TBCB114,TBCB115,TBCB116,TB', 'Tự động xếp officer_daily (25 lịch)', NULL),
-(1, 'lmthao', 'admin', 'lichtrucban', 'create', 'duty_schedule', 'TBCB136,TBCB137,TBCB138,TBCB139,TBCB140,TBCB141,TB', 'Tự động xếp officer_daily (35 lịch)', NULL),
-(12, 'vtlong', 'officer', 'lichcongtac', 'create', 'work_schedule', 'LCT006', 'Thêm mới lịch công tác LCT006 - a', NULL),
-(5, 'tvson', 'manager', 'lichcongtac', 'approve', 'work_schedule', 'LCT006', 'Duyệt lịch công tác LCT006', NULL),
-(5, 'tvson', 'manager', 'lichcongtac', 'create', 'work_schedule', 'LCT007', 'Thêm mới lịch công tác LCT007 - a', NULL),
-(5, 'tvson', 'manager', 'lichcongtac', 'approve', 'work_schedule', 'LCT007', 'Duyệt lịch công tác LCT007', NULL);
+(1, 'thaolm', 'admin', 'lichcongtac', 'create', 'work_schedule', 'LCT001', 'Tạo lịch công tác LCT001', JSON_OBJECT('note', 'Khởi tạo lịch')),
+(7, 'huypq', 'manager', 'lichcongtac', 'create', 'work_schedule', 'LCT002', 'Tạo lịch công tác LCT002', JSON_OBJECT('note', 'Khởi tạo lịch')),
+(8, 'duchm', 'manager', 'lichcongtac', 'create', 'work_schedule', 'LCT003', 'Tạo lịch công tác LCT003', JSON_OBJECT('note', 'Khởi tạo lịch')),
+(2, 'cannv', 'admin', 'lichcongtac', 'update', 'work_schedule', 'LCT004', 'Cập nhật lịch công tác LCT004', JSON_OBJECT('note', 'Điều chỉnh lịch')),
+(1, 'thaolm', 'admin', 'lichtrucban', 'update', 'duty_schedule', 'TBGD015', 'Cập nhật lịch trực ban tuần 15', JSON_OBJECT('note', 'Điều chỉnh lịch')),
+(1, 'thaolm', 'admin', 'lichtrucban', 'update', 'duty_schedule', 'TBCB109', 'Cập nhật lịch trực ban TBCB109', NULL),
+(1, 'thaolm', 'admin', 'lichtrucban', 'create', 'duty_schedule', 'TBCB111,TBCB112,TBCB113,TBCB114,TBCB115,TBCB116,TB', 'Tự động xếp officer_daily (25 lịch)', NULL),
+(1, 'thaolm', 'admin', 'lichtrucban', 'create', 'duty_schedule', 'TBCB136,TBCB137,TBCB138,TBCB139,TBCB140,TBCB141,TB', 'Tự động xếp officer_daily (35 lịch)', NULL),
+(12, 'longvt', 'officer', 'lichcongtac', 'create', 'work_schedule', 'LCT006', 'Thêm mới lịch công tác LCT006 - a', NULL),
+(5, 'sontv', 'manager', 'lichcongtac', 'approve', 'work_schedule', 'LCT006', 'Duyệt lịch công tác LCT006', NULL),
+(5, 'sontv', 'manager', 'lichcongtac', 'create', 'work_schedule', 'LCT007', 'Thêm mới lịch công tác LCT007 - a', NULL),
+(5, 'sontv', 'manager', 'lichcongtac', 'approve', 'work_schedule', 'LCT007', 'Duyệt lịch công tác LCT007', NULL);
 
 -- ========== NOTIFICATIONS ==========
 INSERT INTO notifications (title, content, type, module, entityType, entityId, targetUserId, targetRole, isActive) VALUES
@@ -812,13 +853,13 @@ INSERT INTO notifications (title, content, type, module, entityType, entityId, t
 
 -- ========== EXPORT LOGS ==========
 INSERT INTO export_logs (userId, username, role, exportType, exportScope, exportFormat, itemCount) VALUES
-(1, 'lmthao', 'admin', 'congtac', 'week', 'pdf', 5),
-(2, 'nvcan', 'admin', 'both', 'week', 'pdf', 12),
-(7, 'pqhuy', 'manager', 'congtac', 'week', 'pdf', 3),
-(1, 'lmthao', 'admin', 'trucban', 'week', 'pdf', 36),
-(1, 'lmthao', 'admin', 'both', 'week', 'pdf', 41),
-(5, 'tvson', 'manager', 'trucban', 'week', 'pdf', 36),
-(5, 'tvson', 'manager', 'trucban', 'week', 'pdf', 36);
+(1, 'thaolm', 'admin', 'congtac', 'week', 'pdf', 5),
+(2, 'cannv', 'admin', 'both', 'week', 'pdf', 12),
+(7, 'huypq', 'manager', 'congtac', 'week', 'pdf', 3),
+(1, 'thaolm', 'admin', 'trucban', 'week', 'pdf', 36),
+(1, 'thaolm', 'admin', 'both', 'week', 'pdf', 41),
+(5, 'sontv', 'manager', 'trucban', 'week', 'pdf', 36),
+(5, 'sontv', 'manager', 'trucban', 'week', 'pdf', 36);
 
 -- Verify tables were created
 SELECT 'Database initialized successfully (seeded, except leave_requests/notification_reads)!' AS status;

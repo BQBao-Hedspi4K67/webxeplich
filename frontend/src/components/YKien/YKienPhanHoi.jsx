@@ -65,6 +65,29 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], reloadData }
     setPhanHoiMap(prev => ({ ...prev, [id]: '' }));
   };
 
+  const handleApproveWorkSchedule = async (scheduleId) => {
+    if (!scheduleId) return;
+    try {
+      await apiClient.workSchedules.approve(scheduleId, 'approved');
+      if (reloadData) await reloadData();
+    } catch (err) {
+      alert(err?.message || 'Không thể duyệt lịch công tác.');
+    }
+  };
+
+  const handleRejectWorkSchedule = async (scheduleId) => {
+    if (!scheduleId) return;
+    const confirmed = window.confirm('Không duyệt lịch này? Lịch sẽ bị xóa khỏi hệ thống.');
+    if (!confirmed) return;
+
+    try {
+      await apiClient.workSchedules.approve(scheduleId, 'rejected');
+      if (reloadData) await reloadData();
+    } catch (err) {
+      alert(err?.message || 'Không thể từ chối lịch công tác.');
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-5">
       <div>

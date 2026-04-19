@@ -39,6 +39,40 @@ const hasOfficersDepartmentIdColumn = async (connection) => {
   return rows.length > 0;
 };
 
+const hasOfficersBusinessTripStartDateColumn = async (connection) => {
+  const [rows] = await connection.execute("SHOW COLUMNS FROM officers LIKE 'businessTripStartDate'");
+  return rows.length > 0;
+};
+
+const hasOfficersBusinessTripEndDateColumn = async (connection) => {
+  const [rows] = await connection.execute("SHOW COLUMNS FROM officers LIKE 'businessTripEndDate'");
+  return rows.length > 0;
+};
+
+const normalizeOfficerStatus = (status = '') => {
+  const raw = String(status || '').trim().toLowerCase();
+  if (raw === 'on_business_trip') return 'on_business_trip';
+  if (raw === 'inactive') return 'inactive';
+  if (raw === 'studying') return 'studying';
+  return 'active';
+};
+
+const ensureOfficersStatusSchema = async (connection) => {
+  await connection.execute(
+    "ALTER TABLE officers MODIFY COLUMN status ENUM('active', 'on_business_trip', 'inactive', 'studying') DEFAULT 'active'"
+  );
+
+  const hasBusinessTripStartDateColumn = await hasOfficersBusinessTripStartDateColumn(connection);
+  if (!hasBusinessTripStartDateColumn) {
+    await connection.execute("ALTER TABLE officers ADD COLUMN businessTripStartDate DATE NULL AFTER studyUntil");
+  }
+
+  const hasBusinessTripEndDateColumn = await hasOfficersBusinessTripEndDateColumn(connection);
+  if (!hasBusinessTripEndDateColumn) {
+    await connection.execute("ALTER TABLE officers ADD COLUMN businessTripEndDate DATE NULL AFTER businessTripStartDate");
+  }
+};
+
 const hasDepartmentsTable = async (connection) => {
   const [rows] = await connection.execute("SHOW TABLES LIKE 'departments'");
   return rows.length > 0;
@@ -97,7 +131,7 @@ const buildUsernameBase = (fullName = '') => {
 
   const lastName = tokens[tokens.length - 1];
   const initials = tokens.slice(0, -1).map((token) => token[0]).join('');
-  const base = `${initials}${lastName}`;
+  const base = `${lastName}${initials}`;
   return base.slice(0, 40) || 'user';
 };
 
@@ -438,6 +472,8 @@ export const createUserAccount = async (req, res, next) => {
       role = 'officer',
       avatar = null,
       status = 'active',
+      businessTripStartDate = null,
+      businessTripEndDate = null,
     } = req.body;
 
     const splitTitleAndName = (name = '') => {
@@ -457,17 +493,27 @@ export const createUserAccount = async (req, res, next) => {
       });
     }
 
-    if (!['active', 'inactive'].includes(status)) {
+    const normalizedOfficerStatus = normalizeOfficerStatus(status);
+    if (!['active', 'on_business_trip', 'inactive', 'studying'].includes(normalizedOfficerStatus)) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid status. Must be active or inactive.',
+        error: 'Invalid status. Must be active, on_business_trip, inactive or studying.',
         code: 'INVALID_STATUS',
+      });
+    }
+
+    if (normalizedOfficerStatus === 'on_business_trip' && (!businessTripStartDate || !businessTripEndDate)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: businessTripStartDate, businessTripEndDate',
+        code: 'VALIDATION_ERROR',
       });
     }
 
     const connection = await pool.getConnection();
     try {
       await ensureUsersMilitaryRankColumn(connection);
+      await ensureOfficersStatusSchema(connection);
       await connection.beginTransaction();
       const hasUserIdColumn = await hasOfficersUserIdColumn(connection);
       const hasDepartmentIdColumn = await hasOfficersDepartmentIdColumn(connection);
@@ -521,10 +567,12 @@ export const createUserAccount = async (req, res, next) => {
 
       const passwordHash = await bcrypt.hash('123456', 10);
 
+      const userAccountStatus = normalizedOfficerStatus === 'inactive' ? 'inactive' : 'active';
+
       const [result] = await connection.execute(
         `INSERT INTO users (username, passwordHash, fullName, militaryRank, email, role, avatar, status)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [username, passwordHash, fullName, militaryRank || null, email, role, avatar, status]
+        [username, passwordHash, fullName, militaryRank || null, email, role, avatar, userAccountStatus]
       );
 
       const [maxOfficerIdRows] = await connection.execute(
@@ -541,8 +589,8 @@ export const createUserAccount = async (req, res, next) => {
       if (hasUserIdColumn) {
         if (hasDepartmentIdColumn) {
           await connection.execute(
-            `INSERT INTO officers (id, userId, fullName, officerTitle, officerName, position, departmentId, department, departmentGroup, phone, email, role, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO officers (id, userId, fullName, officerTitle, officerName, position, departmentId, department, departmentGroup, phone, email, role, status, businessTripStartDate, businessTripEndDate)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               newOfficerId,
               result.insertId,
@@ -556,21 +604,52 @@ export const createUserAccount = async (req, res, next) => {
               phone,
               email,
               role,
-              status,
+              normalizedOfficerStatus,
+              normalizedOfficerStatus === 'on_business_trip' ? businessTripStartDate : null,
+              normalizedOfficerStatus === 'on_business_trip' ? businessTripEndDate : null,
             ]
           );
         } else {
           await connection.execute(
-            `INSERT INTO officers (id, userId, fullName, officerTitle, officerName, position, department, departmentGroup, phone, email, role, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [newOfficerId, result.insertId, fullName, resolvedOfficerTitle, split.officerName, officerPosition, officerDepartment, departmentRef.departmentType || 'phong', phone, email, role, status]
+            `INSERT INTO officers (id, userId, fullName, officerTitle, officerName, position, department, departmentGroup, phone, email, role, status, businessTripStartDate, businessTripEndDate)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              newOfficerId,
+              result.insertId,
+              fullName,
+              resolvedOfficerTitle,
+              split.officerName,
+              officerPosition,
+              officerDepartment,
+              departmentRef.departmentType || 'phong',
+              phone,
+              email,
+              role,
+              normalizedOfficerStatus,
+              normalizedOfficerStatus === 'on_business_trip' ? businessTripStartDate : null,
+              normalizedOfficerStatus === 'on_business_trip' ? businessTripEndDate : null,
+            ]
           );
         }
       } else {
         await connection.execute(
-          `INSERT INTO officers (id, fullName, officerTitle, officerName, position, department, departmentGroup, phone, email, role, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [newOfficerId, fullName, resolvedOfficerTitle, split.officerName, officerPosition, officerDepartment, departmentRef.departmentType || 'phong', phone, email, role, status]
+          `INSERT INTO officers (id, fullName, officerTitle, officerName, position, department, departmentGroup, phone, email, role, status, businessTripStartDate, businessTripEndDate)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            newOfficerId,
+            fullName,
+            resolvedOfficerTitle,
+            split.officerName,
+            officerPosition,
+            officerDepartment,
+            departmentRef.departmentType || 'phong',
+            phone,
+            email,
+            role,
+            normalizedOfficerStatus,
+            normalizedOfficerStatus === 'on_business_trip' ? businessTripStartDate : null,
+            normalizedOfficerStatus === 'on_business_trip' ? businessTripEndDate : null,
+          ]
         );
       }
 

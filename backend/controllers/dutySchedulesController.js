@@ -30,6 +30,20 @@ const LOCATION_ALIAS = {
 
 const COMMANDER_POSITION_PATTERN = /(PT\s*Kh[oó]a|Ph[oó]\s*tr[uư][oở]ng\s*kh[oó]a|Tr[uư][oở]ng\s*ph[oò]ng)/i;
 
+const SHIFT_LABELS = {
+  sang: 'Ca sáng',
+  chiều: 'Ca chiều',
+  toi: 'Ca tối',
+  tối: 'Ca tối',
+  nguyenday: 'Trực cán bộ',
+  tuan: 'Trực tuần giám đốc',
+};
+
+const getShiftLabel = (shift = '') => {
+  const normalizedShift = String(shift || '').trim().toLowerCase();
+  return SHIFT_LABELS[normalizedShift] || String(shift || '').trim();
+};
+
 const normalizeLocation = (value = '') => {
   const text = String(value || '').trim();
   return LOCATION_ALIAS[text] || text;
@@ -109,19 +123,40 @@ const listHas = async (connection, sql, params = []) => {
   return rows.length > 0;
 };
 
+const getColumnType = async (connection, tableName, columnName) => {
+  const [rows] = await connection.execute(
+    `SELECT COLUMN_TYPE
+     FROM information_schema.columns
+     WHERE table_schema = DATABASE()
+       AND table_name = ?
+       AND column_name = ?
+     LIMIT 1`,
+    [tableName, columnName]
+  );
+  return String(rows[0]?.COLUMN_TYPE || '').toLowerCase();
+};
+
 const ensureDutySchema = async (connection) => {
   await connection.execute("UPDATE duty_schedules SET location = 'Lái xe' WHERE location = 'Nhà xe'");
   await connection.execute("UPDATE duty_schedules SET location = 'Bệnh xá' WHERE location = 'Trạm xá'");
 
-  await connection.execute(`
-    ALTER TABLE duty_schedules
-    MODIFY COLUMN dutyType ENUM('director_weekly', 'officer_daily', 'holiday_daily') NOT NULL
-  `);
+  // Avoid forcing ALTER TABLE on every request because duty_schedules is referenced by leave_requests.
+  // Only migrate enum definitions when the current schema is actually missing required values.
+  const dutyTypeColumnType = await getColumnType(connection, 'duty_schedules', 'dutyType');
+  if (!dutyTypeColumnType.includes("'holiday_daily'")) {
+    await connection.execute(`
+      ALTER TABLE duty_schedules
+      MODIFY COLUMN dutyType ENUM('director_weekly', 'officer_daily', 'holiday_daily') NOT NULL
+    `);
+  }
 
-  await connection.execute(`
-    ALTER TABLE duty_schedules
-    MODIFY COLUMN location ENUM('Nhà hiệu bộ', 'Lái xe', 'Bệnh xá', 'Trực ban Giám đốc') NOT NULL
-  `);
+  const locationColumnType = await getColumnType(connection, 'duty_schedules', 'location');
+  if (!locationColumnType.includes("'trực ban giám đốc'")) {
+    await connection.execute(`
+      ALTER TABLE duty_schedules
+      MODIFY COLUMN location ENUM('Nhà hiệu bộ', 'Lái xe', 'Bệnh xá', 'Trực ban Giám đốc') NOT NULL
+    `);
+  }
 
   const hasDutyRole = await listHas(connection, "SHOW COLUMNS FROM duty_schedules LIKE 'dutyRole'");
   if (!hasDutyRole) {
@@ -521,9 +556,14 @@ export const getDutySchedules = async (req, res, next) => {
         params
       );
 
+      const mappedSchedules = schedules.map((item) => ({
+        ...item,
+        shiftLabel: getShiftLabel(item.shift),
+      }));
+
       return res.json({
         success: true,
-        data: schedules,
+        data: mappedSchedules,
         pagination: {
           total: Number(countRows[0].total || 0),
           page: parseInt(page, 10),
@@ -563,7 +603,13 @@ export const getDutyScheduleById = async (req, res, next) => {
         return res.status(404).json({ success: false, error: 'Duty schedule not found', code: 'SCHEDULE_NOT_FOUND' });
       }
 
-      return res.json({ success: true, data: rows[0] });
+      return res.json({
+        success: true,
+        data: {
+          ...rows[0],
+          shiftLabel: getShiftLabel(rows[0].shift),
+        },
+      });
     } finally {
       connection.release();
     }

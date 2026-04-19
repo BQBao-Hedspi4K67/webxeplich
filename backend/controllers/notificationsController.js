@@ -34,7 +34,7 @@ export const getNotifications = async (req, res, next) => {
       const limitClause = fetchAll ? '' : `LIMIT ${lim}`;
 
       const [rows] = await connection.execute(
-        `SELECT n.id, n.title, n.content, n.type, n.createdAt, nr.readAt
+        `SELECT n.id, n.title, n.content, n.type, n.module, n.entityType, n.entityId, n.createdAt, nr.readAt
          FROM notifications n
          LEFT JOIN notification_reads nr
            ON n.id = nr.notificationId AND nr.userId = ?
@@ -57,6 +57,9 @@ export const getNotifications = async (req, res, next) => {
         daDoc: Boolean(n.readAt),
         thoiGian: toRelativeTimeVi(n.createdAt),
         createdAt: n.createdAt,
+        module: n.module || '',
+        entityType: n.entityType || '',
+        entityId: n.entityId || '',
       }));
 
       res.json({ success: true, data });

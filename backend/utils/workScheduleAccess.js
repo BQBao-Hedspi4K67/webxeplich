@@ -3,6 +3,8 @@ const hasOfficersUserIdColumn = async (connection) => {
   return rows.length > 0;
 };
 
+const ADMIN_DEPARTMENT = 'Phòng hành chính tổng hợp';
+
 const hasOfficersDepartmentIdColumn = async (connection) => {
   const [rows] = await connection.execute("SHOW COLUMNS FROM officers LIKE 'departmentId'");
   return rows.length > 0;
@@ -86,26 +88,28 @@ const getWorkSchedulePermissionState = async (connection, officerId) => {
 export const getWorkScheduleAccessState = async (connection, reqUser = {}) => {
   await ensureWorkScheduleAccessSchema(connection);
 
+  const officer = await resolveRequesterOfficer(connection, reqUser);
   const isDirector = reqUser?.role === 'admin';
   const isDepartmentManager = reqUser?.role === 'manager';
+  const departmentName = String(officer?.department || '').trim();
+  const canGrantWorkSchedulePermissions = isDirector || (isDepartmentManager && departmentName === ADMIN_DEPARTMENT);
 
   if (isDirector) {
     return {
-      officer: null,
+      officer,
       canCreateWorkSchedules: true,
       canApproveWorkSchedules: true,
       canCreateWorkSchedulesByRole: true,
       canApproveWorkSchedulesByRole: true,
       canCreateWorkSchedulesByPermission: false,
       canApproveWorkSchedulesByPermission: false,
-      canGrantWorkSchedulePermissions: true,
+      canGrantWorkSchedulePermissions,
     };
   }
 
-  const officer = await resolveRequesterOfficer(connection, reqUser);
   const permissionState = await getWorkSchedulePermissionState(connection, officer?.id);
   const canCreateWorkSchedulesByRole = isDepartmentManager;
-  const canApproveWorkSchedulesByRole = false;
+  const canApproveWorkSchedulesByRole = isDepartmentManager && departmentName === ADMIN_DEPARTMENT;
 
   return {
     officer,
@@ -115,7 +119,7 @@ export const getWorkScheduleAccessState = async (connection, reqUser = {}) => {
     canApproveWorkSchedulesByRole,
     canCreateWorkSchedulesByPermission: permissionState.canCreateWorkSchedulesByPermission,
     canApproveWorkSchedulesByPermission: permissionState.canApproveWorkSchedulesByPermission,
-    canGrantWorkSchedulePermissions: false,
+    canGrantWorkSchedulePermissions,
   };
 };
 

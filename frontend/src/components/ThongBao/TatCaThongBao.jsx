@@ -1,7 +1,7 @@
 import React from 'react';
 import { Bell, CheckCheck } from 'lucide-react';
 
-const TatCaThongBao = ({ thongBaoData = [], onMarkNotificationRead, onMarkAllNotificationsRead }) => {
+const TatCaThongBao = ({ thongBaoData = [], onMarkNotificationRead, onMarkAllNotificationsRead, onNavigate }) => {
   const notifications = Array.isArray(thongBaoData) ? thongBaoData : [];
   const unreadCount = notifications.filter((n) => !n.daDoc).length;
 
@@ -17,9 +17,59 @@ const TatCaThongBao = ({ thongBaoData = [], onMarkNotificationRead, onMarkAllNot
     info: 'Thông tin',
   };
 
-  const handleMarkRead = async (id, daDoc) => {
-    if (daDoc || !onMarkNotificationRead) return;
-    await onMarkNotificationRead(id);
+  const resolvePageFromNotification = (notification) => {
+    const moduleKey = String(notification?.module || '').toLowerCase();
+    const entityTypeKey = String(notification?.entityType || '').toLowerCase();
+    const text = `${String(notification?.tieuDe || '')} ${String(notification?.noiDung || '')}`.toLowerCase();
+
+    const moduleToPage = {
+      lichcongtac: 'lichcongtac',
+      lichtrucban: 'lichtrucan',
+      leave_request: 'ykien',
+      ykien: 'ykien',
+      canbo: 'canbo',
+      phongban: 'phongban',
+      ngayle: 'ngayle',
+      xuat: 'xuat',
+    };
+
+    const entityToPage = {
+      work_schedule: 'lichcongtac',
+      work_schedule_permission: 'lichcongtac',
+      duty_schedule: 'lichtrucan',
+      duty_schedule_permission: 'lichtrucan',
+      leave_request: 'ykien',
+      officer: 'canbo',
+      department: 'phongban',
+      holiday: 'ngayle',
+      export_log: 'xuat',
+    };
+
+    const keywordRules = [
+      { pattern: /(xin nghi|xin nghỉ|don xin nghi|đơn xin nghỉ|cho duyet|chờ duyệt)/, page: 'ykien' },
+      { pattern: /(lich truc|lịch trực|truc ban|trực ban)/, page: 'lichtrucan' },
+      { pattern: /(lich cong tac|lịch công tác|cho duyet lich|duyet lich)/, page: 'lichcongtac' },
+      { pattern: /(can bo|cán bộ|phan quyen|phân quyền)/, page: 'canbo' },
+      { pattern: /(phong ban|phòng ban|don vi|đơn vị)/, page: 'phongban' },
+      { pattern: /(ngay le|ngày lễ|ky niem|kỷ niệm)/, page: 'ngayle' },
+      { pattern: /(xuat|xuất|in lich|in lịch|pdf|excel)/, page: 'xuat' },
+    ];
+
+    if (moduleToPage[moduleKey]) return moduleToPage[moduleKey];
+    if (entityToPage[entityTypeKey]) return entityToPage[entityTypeKey];
+
+    const matched = keywordRules.find((rule) => rule.pattern.test(text));
+    return matched?.page || 'dashboard';
+  };
+
+  const handleOpenNotification = async (notification) => {
+    if (!notification) return;
+    if (!notification.daDoc && onMarkNotificationRead) {
+      await onMarkNotificationRead(notification.id);
+    }
+    if (onNavigate) {
+      onNavigate(resolvePageFromNotification(notification));
+    }
   };
 
   return (
@@ -53,7 +103,7 @@ const TatCaThongBao = ({ thongBaoData = [], onMarkNotificationRead, onMarkAllNot
             <button
               key={n.id}
               type="button"
-              onClick={() => handleMarkRead(n.id, n.daDoc)}
+              onClick={() => handleOpenNotification(n)}
               className={`card-lg w-full text-left transition-all hover:shadow-md ${!n.daDoc ? 'border-blue-200 bg-blue-50/50' : ''}`}
             >
               <div className="flex items-start gap-3">

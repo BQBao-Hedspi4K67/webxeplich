@@ -52,6 +52,40 @@ const hasOfficersDepartmentIdColumn = async (connection) => {
   return rows.length > 0;
 };
 
+const hasOfficersBusinessTripStartDateColumn = async (connection) => {
+  const [rows] = await connection.execute("SHOW COLUMNS FROM officers LIKE 'businessTripStartDate'");
+  return rows.length > 0;
+};
+
+const hasOfficersBusinessTripEndDateColumn = async (connection) => {
+  const [rows] = await connection.execute("SHOW COLUMNS FROM officers LIKE 'businessTripEndDate'");
+  return rows.length > 0;
+};
+
+const normalizeOfficerStatus = (status = '') => {
+  const raw = String(status || '').trim().toLowerCase();
+  if (raw === 'on_business_trip') return 'on_business_trip';
+  if (raw === 'inactive') return 'inactive';
+  if (raw === 'studying') return 'studying';
+  return 'active';
+};
+
+const ensureOfficersStatusSchema = async (connection) => {
+  await connection.execute(
+    "ALTER TABLE officers MODIFY COLUMN status ENUM('active', 'on_business_trip', 'inactive', 'studying') DEFAULT 'active'"
+  );
+
+  const hasBusinessTripStartDateColumn = await hasOfficersBusinessTripStartDateColumn(connection);
+  if (!hasBusinessTripStartDateColumn) {
+    await connection.execute("ALTER TABLE officers ADD COLUMN businessTripStartDate DATE NULL AFTER studyUntil");
+  }
+
+  const hasBusinessTripEndDateColumn = await hasOfficersBusinessTripEndDateColumn(connection);
+  if (!hasBusinessTripEndDateColumn) {
+    await connection.execute("ALTER TABLE officers ADD COLUMN businessTripEndDate DATE NULL AFTER businessTripStartDate");
+  }
+};
+
 const resolveDepartmentRef = async (connection, { departmentId, department }) => {
   if (departmentId) {
     const [rows] = await connection.execute(
@@ -176,6 +210,7 @@ export const getOfficers = async (req, res, next) => {
     const connection = await pool.getConnection();
 
     try {
+      await ensureOfficersStatusSchema(connection);
       await syncUsersToOfficers(connection);
       await ensureDutyScheduleAccessSchema(connection);
       await ensureWorkScheduleAccessSchema(connection);
@@ -249,7 +284,7 @@ export const getOfficers = async (req, res, next) => {
                 COALESCE(wsp.canCreateWorkSchedules, 0) AS canCreateWorkSchedulesByPermission,
                 COALESCE(wsp.canApproveWorkSchedules, 0) AS canApproveWorkSchedulesByPermission,
                 CASE
-                  WHEN o.department = 'Ban Giám đốc' OR o.department = 'Phòng hành chính tổng hợp' THEN 1
+                  WHEN o.role = 'leader' OR o.role = 'manager' THEN 1
                   ELSE 0
                 END AS canManageDutySchedulesByDepartment,
                 CASE
@@ -257,11 +292,11 @@ export const getOfficers = async (req, res, next) => {
                   ELSE 0
                 END AS canCreateWorkSchedulesByRole,
                 CASE
-                  WHEN o.role = 'leader' THEN 1
+                  WHEN o.role = 'leader' OR (o.role = 'manager' AND o.department = 'Phòng hành chính tổng hợp') THEN 1
                   ELSE 0
                 END AS canApproveWorkSchedulesByRole,
                 CASE
-                  WHEN (o.department = 'Ban Giám đốc' OR o.department = 'Phòng hành chính tổng hợp')
+                  WHEN (o.role = 'leader' OR o.role = 'manager')
                        OR COALESCE(dsp.canManageDutySchedules, 0) = 1
                   THEN 1 ELSE 0
                 END AS canManageDutySchedules,
@@ -270,7 +305,7 @@ export const getOfficers = async (req, res, next) => {
                   THEN 1 ELSE 0
                 END AS canCreateWorkSchedules,
                 CASE
-                  WHEN o.role = 'leader' OR COALESCE(wsp.canApproveWorkSchedules, 0) = 1
+                  WHEN o.role = 'leader' OR (o.role = 'manager' AND o.department = 'Phòng hành chính tổng hợp') OR COALESCE(wsp.canApproveWorkSchedules, 0) = 1
                   THEN 1 ELSE 0
                 END AS canApproveWorkSchedules,
                 dsp.grantedAt AS dutySchedulePermissionGrantedAt,
@@ -318,6 +353,7 @@ export const getOfficerById = async (req, res, next) => {
     const connection = await pool.getConnection();
 
     try {
+      await ensureOfficersStatusSchema(connection);
       await ensureDutyScheduleAccessSchema(connection);
       await ensureWorkScheduleAccessSchema(connection);
       const [rows] = await connection.execute(
@@ -326,7 +362,7 @@ export const getOfficerById = async (req, res, next) => {
                 COALESCE(wsp.canCreateWorkSchedules, 0) AS canCreateWorkSchedulesByPermission,
                 COALESCE(wsp.canApproveWorkSchedules, 0) AS canApproveWorkSchedulesByPermission,
                 CASE
-                  WHEN o.department = 'Ban Giám đốc' OR o.department = 'Phòng hành chính tổng hợp' THEN 1
+                  WHEN o.role = 'leader' OR o.role = 'manager' THEN 1
                   ELSE 0
                 END AS canManageDutySchedulesByDepartment,
                 CASE
@@ -334,11 +370,11 @@ export const getOfficerById = async (req, res, next) => {
                   ELSE 0
                 END AS canCreateWorkSchedulesByRole,
                 CASE
-                  WHEN o.role = 'leader' THEN 1
+                  WHEN o.role = 'leader' OR (o.role = 'manager' AND o.department = 'Phòng hành chính tổng hợp') THEN 1
                   ELSE 0
                 END AS canApproveWorkSchedulesByRole,
                 CASE
-                  WHEN (o.department = 'Ban Giám đốc' OR o.department = 'Phòng hành chính tổng hợp')
+                  WHEN (o.role = 'leader' OR o.role = 'manager')
                        OR COALESCE(dsp.canManageDutySchedules, 0) = 1
                   THEN 1 ELSE 0
                 END AS canManageDutySchedules,
@@ -347,7 +383,7 @@ export const getOfficerById = async (req, res, next) => {
                   THEN 1 ELSE 0
                 END AS canCreateWorkSchedules,
                 CASE
-                  WHEN o.role = 'leader' OR COALESCE(wsp.canApproveWorkSchedules, 0) = 1
+                  WHEN o.role = 'leader' OR (o.role = 'manager' AND o.department = 'Phòng hành chính tổng hợp') OR COALESCE(wsp.canApproveWorkSchedules, 0) = 1
                   THEN 1 ELSE 0
                 END AS canApproveWorkSchedules,
                 dsp.grantedAt AS dutySchedulePermissionGrantedAt,
@@ -593,6 +629,8 @@ export const createOfficer = async (req, res, next) => {
       role = 'officer',
       status = 'active',
       studyUntil = null,
+      businessTripStartDate = null,
+      businessTripEndDate = null,
     } = req.body;
 
     // Validation
@@ -612,9 +650,28 @@ export const createOfficer = async (req, res, next) => {
       });
     }
 
+    const normalizedStatus = normalizeOfficerStatus(status);
+    const allowedStatuses = Object.values(USER_STATUS);
+    if (!allowedStatuses.includes(normalizedStatus)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid status. Must be one of: ${allowedStatuses.join(', ')}`,
+        code: 'INVALID_STATUS',
+      });
+    }
+
+    if (normalizedStatus === 'on_business_trip' && (!businessTripStartDate || !businessTripEndDate)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: businessTripStartDate, businessTripEndDate',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
     const connection = await pool.getConnection();
 
     try {
+      await ensureOfficersStatusSchema(connection);
       const requesterOfficer = await resolveRequesterOfficer(connection, req.user || {});
       const hasDepartmentIdColumn = await hasOfficersDepartmentIdColumn(connection);
       const departmentRef = await resolveDepartmentRef(connection, { departmentId, department });
@@ -668,8 +725,8 @@ export const createOfficer = async (req, res, next) => {
       if (hasDepartmentIdColumn) {
         await connection.execute(
           `INSERT INTO officers
-           (id, fullName, officerTitle, officerName, position, departmentId, department, departmentGroup, phone, email, role, status, studyUntil)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, fullName, officerTitle, officerName, position, departmentId, department, departmentGroup, phone, email, role, status, studyUntil, businessTripStartDate, businessTripEndDate)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             newId,
             fullName,
@@ -682,15 +739,17 @@ export const createOfficer = async (req, res, next) => {
             phone || null,
             email || null,
             role,
-            status,
-            status === 'studying' ? studyUntil : null,
+            normalizedStatus,
+            normalizedStatus === 'studying' ? studyUntil : null,
+            normalizedStatus === 'on_business_trip' ? businessTripStartDate : null,
+            normalizedStatus === 'on_business_trip' ? businessTripEndDate : null,
           ]
         );
       } else {
         await connection.execute(
           `INSERT INTO officers
-           (id, fullName, officerTitle, officerName, position, department, departmentGroup, phone, email, role, status, studyUntil)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, fullName, officerTitle, officerName, position, department, departmentGroup, phone, email, role, status, studyUntil, businessTripStartDate, businessTripEndDate)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             newId,
             fullName,
@@ -702,8 +761,10 @@ export const createOfficer = async (req, res, next) => {
             phone || null,
             email || null,
             role,
-            status,
-            status === 'studying' ? studyUntil : null,
+            normalizedStatus,
+            normalizedStatus === 'studying' ? studyUntil : null,
+            normalizedStatus === 'on_business_trip' ? businessTripStartDate : null,
+            normalizedStatus === 'on_business_trip' ? businessTripEndDate : null,
           ]
         );
       }
@@ -719,10 +780,12 @@ export const createOfficer = async (req, res, next) => {
           phone: phone || null,
           email: email || null,
           role,
-          status,
+          status: normalizedStatus,
           officerTitle: resolvedTitle,
           officerName: resolvedName,
-          studyUntil: status === 'studying' ? studyUntil : null,
+          studyUntil: normalizedStatus === 'studying' ? studyUntil : null,
+          businessTripStartDate: normalizedStatus === 'on_business_trip' ? businessTripStartDate : null,
+          businessTripEndDate: normalizedStatus === 'on_business_trip' ? businessTripEndDate : null,
         },
         message: 'Officer created successfully',
       });
@@ -749,9 +812,36 @@ export const createOfficer = async (req, res, next) => {
 export const updateOfficer = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { fullName, officerTitle, officerName, position, departmentId, department, phone, email, role, status, studyUntil } = req.body;
+    const {
+      fullName,
+      officerTitle,
+      officerName,
+      position,
+      departmentId,
+      department,
+      phone,
+      email,
+      role,
+      status,
+      studyUntil,
+      businessTripStartDate,
+      businessTripEndDate,
+    } = req.body;
 
-    if (!fullName && !officerTitle && !officerName && !position && !department && !role && !status && !phone && !email && studyUntil === undefined) {
+    if (
+      !fullName
+      && !officerTitle
+      && !officerName
+      && !position
+      && !department
+      && !role
+      && !status
+      && !phone
+      && !email
+      && studyUntil === undefined
+      && businessTripStartDate === undefined
+      && businessTripEndDate === undefined
+    ) {
       return res.status(400).json({
         success: false,
         error: 'No fields to update',
@@ -759,9 +849,19 @@ export const updateOfficer = async (req, res, next) => {
       });
     }
 
+    const normalizedStatus = status !== undefined ? normalizeOfficerStatus(status) : undefined;
+    if (normalizedStatus !== undefined && !Object.values(USER_STATUS).includes(normalizedStatus)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid status. Must be one of: ${Object.values(USER_STATUS).join(', ')}`,
+        code: 'INVALID_STATUS',
+      });
+    }
+
     const connection = await pool.getConnection();
 
     try {
+      await ensureOfficersStatusSchema(connection);
       const requesterOfficer = await resolveRequesterOfficer(connection, req.user || {});
       const hasDepartmentIdColumn = await hasOfficersDepartmentIdColumn(connection);
       const departmentRef = (department !== undefined || departmentId !== undefined)
@@ -779,8 +879,8 @@ export const updateOfficer = async (req, res, next) => {
       // Check if exists
       const [check] = await connection.execute(
         hasDepartmentIdColumn
-          ? 'SELECT id, departmentId, department, role, status FROM officers WHERE id = ?'
-          : 'SELECT id, NULL AS departmentId, department, role, status FROM officers WHERE id = ?',
+          ? 'SELECT id, departmentId, department, role, status, studyUntil, businessTripStartDate, businessTripEndDate FROM officers WHERE id = ?'
+          : 'SELECT id, NULL AS departmentId, department, role, status, studyUntil, businessTripStartDate, businessTripEndDate FROM officers WHERE id = ?',
         [id]
       );
 
@@ -790,6 +890,19 @@ export const updateOfficer = async (req, res, next) => {
           error: 'Officer not found',
           code: 'OFFICER_NOT_FOUND',
         });
+      }
+
+      const nextStatus = normalizedStatus || check[0].status;
+      if (nextStatus === 'on_business_trip') {
+        const nextBusinessTripStartDate = businessTripStartDate !== undefined ? businessTripStartDate : check[0].businessTripStartDate;
+        const nextBusinessTripEndDate = businessTripEndDate !== undefined ? businessTripEndDate : check[0].businessTripEndDate;
+        if (!nextBusinessTripStartDate || !nextBusinessTripEndDate) {
+          return res.status(400).json({
+            success: false,
+            error: 'Missing required fields: businessTripStartDate, businessTripEndDate',
+            code: 'VALIDATION_ERROR',
+          });
+        }
       }
 
       if (req.user?.role === 'manager') {
@@ -855,13 +968,21 @@ export const updateOfficer = async (req, res, next) => {
         updateFields.push('role = ?');
         params.push(role);
       }
-      if (status !== undefined) {
+      if (normalizedStatus !== undefined) {
         updateFields.push('status = ?');
-        params.push(status);
+        params.push(normalizedStatus);
       }
-      if (studyUntil !== undefined) {
+      if (studyUntil !== undefined || normalizedStatus !== undefined) {
         updateFields.push('studyUntil = ?');
-        params.push(studyUntil || null);
+        params.push(nextStatus === 'studying' ? (studyUntil || null) : null);
+      }
+      if (businessTripStartDate !== undefined || normalizedStatus !== undefined) {
+        updateFields.push('businessTripStartDate = ?');
+        params.push(nextStatus === 'on_business_trip' ? (businessTripStartDate || null) : null);
+      }
+      if (businessTripEndDate !== undefined || normalizedStatus !== undefined) {
+        updateFields.push('businessTripEndDate = ?');
+        params.push(nextStatus === 'on_business_trip' ? (businessTripEndDate || null) : null);
       }
 
       if (officerTitle !== undefined) {

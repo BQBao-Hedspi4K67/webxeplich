@@ -1,4 +1,4 @@
-const PRIVILEGED_DUTY_SCHEDULE_DEPARTMENTS = ['Ban Giám đốc', 'Phòng hành chính tổng hợp'];
+const ADMIN_DEPARTMENT = 'Phòng hành chính tổng hợp';
 
 const hasOfficersUserIdColumn = async (connection) => {
   const [rows] = await connection.execute("SHOW COLUMNS FROM officers LIKE 'userId'");
@@ -64,32 +64,25 @@ export const hasDutySchedulePermission = async (connection, officerId) => {
 export const getDutyScheduleAccessState = async (connection, reqUser = {}) => {
   await ensureDutyScheduleAccessSchema(connection);
 
-  if (reqUser?.role === 'admin') {
-    return {
-      officer: null,
-      canManageDutySchedules: true,
-      canManageDutySchedulesByDepartment: true,
-      canManageDutySchedulesByPermission: false,
-      canGrantDutySchedulePermissions: true,
-    };
-  }
-
   const officer = await resolveRequesterOfficer(connection, reqUser);
+  const isAdminRole = reqUser?.role === 'admin';
+  const isManagerRole = reqUser?.role === 'manager';
   const departmentName = String(officer?.department || '').trim();
-  const canManageDutySchedulesByDepartment = PRIVILEGED_DUTY_SCHEDULE_DEPARTMENTS.includes(departmentName);
+  const canManageDutySchedulesByDepartment = isAdminRole || isManagerRole;
   const canManageDutySchedulesByPermission = await hasDutySchedulePermission(connection, officer?.id);
+  const canGrantDutySchedulePermissions =
+    isAdminRole || (isManagerRole && departmentName === ADMIN_DEPARTMENT);
 
   return {
     officer,
     canManageDutySchedules: canManageDutySchedulesByDepartment || canManageDutySchedulesByPermission,
     canManageDutySchedulesByDepartment,
     canManageDutySchedulesByPermission,
-    canGrantDutySchedulePermissions: canManageDutySchedulesByDepartment,
+    canGrantDutySchedulePermissions,
   };
 };
 
 export const canGrantDutySchedulePermissions = async (connection, reqUser = {}) => {
-  if (reqUser?.role === 'admin') return true;
   const accessState = await getDutyScheduleAccessState(connection, reqUser);
   return Boolean(accessState.canGrantDutySchedulePermissions);
 };

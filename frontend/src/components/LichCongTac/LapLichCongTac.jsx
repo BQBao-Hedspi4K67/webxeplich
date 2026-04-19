@@ -84,8 +84,10 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
   const [permissionResult, setPermissionResult] = useState({ type: '', message: '' });
   const [permissionPage, setPermissionPage] = useState(1);
   const [permissionRowsState, setPermissionRowsState] = useState([]);
+  const [approvalPage, setApprovalPage] = useState(1);
 
   const PERMISSION_PAGE_SIZE = 8;
+  const APPROVAL_PAGE_SIZE = 8;
 
   useEffect(() => {
     setData(lichCongTacData);
@@ -98,6 +100,10 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
   useEffect(() => {
     setPermissionRowsState((canBoData || []).filter((item) => item.trangThai === 'active'));
   }, [canBoData]);
+
+  const pendingWorkSchedules = (data || [])
+    .filter((item) => item?.trangThaiDuyet === 'pending')
+    .sort((a, b) => String(b.ngay || '').localeCompare(String(a.ngay || '')));
 
   useEffect(() => {
     const loadOfficerOptions = async () => {
@@ -374,6 +380,19 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
     }
   };
 
+  const approvalTotalPages = Math.max(1, Math.ceil(pendingWorkSchedules.length / APPROVAL_PAGE_SIZE));
+  const approvalPageSafe = Math.min(approvalPage, approvalTotalPages);
+  const approvalRows = pendingWorkSchedules.slice(
+    (approvalPageSafe - 1) * APPROVAL_PAGE_SIZE,
+    (approvalPageSafe - 1) * APPROVAL_PAGE_SIZE + APPROVAL_PAGE_SIZE
+  );
+
+  useEffect(() => {
+    if (approvalPage > approvalTotalPages) {
+      setApprovalPage(approvalTotalPages);
+    }
+  }, [approvalPage, approvalTotalPages]);
+
   return (
     <div className="max-w-7xl mx-auto space-y-5">
       {/* Header */}
@@ -390,13 +409,19 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
             className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'month' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
             <CalendarDays size={14} className="inline mr-1.5" />Lịch tháng
           </button>
+          {canReview && (
+            <button onClick={() => setViewMode('approval')}
+              className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'approval' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+              <Clock size={14} className="inline mr-1.5" />Phê duyệt lịch công tác
+            </button>
+          )}
           {canGrantPermission && (
             <button onClick={() => setViewMode('permission')}
               className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'permission' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-              Phân quyền
+              <User size={14} className="inline mr-1.5" />Phân quyền
             </button>
           )}
-          {canCreate && viewMode !== 'permission' && (
+          {canCreate && (
             <button onClick={() => openAdd(3)} className="btn-primary">
               <Plus size={16} /> Thêm lịch
             </button>
@@ -610,7 +635,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                 if (!d) return <div key={`empty-${idx}`} className="min-h-32 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100/50" />;
                 const dateStr = toDateStr(d);
                 const isToday = dateStr === toDateStr(new Date());
-                const isMonday = d.getDay() === 1;
+                const isFirstMondayOfMonth = d.getDay() === 1 && d.getDate() <= 7;
                 const isWeekend = d.getDay() === 6 || d.getDay() === 0;
                 const holiday = HOLIDAYS[dateStr];
                 const dayEvents = monthData.filter((x) => x.ngay === dateStr);
@@ -638,7 +663,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                       <span className={`text-base font-extrabold ${isToday ? 'text-blue-700' : isWeekend ? 'text-slate-400' : 'text-slate-800'}`}>
                         {d.getDate()}
                       </span>
-                      {isMonday && (
+                      {isFirstMondayOfMonth && (
                         <span className="text-[9px] px-2 py-1 rounded-full font-bold bg-gradient-to-r from-emerald-100 to-emerald-50 text-emerald-700 border border-emerald-200">
                           Chào cờ
                         </span>
@@ -686,6 +711,59 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
               })}
             </div>
           </div>
+        </div>
+      ) : viewMode === 'approval' ? (
+        <div className="card-lg p-0 overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-700">Phê duyệt lịch công tác</h3>
+            <span className="text-xs text-slate-500">{pendingWorkSchedules.length} lịch chờ duyệt</span>
+          </div>
+          <div className="overflow-x-auto">
+            {canReview ? (
+              <table className="w-full min-w-[900px]">
+                <thead>
+                  <tr>
+                    {['Mã lịch', 'Nội dung', 'Ngày', 'Đơn vị', 'Người tạo', ''].map((h) => (
+                      <th key={h} className="table-th">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {approvalRows.map((item) => (
+                    <tr key={item.id} className="hover:bg-slate-50/70 align-top">
+                      <td className="table-td font-mono text-xs">{item.id}</td>
+                      <td className="table-td text-sm text-slate-700 font-medium">{item.tieuDe || '-'}</td>
+                      <td className="table-td text-sm text-slate-600">{item.ngay || '-'}</td>
+                      <td className="table-td text-sm text-slate-600">{item.donVi || '-'}</td>
+                      <td className="table-td text-sm text-slate-600">{item.nguoiTao || '-'}</td>
+                      <td className="table-td">
+                        <div className="flex gap-2">
+                          <button onClick={() => handleApprove(item.id)} className="btn-primary !py-1.5 !px-3 text-xs">Duyệt</button>
+                          <button onClick={() => handleReject(item.id)} className="btn-danger !py-1.5 !px-3 text-xs">Từ chối</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {pendingWorkSchedules.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="text-center py-10 text-slate-400">Hiện không có lịch công tác chờ duyệt.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            ) : (
+              <div className="px-5 py-12 text-center text-slate-400">
+                Bạn không có quyền phê duyệt lịch công tác.
+              </div>
+            )}
+          </div>
+          {pendingWorkSchedules.length > APPROVAL_PAGE_SIZE && (
+            <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-between text-sm text-slate-600">
+              <button className="btn-secondary !py-1.5 !px-3" onClick={() => setApprovalPage((p) => Math.max(1, p - 1))} disabled={approvalPageSafe === 1}>Trước</button>
+              <span>Trang {approvalPageSafe}/{approvalTotalPages}</span>
+              <button className="btn-secondary !py-1.5 !px-3" onClick={() => setApprovalPage((p) => Math.min(approvalTotalPages, p + 1))} disabled={approvalPageSafe === approvalTotalPages}>Sau</button>
+            </div>
+          )}
         </div>
       ) : viewMode === 'permission' ? (
         <div className="card-lg p-0 overflow-hidden">

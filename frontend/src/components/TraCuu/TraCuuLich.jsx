@@ -176,7 +176,7 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
                       return (
                         <tr key={item.id} className="hover:bg-slate-50/70 transition-colors cursor-pointer group" onClick={() => setSelectedItem(item)}>
                           <td className="table-td">
-                            <span className={`badge text-[11px] ${typeColors[item.type]}`}>{typeLabels[item.type]}</span>
+                            <span className={`badge inline-flex items-center whitespace-nowrap text-[11px] ${typeColors[item.type]}`}>{typeLabels[item.type]}</span>
                           </td>
                           <td className="table-td max-w-[240px]">
                             <div className="font-semibold text-slate-800 text-sm group-hover:text-blue-600 transition-colors">{item.tieuDe}</div>
@@ -281,7 +281,7 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
                         <div className={`w-1 self-stretch rounded-full flex-shrink-0 ${item.type === 'congtac' ? 'bg-blue-400' : 'bg-indigo-400'}`} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start gap-2 flex-wrap">
-                            <span className={`badge text-[10px] ${typeColors[item.type]}`}>{typeLabels[item.type]}</span>
+                            <span className={`badge inline-flex items-center whitespace-nowrap text-[10px] ${typeColors[item.type]}`}>{typeLabels[item.type]}</span>
                           </div>
                           <p className="text-sm font-semibold text-slate-800 mt-1 group-hover:text-blue-600 transition-colors line-clamp-1">{item.tieuDe}</p>
                           <div className="flex items-center gap-3 mt-1 flex-wrap">
@@ -306,7 +306,7 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fade-in-up">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div>
-                <span className={`badge text-xs mb-1 ${typeColors[selectedItem.type]}`}>{typeLabels[selectedItem.type]}</span>
+                <span className={`badge inline-flex items-center whitespace-nowrap text-xs mb-1 ${typeColors[selectedItem.type]}`}>{typeLabels[selectedItem.type]}</span>
                 <h3 className="text-base font-bold text-slate-800 leading-tight mt-1">{selectedItem.tieuDe}</h3>
               </div>
               <button onClick={() => setSelectedItem(null)} className="text-slate-400 hover:text-slate-600 ml-3"><X size={18} /></button>

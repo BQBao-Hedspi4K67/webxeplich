@@ -2,6 +2,7 @@ export const LOAI_LICH_COLORS = {
   hop: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Họp' },
   hoiThao: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Hội thảo' },
   tiepkhach: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Tiếp khách' },
+  congtac: { bg: 'bg-cyan-100', text: 'text-cyan-700', label: 'Công tác' },
   khaoSat: { bg: 'bg-green-100', text: 'text-green-700', label: 'Khảo sát' },
   dienTap: { bg: 'bg-red-100', text: 'text-red-700', label: 'Diễn tập' },
   sinhHoat: { bg: 'bg-teal-100', text: 'text-teal-700', label: 'Sinh hoạt' },
@@ -13,7 +14,7 @@ export const CA_TRUC_COLORS = {
   sáng: { bg: 'bg-amber-50', border: 'border-amber-300', text: 'text-amber-700', badge: 'bg-amber-100 text-amber-700', label: 'Ca sáng' },
   chiều: { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-700', label: 'Ca chiều' },
   tối: { bg: 'bg-indigo-50', border: 'border-indigo-300', text: 'text-indigo-700', badge: 'bg-indigo-100 text-indigo-700', label: 'Ca tối' },
-  nguyenday: { bg: 'bg-emerald-50', border: 'border-emerald-300', text: 'text-emerald-700', badge: 'bg-emerald-100 text-emerald-700', label: 'Trực nguyên ngày' },
+  nguyenday: { bg: 'bg-emerald-50', border: 'border-emerald-300', text: 'text-emerald-700', badge: 'bg-emerald-100 text-emerald-700', label: 'Trực cán bộ' },
   tuan: { bg: 'bg-violet-50', border: 'border-violet-300', text: 'text-violet-700', badge: 'bg-violet-100 text-violet-700', label: 'Trực tuần giám đốc' },
 };
 

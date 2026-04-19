@@ -171,14 +171,14 @@ const Dashboard = ({
               if (!d) return <div key={`empty-${idx}`} className="h-28 rounded-xl bg-slate-50" />;
               const dateStr = toDateStr(d);
               const isToday = dateStr === today;
-              const isMonday = d.getDay() === 1;
+              const isFirstMondayOfMonth = d.getDay() === 1 && d.getDate() <= 7;
               const holiday = HOLIDAYS[dateStr];
               const dayEvents = lichCongTacData.filter((x) => x.ngay === dateStr);
               return (
                 <div key={dateStr} className={`h-28 rounded-xl border p-2 overflow-hidden ${isToday ? 'border-blue-500 bg-blue-50/50' : 'border-slate-200 bg-white'}`}>
                   <div className="flex items-center justify-between mb-1">
                     <span className={`text-xs font-bold ${isToday ? 'text-blue-600' : 'text-slate-700'}`}>{d.getDate()}</span>
-                    {isMonday && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">Chào cờ</span>}
+                    {isFirstMondayOfMonth && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">Chào cờ</span>}
                   </div>
                   {holiday && <div className="text-[10px] text-red-600 font-medium line-clamp-1">{holiday}</div>}
                   <div className="space-y-1 mt-1">
@@ -274,7 +274,7 @@ const Dashboard = ({
                       </div>
                     </div>
                   </td>
-                  <td className="table-td text-sm text-slate-700">{cb.chucVu}</td>
+                  <td className="table-td text-sm text-slate-700 whitespace-nowrap">{cb.chucVu}</td>
                   <td className="table-td text-sm text-slate-700">{cb.donVi}</td>
                   <td className="table-td">
                     <div className="text-xs text-slate-500 space-y-1">
@@ -283,12 +283,12 @@ const Dashboard = ({
                     </div>
                   </td>
                   <td className="table-td">
-                    <span className={`badge ${cb.vaiTro === 'Lãnh đạo' ? 'bg-purple-100 text-purple-700' : cb.vaiTro === 'Quản lý' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                    <span className={`badge inline-flex items-center whitespace-nowrap ${cb.vaiTro === 'Lãnh đạo' ? 'bg-purple-100 text-purple-700' : cb.vaiTro === 'Quản lý' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
                       {cb.vaiTro}
                     </span>
                   </td>
                   <td className="table-td">
-                    <span className={`badge ${cb.trangThai === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                    <span className={`badge inline-flex items-center whitespace-nowrap ${cb.trangThai === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                       {cb.trangThai === 'active' ? 'Đang công tác' : 'Tạm nghỉ'}
                     </span>
                   </td>
