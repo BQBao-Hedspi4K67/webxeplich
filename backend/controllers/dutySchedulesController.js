@@ -485,11 +485,7 @@ export const getDutySchedules = async (req, res, next) => {
     const connection = await pool.getConnection();
 
     try {
-      const accessCheck = await requireDutyScheduleManagementAccess(connection, req.user || {});
-      if (!accessCheck.ok) {
-        return res.status(accessCheck.status || 403).json({ success: false, error: accessCheck.error, code: accessCheck.code });
-      }
-
+      // Bỏ kiểm tra quyền quản lý, chỉ cần đăng nhập là xem được danh sách lịch trực
       await ensureDutySchema(connection);
 
       const whereConditions = [];
