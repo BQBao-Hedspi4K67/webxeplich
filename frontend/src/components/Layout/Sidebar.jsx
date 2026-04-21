@@ -13,10 +13,10 @@ const menuItems = [
   { id: 'lichtrucan', label: 'Lập lịch trực ban', icon: ClipboardList, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'lichcuatoi', label: 'Lịch của tôi', icon: CalendarCheck, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'tracuu', label: 'Tra cứu lịch', icon: Search, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
+  { id: 'ykien', label: 'Phê duyệt', icon: MessageSquareQuote, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'xuat', label: 'Xuất / In lịch', icon: Printer, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'ngayle', label: 'Quản lý ngày lễ', icon: CalendarRange, badge: null, roles: ['Quản trị viên', 'Quản lý'] },
   { id: 'phongban', label: 'Quản lý phòng ban', icon: Building2, badge: null, roles: ['Quản trị viên'] },
-  { id: 'ykien', label: 'Đơn xin nghỉ', icon: MessageSquareQuote, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'quytrinh', label: 'Quy trình chức năng', icon: FileText, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'taikhoan', label: 'Quản trị tài khoản', icon: Settings, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
 ];

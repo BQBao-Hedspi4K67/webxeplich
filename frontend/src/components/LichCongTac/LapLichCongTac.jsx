@@ -63,13 +63,10 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
     user?.canApproveWorkSchedules
     || user?.backendRole === 'admin'
   );
-  const canGrantPermission = Boolean(
-    user?.canGrantWorkSchedulePermissions
-    || user?.backendRole === 'admin'
-  );
+
   const [data, setData] = useState(lichCongTacData);
   const [officerOptions, setOfficerOptions] = useState(canBoData || []);
-  const [viewMode, setViewMode] = useState('month'); // 'week' | 'month' | 'permission'
+  const [viewMode, setViewMode] = useState('month'); // 'week' | 'month' | 'approval'
   const [weekOffset, setWeekOffset] = useState(0);
   const [monthOffset, setMonthOffset] = useState(0);
   const [showModal, setShowModal] = useState(false);
@@ -80,13 +77,8 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
   const [filterLoai, setFilterLoai] = useState('');
   const [filterDonVi, setFilterDonVi] = useState('');
   const [showBgdPicker, setShowBgdPicker] = useState(false);
-  const [permissionLoadingId, setPermissionLoadingId] = useState('');
-  const [permissionResult, setPermissionResult] = useState({ type: '', message: '' });
-  const [permissionPage, setPermissionPage] = useState(1);
-  const [permissionRowsState, setPermissionRowsState] = useState([]);
   const [approvalPage, setApprovalPage] = useState(1);
-
-  const PERMISSION_PAGE_SIZE = 8;
+  const [approvalTab, setApprovalTab] = useState('leave'); // 'leave' | 'work'
   const APPROVAL_PAGE_SIZE = 8;
 
   useEffect(() => {
@@ -97,9 +89,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
     setOfficerOptions(canBoData || []);
   }, [canBoData]);
 
-  useEffect(() => {
-    setPermissionRowsState((canBoData || []).filter((item) => item.trangThai === 'active'));
-  }, [canBoData]);
+
 
   const pendingWorkSchedules = (data || [])
     .filter((item) => item?.trangThaiDuyet === 'pending')
@@ -324,61 +314,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
     return canReview && schedule?.trangThaiDuyet === 'pending';
   };
 
-  const permissionCandidates = permissionRowsState;
-  const permissionTotalPages = Math.max(1, Math.ceil(permissionCandidates.length / PERMISSION_PAGE_SIZE));
-  const permissionPageSafe = Math.min(permissionPage, permissionTotalPages);
-  const permissionRows = permissionCandidates.slice(
-    (permissionPageSafe - 1) * PERMISSION_PAGE_SIZE,
-    (permissionPageSafe - 1) * PERMISSION_PAGE_SIZE + PERMISSION_PAGE_SIZE
-  );
 
-  useEffect(() => {
-    if (permissionPage > permissionTotalPages) {
-      setPermissionPage(permissionTotalPages);
-    }
-  }, [permissionPage, permissionTotalPages]);
-
-  const handleToggleWorkSchedulePermission = async (officer, field) => {
-    if (!officer?.id) return;
-
-    const currentCreate = Boolean(officer.canCreateWorkSchedulesByPermission);
-    const currentApprove = Boolean(officer.canApproveWorkSchedulesByPermission);
-    const nextCreate = field === 'create' ? !currentCreate : currentCreate;
-    const nextApprove = field === 'approve' ? !currentApprove : currentApprove;
-
-    setPermissionResult({ type: '', message: '' });
-
-    try {
-      setPermissionLoadingId(`${officer.id}:${field}`);
-      await apiClient.officers.updateWorkSchedulePermission(officer.id, {
-        canCreateWorkSchedules: nextCreate,
-        canApproveWorkSchedules: nextApprove,
-      });
-
-      setPermissionRowsState((prev) => prev.map((item) => {
-        if (item.id !== officer.id) return item;
-        return {
-          ...item,
-          canCreateWorkSchedulesByPermission: nextCreate,
-          canApproveWorkSchedulesByPermission: nextApprove,
-          canCreateWorkSchedules: Boolean(item.canCreateWorkSchedulesByRole) || nextCreate,
-          canApproveWorkSchedules: Boolean(item.canApproveWorkSchedulesByRole) || nextApprove,
-        };
-      }));
-
-      setPermissionResult({
-        type: 'success',
-        message: `Đã cập nhật quyền lịch công tác cho ${officer.hoTenDayDu || officer.hoTen}.`,
-      });
-    } catch (err) {
-      setPermissionResult({
-        type: 'error',
-        message: err?.message || 'Không thể cập nhật quyền lịch công tác.',
-      });
-    } finally {
-      setPermissionLoadingId('');
-    }
-  };
 
   const approvalTotalPages = Math.max(1, Math.ceil(pendingWorkSchedules.length / APPROVAL_PAGE_SIZE));
   const approvalPageSafe = Math.min(approvalPage, approvalTotalPages);
@@ -412,13 +348,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
           {canReview && (
             <button onClick={() => setViewMode('approval')}
               className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'approval' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-              <Clock size={14} className="inline mr-1.5" />Phê duyệt lịch công tác
-            </button>
-          )}
-          {canGrantPermission && (
-            <button onClick={() => setViewMode('permission')}
-              className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'permission' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-              <User size={14} className="inline mr-1.5" />Phân quyền
+              <Clock size={14} className="inline mr-1.5" />Phê duyệt
             </button>
           )}
           {canCreate && (
@@ -714,12 +644,33 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
         </div>
       ) : viewMode === 'approval' ? (
         <div className="card-lg p-0 overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-700">Phê duyệt lịch công tác</h3>
-            <span className="text-xs text-slate-500">{pendingWorkSchedules.length} lịch chờ duyệt</span>
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-4">
+            <h3 className="text-sm font-bold text-slate-700">Phê duyệt</h3>
+            <div className="flex gap-2">
+              <button
+                className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${approvalTab === 'leave' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                onClick={() => setApprovalTab('leave')}
+              >
+                Đơn xin nghỉ
+              </button>
+              <button
+                className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${approvalTab === 'work' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                onClick={() => setApprovalTab('work')}
+              >
+                Phê duyệt lịch công tác
+              </button>
+            </div>
           </div>
-          <div className="overflow-x-auto">
-            {canReview ? (
+          {approvalTab === 'leave' ? (
+            <div className="p-4">
+              <div className="text-slate-500 text-sm">Vào mục <b>Đơn xin nghỉ</b> để duyệt các đơn xin nghỉ trực của cán bộ.</div>
+              <div className="mt-4">
+                {/* Render leave requests component here if needed, or link to YKienPhanHoi */}
+                <span className="text-xs text-slate-400">Vào mục Đơn xin nghỉ để duyệt chi tiết.</span>
+              </div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
               <table className="w-full min-w-[900px]">
                 <thead>
                   <tr>
@@ -729,21 +680,30 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                   </tr>
                 </thead>
                 <tbody>
-                  {approvalRows.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50/70 align-top">
-                      <td className="table-td font-mono text-xs">{item.id}</td>
-                      <td className="table-td text-sm text-slate-700 font-medium">{item.tieuDe || '-'}</td>
-                      <td className="table-td text-sm text-slate-600">{item.ngay || '-'}</td>
-                      <td className="table-td text-sm text-slate-600">{item.donVi || '-'}</td>
-                      <td className="table-td text-sm text-slate-600">{item.nguoiTao || '-'}</td>
-                      <td className="table-td">
-                        <div className="flex gap-2">
-                          <button onClick={() => handleApprove(item.id)} className="btn-primary !py-1.5 !px-3 text-xs">Duyệt</button>
-                          <button onClick={() => handleReject(item.id)} className="btn-danger !py-1.5 !px-3 text-xs">Từ chối</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {approvalRows.map((item) => {
+                    // Ẩn nút duyệt nếu người tạo là người duyệt
+                    const isSelfApprove = String(item.nguoiTaoOfficerId || '') === String(user.id || '');
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-50/70 align-top">
+                        <td className="table-td font-mono text-xs">{item.id}</td>
+                        <td className="table-td text-sm text-slate-700 font-medium">{item.tieuDe || '-'}</td>
+                        <td className="table-td text-sm text-slate-600">{item.ngay || '-'}</td>
+                        <td className="table-td text-sm text-slate-600">{item.donVi || '-'}</td>
+                        <td className="table-td text-sm text-slate-600">{item.nguoiTao || '-'}</td>
+                        <td className="table-td">
+                          {!isSelfApprove && (
+                            <div className="flex gap-2">
+                              <button onClick={() => handleApprove(item.id)} className="btn-primary !py-1.5 !px-3 text-xs">Duyệt</button>
+                              <button onClick={() => handleReject(item.id)} className="btn-danger !py-1.5 !px-3 text-xs">Từ chối</button>
+                            </div>
+                          )}
+                          {isSelfApprove && (
+                            <span className="text-xs text-slate-400">Không cần duyệt</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {pendingWorkSchedules.length === 0 && (
                     <tr>
                       <td colSpan={6} className="text-center py-10 text-slate-400">Hiện không có lịch công tác chờ duyệt.</td>
@@ -751,113 +711,13 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                   )}
                 </tbody>
               </table>
-            ) : (
-              <div className="px-5 py-12 text-center text-slate-400">
-                Bạn không có quyền phê duyệt lịch công tác.
-              </div>
-            )}
-          </div>
-          {pendingWorkSchedules.length > APPROVAL_PAGE_SIZE && (
-            <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-between text-sm text-slate-600">
-              <button className="btn-secondary !py-1.5 !px-3" onClick={() => setApprovalPage((p) => Math.max(1, p - 1))} disabled={approvalPageSafe === 1}>Trước</button>
-              <span>Trang {approvalPageSafe}/{approvalTotalPages}</span>
-              <button className="btn-secondary !py-1.5 !px-3" onClick={() => setApprovalPage((p) => Math.min(approvalTotalPages, p + 1))} disabled={approvalPageSafe === approvalTotalPages}>Sau</button>
-            </div>
-          )}
-        </div>
-      ) : viewMode === 'permission' ? (
-        <div className="card-lg p-0 overflow-hidden">
-          <div className="p-4 border-b border-slate-100">
-            <h3 className="text-sm font-bold text-slate-700">Phân quyền lịch công tác</h3>
-            
-            {permissionResult.message && (
-              <div className={`text-sm rounded-xl px-3 py-2 mt-3 ${permissionResult.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-                {permissionResult.message}
-              </div>
-            )}
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px]">
-              <thead>
-                <tr>
-                  <th className="table-th">Quân hàm + Họ và tên</th>
-                  <th className="table-th">Chức vụ</th>
-                  <th className="table-th">Đơn vị</th>
-                  <th className="table-th">Quyền tạo</th>
-                  <th className="table-th">Quyền duyệt</th>
-                </tr>
-              </thead>
-              <tbody>
-                {permissionRows.map((item) => {
-                  const loadingCreate = permissionLoadingId === `${item.id}:create`;
-                  const loadingApprove = permissionLoadingId === `${item.id}:approve`;
-                  const hasCreateByRole = Boolean(item.canCreateWorkSchedulesByRole);
-                  const hasApproveByRole = Boolean(item.canApproveWorkSchedulesByRole);
-
-                  return (
-                    <tr key={item.id} className="hover:bg-slate-50/70">
-                      <td className="table-td font-semibold text-slate-800">{item.hoTenDayDu || item.hoTen}</td>
-                      <td className="table-td text-slate-600">{item.chucVu || 'Chưa cập nhật'}</td>
-                      <td className="table-td text-slate-600">{item.donVi || 'Chưa cập nhật'}</td>
-                      <td className="table-td">
-                        {hasCreateByRole ? (
-                          <span className="inline-flex px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-700">Theo vai trò</span>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={loadingCreate || loadingApprove}
-                            onClick={() => handleToggleWorkSchedulePermission(item, 'create')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${(item.canCreateWorkSchedulesByPermission ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'bg-emerald-600 text-white hover:bg-emerald-700')} disabled:opacity-50`}
-                          >
-                            {loadingCreate
-                              ? 'Đang lưu...'
-                              : item.canCreateWorkSchedulesByPermission
-                                ? 'Thu hồi'
-                                : 'Cấp quyền'}
-                          </button>
-                        )}
-                      </td>
-                      <td className="table-td">
-                        {hasApproveByRole ? (
-                          <span className="inline-flex px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-700">Theo vai trò</span>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={loadingApprove || loadingCreate}
-                            onClick={() => handleToggleWorkSchedulePermission(item, 'approve')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${(item.canApproveWorkSchedulesByPermission ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'bg-emerald-600 text-white hover:bg-emerald-700')} disabled:opacity-50`}
-                          >
-                            {loadingApprove
-                              ? 'Đang lưu...'
-                              : item.canApproveWorkSchedulesByPermission
-                                ? 'Thu hồi'
-                                : 'Cấp quyền'}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          {permissionCandidates.length > PERMISSION_PAGE_SIZE && (
-            <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-slate-100 bg-white">
-              <button
-                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 disabled:opacity-40"
-                onClick={() => setPermissionPage((p) => Math.max(1, p - 1))}
-                disabled={permissionPageSafe <= 1}
-              >
-                Trước
-              </button>
-              <span className="text-sm text-slate-500">Trang {permissionPageSafe}/{permissionTotalPages}</span>
-              <button
-                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 disabled:opacity-40"
-                onClick={() => setPermissionPage((p) => Math.min(permissionTotalPages, p + 1))}
-                disabled={permissionPageSafe >= permissionTotalPages}
-              >
-                Sau
-              </button>
+              {pendingWorkSchedules.length > APPROVAL_PAGE_SIZE && (
+                <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-between text-sm text-slate-600">
+                  <button className="btn-secondary !py-1.5 !px-3" onClick={() => setApprovalPage((p) => Math.max(1, p - 1))} disabled={approvalPageSafe === 1}>Trước</button>
+                  <span>Trang {approvalPageSafe}/{approvalTotalPages}</span>
+                  <button className="btn-secondary !py-1.5 !px-3" onClick={() => setApprovalPage((p) => Math.min(approvalTotalPages, p + 1))} disabled={approvalPageSafe === approvalTotalPages}>Sau</button>
+                </div>
+              )}
             </div>
           )}
         </div>

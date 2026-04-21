@@ -340,18 +340,28 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
 
   const renderDutyCell = (slot, emptyText = 'Chưa phân công') => (
     slot ? (
-      <button
-        onClick={() => openEditSingle(slot)}
-        className="text-left w-full h-12 p-2 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100 flex items-center gap-2"
-        title="Chi tiết"
-        aria-label="Chi tiết"
-      >
-        <Eye size={14} className="text-slate-500 flex-shrink-0" />
-        <div className="min-w-0">
-          <div className="text-xs font-semibold text-slate-800 line-clamp-1 whitespace-nowrap">{slot.tenCanBo}</div>
-          <div className="text-xs text-slate-400 font-mono">{slot.canBoId}</div>
-        </div>
-      </button>
+      <div className="relative group">
+        <button
+          onClick={() => openEditSingle(slot)}
+          className="text-left w-full h-12 p-2 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100 flex items-center gap-2"
+          title="Chi tiết"
+          aria-label="Chi tiết"
+        >
+          <Eye size={14} className="text-slate-500 flex-shrink-0" />
+          <div className="min-w-0">
+            <div className="text-xs font-semibold text-slate-800 line-clamp-1 whitespace-nowrap">{slot.tenCanBo}</div>
+            <div className="text-xs text-slate-400 font-mono">{slot.canBoId}</div>
+          </div>
+        </button>
+        {/* Nút bút chỉnh sửa */}
+        <button
+          onClick={() => openEditSingle(slot)}
+          className="absolute top-1 right-1 p-1 rounded-full bg-white border border-slate-200 shadow hover:bg-blue-50 hover:text-blue-600 text-slate-400 group-hover:visible invisible"
+          title="Đổi người trực"
+        >
+          <Edit2 size={13} />
+        </button>
+      </div>
     ) : <span className="text-slate-400 text-sm">{emptyText}</span>
   );
 
@@ -408,6 +418,11 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
     }
 
     try {
+      // Xóa hết lịch trực cũ của ngày này trước khi tạo mới
+      const oldItems = data.filter(x => x.ngay === dayForm.date && x.loaiTruc === dayForm.dutyType);
+      for (const item of oldItems) {
+        await apiClient.dutySchedules.delete(item.id);
+      }
       await apiClient.dutySchedules.create({
         dutyType: dayForm.dutyType,
         date: dayForm.date,
@@ -430,15 +445,32 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
       return;
     }
 
+    // Nếu không đổi người trực thì không gọi API update
+    if (editItem.canBoId === singleOfficerId) {
+      setEditItem(null);
+      setSingleOfficerId('');
+      return;
+    }
+
     try {
       await apiClient.dutySchedules.update(editItem.id, {
         officerId: singleOfficerId,
+        date: editItem.ngay,
+        location: editItem.viTri,
+        dutyRole: editItem.vaiTroTruc,
+        slotNo: editItem.slotNo,
+        dutyType: editItem.loaiTruc,
       });
       if (reloadData) await reloadData();
       setEditItem(null);
       setSingleOfficerId('');
     } catch (err) {
-      alert(err?.message || 'Không thể cập nhật lịch trực.');
+      // Nếu lỗi 409 (trùng cán bộ trực), hiển thị rõ thông báo từ backend
+      if (err?.response?.status === 409 && err?.response?.data?.message) {
+        alert(err.response.data.message);
+      } else {
+        alert(err?.message || 'Không thể cập nhật lịch trực.');
+      }
     }
   };
 

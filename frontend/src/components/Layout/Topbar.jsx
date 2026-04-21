@@ -12,7 +12,7 @@ const pageTitles = {
   xuat: 'Xuất / In lịch',
   ngayle: 'Quản lý ngày lễ',
   phongban: 'Quản lý phòng ban',
-  ykien: 'Đơn xin nghỉ',
+  ykien: 'Phê duyệt',
   quytrinh: 'Quy trình chức năng',
   taikhoan: 'Quản trị tài khoản',
 };

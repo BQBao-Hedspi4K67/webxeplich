@@ -38,10 +38,10 @@ const corsOrigin = (origin, callback) => {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-// CORS configuration
+// CORS configuration: allow all origins
 app.use(
   cors({
-    origin: corsOrigin,
+    origin: '*',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

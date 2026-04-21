@@ -757,6 +757,8 @@ function App() {
       await loadData();
     },
     reloadData: loadData,
+    // Pass lichCongTacData to YKienPhanHoi for work schedule approval tab
+    ...(safeActivePage === 'ykien' ? { lichCongTacData } : {}),
   };
 
   return (
