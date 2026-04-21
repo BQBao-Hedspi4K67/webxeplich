@@ -59,14 +59,10 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
     || user?.backendRole === 'manager'
   );
   const canEdit = ['Quản trị viên', 'Quản lý'].includes(user?.role);
-  const canReview = Boolean(
-    user?.canApproveWorkSchedules
-    || user?.backendRole === 'admin'
-  );
 
   const [data, setData] = useState(lichCongTacData);
   const [officerOptions, setOfficerOptions] = useState(canBoData || []);
-  const [viewMode, setViewMode] = useState('month'); // 'week' | 'month' | 'approval'
+  const [viewMode, setViewMode] = useState('month'); // 'week' | 'month'
   const [weekOffset, setWeekOffset] = useState(0);
   const [monthOffset, setMonthOffset] = useState(0);
   const [showModal, setShowModal] = useState(false);
@@ -77,9 +73,6 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
   const [filterLoai, setFilterLoai] = useState('');
   const [filterDonVi, setFilterDonVi] = useState('');
   const [showBgdPicker, setShowBgdPicker] = useState(false);
-  const [approvalPage, setApprovalPage] = useState(1);
-  const [approvalTab, setApprovalTab] = useState('leave'); // 'leave' | 'work'
-  const APPROVAL_PAGE_SIZE = 8;
 
   useEffect(() => {
     setData(lichCongTacData);
@@ -88,12 +81,6 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
   useEffect(() => {
     setOfficerOptions(canBoData || []);
   }, [canBoData]);
-
-
-
-  const pendingWorkSchedules = (data || [])
-    .filter((item) => item?.trangThaiDuyet === 'pending')
-    .sort((a, b) => String(b.ngay || '').localeCompare(String(a.ngay || '')));
 
   useEffect(() => {
     const loadOfficerOptions = async () => {
@@ -191,13 +178,6 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
     setShowBgdPicker(false);
   };
 
-  const getDayEvents = (dateStr) => weekData.filter(l => {
-    const d = new Date(l.ngay).getDay();
-    const dayMap = { 1: '09', 2: '10', 3: '11', 4: '12', 5: '13', 6: '14', 0: '15' };
-    const dd = dayMap[d];
-    return l.ngay.endsWith(`-${dd}`);
-  });
-
   const getEventsForDate = (dateIdx) => {
     const targetDate = toDateOnly(weekDates[dateIdx]);
     return weekData.filter((l) => l.ngay === targetDate);
@@ -279,56 +259,6 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
     }
   };
 
-  const handleApprove = async (scheduleId) => {
-    try {
-      await apiClient.workSchedules.approve(scheduleId, 'approved');
-      if (reloadData) await reloadData();
-    } catch (err) {
-      alert(err?.message || 'Không thể duyệt lịch công tác.');
-    }
-  };
-
-  const handleReject = async (scheduleId) => {
-    const confirmed = window.confirm('Không duyệt lịch này? Lịch sẽ bị xóa khỏi hệ thống.');
-    if (!confirmed) return;
-
-    try {
-      await apiClient.workSchedules.approve(scheduleId, 'rejected');
-      if (reloadData) await reloadData();
-    } catch (err) {
-      alert(err?.message || 'Không thể từ chối lịch công tác.');
-    }
-  };
-
-  const getApprovalBadge = (status) => {
-    if (status === 'pending') {
-      return { label: 'Chờ duyệt', cls: 'bg-amber-100 text-amber-700 border-amber-200' };
-    }
-    if (status === 'rejected') {
-      return { label: 'Từ chối', cls: 'bg-red-100 text-red-700 border-red-200' };
-    }
-    return { label: 'Đã duyệt', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
-  };
-
-  const canReviewSchedule = (schedule) => {
-    return canReview && schedule?.trangThaiDuyet === 'pending';
-  };
-
-
-
-  const approvalTotalPages = Math.max(1, Math.ceil(pendingWorkSchedules.length / APPROVAL_PAGE_SIZE));
-  const approvalPageSafe = Math.min(approvalPage, approvalTotalPages);
-  const approvalRows = pendingWorkSchedules.slice(
-    (approvalPageSafe - 1) * APPROVAL_PAGE_SIZE,
-    (approvalPageSafe - 1) * APPROVAL_PAGE_SIZE + APPROVAL_PAGE_SIZE
-  );
-
-  useEffect(() => {
-    if (approvalPage > approvalTotalPages) {
-      setApprovalPage(approvalTotalPages);
-    }
-  }, [approvalPage, approvalTotalPages]);
-
   return (
     <div className="max-w-7xl mx-auto space-y-5">
       {/* Header */}
@@ -345,12 +275,6 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
             className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'month' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
             <CalendarDays size={14} className="inline mr-1.5" />Lịch tháng
           </button>
-          {canReview && (
-            <button onClick={() => setViewMode('approval')}
-              className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'approval' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-              <Clock size={14} className="inline mr-1.5" />Phê duyệt
-            </button>
-          )}
           {canCreate && (
             <button onClick={() => openAdd(3)} className="btn-primary">
               <Plus size={16} /> Thêm lịch
@@ -641,85 +565,6 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
               })}
             </div>
           </div>
-        </div>
-      ) : viewMode === 'approval' ? (
-        <div className="card-lg p-0 overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-4">
-            <h3 className="text-sm font-bold text-slate-700">Phê duyệt</h3>
-            <div className="flex gap-2">
-              <button
-                className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${approvalTab === 'leave' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                onClick={() => setApprovalTab('leave')}
-              >
-                Đơn xin nghỉ
-              </button>
-              <button
-                className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${approvalTab === 'work' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                onClick={() => setApprovalTab('work')}
-              >
-                Phê duyệt lịch công tác
-              </button>
-            </div>
-          </div>
-          {approvalTab === 'leave' ? (
-            <div className="p-4">
-              <div className="text-slate-500 text-sm">Vào mục <b>Đơn xin nghỉ</b> để duyệt các đơn xin nghỉ trực của cán bộ.</div>
-              <div className="mt-4">
-                {/* Render leave requests component here if needed, or link to YKienPhanHoi */}
-                <span className="text-xs text-slate-400">Vào mục Đơn xin nghỉ để duyệt chi tiết.</span>
-              </div>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px]">
-                <thead>
-                  <tr>
-                    {['Mã lịch', 'Nội dung', 'Ngày', 'Đơn vị', 'Người tạo', ''].map((h) => (
-                      <th key={h} className="table-th">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {approvalRows.map((item) => {
-                    // Ẩn nút duyệt nếu người tạo là người duyệt
-                    const isSelfApprove = String(item.nguoiTaoOfficerId || '') === String(user.id || '');
-                    return (
-                      <tr key={item.id} className="hover:bg-slate-50/70 align-top">
-                        <td className="table-td font-mono text-xs">{item.id}</td>
-                        <td className="table-td text-sm text-slate-700 font-medium">{item.tieuDe || '-'}</td>
-                        <td className="table-td text-sm text-slate-600">{item.ngay || '-'}</td>
-                        <td className="table-td text-sm text-slate-600">{item.donVi || '-'}</td>
-                        <td className="table-td text-sm text-slate-600">{item.nguoiTao || '-'}</td>
-                        <td className="table-td">
-                          {!isSelfApprove && (
-                            <div className="flex gap-2">
-                              <button onClick={() => handleApprove(item.id)} className="btn-primary !py-1.5 !px-3 text-xs">Duyệt</button>
-                              <button onClick={() => handleReject(item.id)} className="btn-danger !py-1.5 !px-3 text-xs">Từ chối</button>
-                            </div>
-                          )}
-                          {isSelfApprove && (
-                            <span className="text-xs text-slate-400">Không cần duyệt</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {pendingWorkSchedules.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="text-center py-10 text-slate-400">Hiện không có lịch công tác chờ duyệt.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-              {pendingWorkSchedules.length > APPROVAL_PAGE_SIZE && (
-                <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-between text-sm text-slate-600">
-                  <button className="btn-secondary !py-1.5 !px-3" onClick={() => setApprovalPage((p) => Math.max(1, p - 1))} disabled={approvalPageSafe === 1}>Trước</button>
-                  <span>Trang {approvalPageSafe}/{approvalTotalPages}</span>
-                  <button className="btn-secondary !py-1.5 !px-3" onClick={() => setApprovalPage((p) => Math.min(approvalTotalPages, p + 1))} disabled={approvalPageSafe === approvalTotalPages}>Sau</button>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       ) : null}
 
