@@ -237,6 +237,13 @@ export const getOfficers = async (req, res, next) => {
         }
         whereConditions.push('id = ?');
         params.push(requesterOfficer.id);
+      } else if (!isSystemScope && req.user?.role === 'manager') {
+        // Manager can only see officers in their department
+        const managerDept = requesterOfficer?.department || req.user?.department;
+        if (managerDept) {
+          whereConditions.push('department = ?');
+          params.push(managerDept);
+        }
       }
 
       if (search) {

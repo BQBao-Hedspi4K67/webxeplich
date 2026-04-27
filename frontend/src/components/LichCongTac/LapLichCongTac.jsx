@@ -32,6 +32,13 @@ const getWeekStart = (offset = 0) => {
 
 const formatDDMM = (date) => `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`;
 
+const formatDateWithDay = (date) => {
+  const options = { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' };
+  const formatted = date.toLocaleDateString('vi-VN', options);
+  // Capitalize first letter of day name
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+};
+
 const getIsoWeekNo = (dateStr) => {
   const date = new Date(`${dateStr}T00:00:00`);
   date.setHours(0, 0, 0, 0);
@@ -52,7 +59,7 @@ const initialForm = {
   thanhPhanThamGia: [], bgdMemberIds: [], loai: 'hop', ghiChu: ''
 };
 
-const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], departmentData = [], holidayData = [], reloadData }) => {
+const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], departmentData = [], holidayData = [], dutyScheduleData = [], reloadData }) => {
   const canCreate = Boolean(
     user?.canCreateWorkSchedules
     || user?.backendRole === 'admin'
@@ -63,6 +70,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
 
   const [data, setData] = useState(lichCongTacData);
   const [officerOptions, setOfficerOptions] = useState(canBoData || []);
+  const [dutyData, setDutyData] = useState(dutyScheduleData || []);
   const [viewMode, setViewMode] = useState(() => sessionStorage.getItem('lapLichCongTacViewMode') || 'month'); // 'week' | 'month'
   const [weekOffset, setWeekOffset] = useState(() => Number(sessionStorage.getItem('lapLichCongTacWeekOffset')) || 0);
   const [monthOffset, setMonthOffset] = useState(() => Number(sessionStorage.getItem('lapLichCongTacMonthOffset')) || 0);
@@ -94,6 +102,45 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
   useEffect(() => {
     setOfficerOptions(canBoData || []);
   }, [canBoData]);
+
+
+  useEffect(() => {
+    const loadDutySchedules = async () => {
+      try {
+        const weekStart = getWeekStart(weekOffset);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        const res = await apiClient.dutySchedules.list(1, 500, {
+          startDate: toDateOnly(weekStart),
+          endDate: toDateOnly(weekEnd),
+        });
+        if (res?.data) {
+          setDutyData((res.data || []).map((d) => ({
+            id: d.id,
+            kieuTruc: d.dutyType === 'director_weekly' ? 'giamdoc' : 'canbo',
+            tenCanBo: d.officerName || d.officerId || '',
+            ngay: toDateOnly(d.date),
+            denNgay: toDateOnly(d.endDate),
+            ca: d.shift || (d.dutyType === 'director_weekly' ? 'tuan' : 'nguyenday'),
+            gioBatDau: d.startTime || '00:00',
+            gioKetThuc: d.endTime || '00:00',
+            viTri: d.location || '',
+            dutyRole: d.dutyRole || 'officer',
+            slotNo: Number(d.slotNo || 1),
+            vaiTroTruc: d.dutyRole || 'officer',
+            nhomPhanCong: d.assignmentGroup || '',
+            donVi: d.department || '',
+            donViId: d.departmentId || null,
+            ghiChu: d.notes || '',
+          })));
+        }
+      } catch (err) {
+        console.error('Error loading duty schedules:', err);
+      }
+    };
+    
+    loadDutySchedules();
+  }, [weekOffset]);
 
   useEffect(() => {
     const loadOfficerOptions = async () => {
@@ -341,82 +388,173 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
               </button>
             )}
           </div>
+          
+          {/* Weekly table layout - Day | Session | Time | Details */}
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px]">
+            <table className="w-full text-sm">
               <thead>
-                <tr>
-                  {['Ngày', 'Buổi', 'Giờ', 'Nội dung', 'Địa điểm', 'Đơn vị', 'Trạng thái'].map((h) => (
-                    <th key={h} className="table-th">{h}</th>
-                  ))}
+                <tr className="border-b-2 border-slate-300">
+                  <th className="px-4 py-3 text-left font-bold text-slate-700 bg-slate-100 w-1/6">Ngày/Tháng/Năm</th>
+                  <th className="px-4 py-3 text-left font-bold text-slate-700 bg-slate-100 w-1/8">Buổi</th>
+                  <th className="px-4 py-3 text-left font-bold text-slate-700 bg-slate-100 w-1/8">Giờ</th>
+                  <th className="px-4 py-3 text-left font-bold text-slate-700 bg-slate-100 flex-1">Chi tiết nội dung</th>
                 </tr>
               </thead>
               <tbody>
-                {weekDates.flatMap((dayDate, dayIdx) => {
-                  const dayStr = toDateOnly(dayDate);
-                  const holiday = HOLIDAYS[dayStr];
-                  const rows = weekData
-                    .filter((x) => x.ngay === dayStr)
-                    .sort((a, b) => String(a.gioBatDau || '').localeCompare(String(b.gioBatDau || '')));
-
-                  if (!rows.length) {
-                    return [
-                      <tr key={`${dayStr}-empty`} className="hover:bg-slate-50/50">
-                        <td className="table-td">
-                          <div className="font-semibold text-slate-700">{WEEK_DAYS[dayIdx]} {formatDDMM(dayDate)}</div>
-                          {holiday && <div className="text-xs text-red-600">{holiday}</div>}
-                        </td>
-                        <td className="table-td text-slate-400">-</td>
-                        <td className="table-td text-slate-400">-</td>
-                        <td className="table-td text-slate-400">Không có lịch</td>
-                        <td className="table-td text-slate-400">-</td>
-                        <td className="table-td text-slate-400">-</td>
-                        <td className="table-td text-slate-400">-</td>
-                      </tr>,
-                    ];
-                  }
-
-                  return rows.map((evt, idx) => {
-                    const startHour = Number(String(evt.gioBatDau || '00:00').slice(0, 2));
-                    const buoi = startHour < 12 ? 'Sáng' : startHour < 18 ? 'Chiều' : 'Tối';
-                    const colorInfo = LOAI_LICH_COLORS[evt.loai] || LOAI_LICH_COLORS.hop;
-                    const isPending = evt.trangThaiDuyet === 'pending';
-
-                    return (
-                      <tr
-                        key={evt.id}
-                        className={`hover:bg-slate-50/70 ${isPending ? 'bg-amber-50/40' : ''}`}
-                        onClick={canEdit ? () => openEdit(evt) : undefined}
-                      >
-                        <td className="table-td">
-                          {idx === 0 ? (
-                            <>
-                              <div className="font-semibold text-slate-700">{WEEK_DAYS[dayIdx]} {formatDDMM(dayDate)}</div>
-                              {holiday && <div className="text-xs text-red-600">{holiday}</div>}
-                            </>
-                          ) : null}
-                        </td>
-                        <td className="table-td text-sm text-slate-700">{buoi}</td>
-                        <td className="table-td text-sm font-semibold text-slate-700">
-                          {formatDisplayTime(evt.gioBatDau)} - {formatDisplayTime(evt.gioKetThuc)}
-                        </td>
-                        <td className="table-td">
-                          <div className={`rounded-lg px-2.5 py-2 border border-current border-opacity-30 ${colorInfo.bg} ${colorInfo.text} ${isPending ? 'opacity-70 border-dashed' : ''}`}>
-                            <div className="font-semibold text-sm">{evt.tieuDe}</div>
-                            {evt.ghiChu && <div className="text-xs mt-0.5 opacity-80">{evt.ghiChu}</div>}
-                          </div>
-                        </td>
-                        <td className="table-td text-sm text-slate-700">{evt.diaDiem || '-'}</td>
-                        <td className="table-td text-sm text-slate-700">{evt.donVi || '-'}</td>
-                        <td className="table-td">
-                          {isPending ? (
-                            <span className="badge bg-amber-100 text-amber-700">Chưa duyệt</span>
-                          ) : (
-                            <span className="badge bg-emerald-100 text-emerald-700">Đã duyệt</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
+                {weekDates.map((dayDate, dayIdx) => {
+                  const dateStr = toDateOnly(dayDate);
+                  const holiday = HOLIDAYS[dateStr];
+                  const isWeekend = dayIdx === 5 || dayIdx === 6;
+                  
+                  // Get schedules for this day
+                  const daySchedules = weekData.filter(l => l.ngay === dateStr);
+                  
+                  // Separate morning and afternoon schedules
+                  const morningSchedules = daySchedules.filter(l => {
+                    const hour = parseInt(String(l.gioBatDau || '00:00').split(':')[0]);
+                    return hour < 12;
                   });
+                  const afternoonSchedules = daySchedules.filter(l => {
+                    const hour = parseInt(String(l.gioBatDau || '00:00').split(':')[0]);
+                    return hour >= 12;
+                  });
+                  
+                  // Get duty schedules for this day
+                  const dayDuties = dutyData.filter(duty => {
+                    const dutyDate = duty.date || duty.ngay;
+                    return dutyDate === dateStr;
+                  });
+
+                  // Build rows for this day
+                  const dayRows = [];
+                  
+                  // Morning session with duties
+                  dayRows.push({
+                    isFirstRow: true,
+                    session: 'Sáng',
+                    time: '00:00',
+                    content: dayDuties,
+                    schedules: [],
+                    isDutyRow: true,
+                  });
+                  
+                  // Morning work schedules
+                  morningSchedules.forEach((sch, idx) => {
+                    dayRows.push({
+                      isFirstRow: false,
+                      session: idx > 0 ? '' : '',
+                      time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
+                      schedules: [sch],
+                      content: [],
+                      isDutyRow: false,
+                    });
+                  });
+                  
+                  // Afternoon session
+                  dayRows.push({
+                    isFirstRow: false,
+                    session: 'Chiều',
+                    time: '',
+                    content: [],
+                    schedules: [],
+                    isDutyRow: false,
+                  });
+                  
+                  // Afternoon work schedules
+                  afternoonSchedules.forEach((sch, idx) => {
+                    dayRows.push({
+                      isFirstRow: false,
+                      session: '',
+                      time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
+                      schedules: [sch],
+                      content: [],
+                      isDutyRow: false,
+                    });
+                  });
+
+                  return dayRows.map((row, rowIdx) => (
+                    <tr key={`${dateStr}-${rowIdx}`} className={`border-b border-slate-200 ${isWeekend ? 'bg-slate-50' : rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'} hover:bg-blue-50/30 transition-colors`}>
+                      {/* Day column - only on first row of the day */}
+                      {rowIdx === 0 && (
+                        <td rowSpan={dayRows.length} className={`px-4 py-3 align-top font-bold text-sm ${isWeekend ? 'bg-slate-100' : 'bg-white'} border-r border-slate-200`}>
+                          <div className="text-slate-800">{formatDateWithDay(dayDate)}</div>
+                          {holiday && <div className="text-xs text-red-600 font-semibold mt-1">{holiday}</div>}
+                        </td>
+                      )}
+                      
+                      {/* Session column */}
+                      <td className="px-4 py-2 align-top text-center font-semibold text-slate-700 border-r border-slate-200">
+                        {row.session || '—'}
+                      </td>
+                      
+                      {/* Time column */}
+                      <td className="px-4 py-2 align-top text-slate-600 text-xs font-semibold border-r border-slate-200 min-w-[80px]">
+                        {row.time || '—'}
+                      </td>
+                      
+                      {/* Content column */}
+                      <td className="px-4 py-2 align-top text-slate-700">
+                        {row.isDutyRow ? (
+                          <div className="space-y-1 text-sm leading-6">
+                            {(() => {
+                              const sortedDutyItems = [...row.content].sort((a, b) => {
+                                const slotA = Number(a.slotNo || 1);
+                                const slotB = Number(b.slotNo || 1);
+                                if (a.kieuTruc !== b.kieuTruc) return a.kieuTruc === 'giamdoc' ? -1 : 1;
+                                if (a.viTri !== b.viTri) {
+                                  const order = { 'Nhà hiệu bộ': 1, 'Lái xe': 2, 'Bệnh xá': 3, 'Trực ban Giám đốc': 0 };
+                                  return (order[a.viTri] || 99) - (order[b.viTri] || 99);
+                                }
+                                return slotA - slotB;
+                              });
+
+                              const directorDuty = sortedDutyItems.find((d) => d.kieuTruc === 'giamdoc');
+                              const canboDuties = sortedDutyItems.filter((d) => d.kieuTruc === 'canbo');
+
+                              const slotLabel = (item) => {
+                                if (item.viTri === 'Nhà hiệu bộ' && item.dutyRole === 'commander') return 'HB - Chỉ huy';
+                                if (item.viTri === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 1) return 'HB - Cán bộ 1';
+                                if (item.viTri === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 2) return 'HB - Cán bộ 2';
+                                return item.viTri || 'Trực ban';
+                              };
+
+                              return (
+                                <div>
+                                  <div className="font-semibold text-slate-900">Trực ban Giám đốc: {directorDuty?.tenCanBo || 'Chưa phân công'}</div>
+                                  <div className="mt-1 font-semibold text-slate-900">Trực ban cán bộ:</div>
+                                  {canboDuties.length > 0 ? (
+                                    <div className="pl-4">
+                                      {canboDuties.map((item) => (
+                                        <div key={`${item.viTri}-${item.dutyRole}-${item.slotNo}`}>
+                                          {slotLabel(item)}: {item.tenCanBo || 'Chưa phân công'}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="pl-4 text-slate-500">Chưa phân công</div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        ) : row.schedules.length > 0 ? (
+                          <div className="space-y-1 text-sm leading-6">
+                            {row.schedules.map((sch) => {
+                              const timeLabel = sch.gioBatDau || sch.gioKetThuc ? `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}` : '';
+                              const details = [sch.tieuDe, sch.diaDiem, sch.donVi].filter(Boolean).join(' - ');
+                              return (
+                                <div key={sch.id} className="text-slate-700">
+                                  {timeLabel ? `${timeLabel} | ${details}` : details}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-slate-400">—</div>
+                        )}
+                      </td>
+                    </tr>
+                  ));
                 })}
               </tbody>
             </table>
@@ -518,13 +656,6 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
           </div>
         </div>
       ) : null}
-
-      {/* Legend */}
-      <div className="flex flex-wrap gap-2 px-1">
-        {Object.entries(LOAI_LICH_COLORS).map(([k, v]) => (
-          <span key={k} className={`badge ${v.bg} ${v.text}`}>{v.label}</span>
-        ))}
-      </div>
 
       {/* Add/Edit Modal */}
       {showModal && (

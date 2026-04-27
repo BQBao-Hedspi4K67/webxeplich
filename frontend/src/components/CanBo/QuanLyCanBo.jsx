@@ -328,6 +328,8 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
     quanly: departmentScopedData.filter(c => c.vaiTro === 'Quản lý').length,
   };
 
+  const showDepartmentFilter = isAdmin;
+
   return (
     <div className="max-w-7xl mx-auto space-y-5">
       {/* Header */}
@@ -337,7 +339,7 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
         </div>
       </div>
 
-      {(isAdmin || isManager) && (
+      {showDepartmentFilter && (
         <div className="card p-3 relative">
           <div className="flex items-center gap-2">
             <Building2 size={16} className="text-slate-500" />
@@ -353,22 +355,20 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
               {showDeptdropdown && (
                 <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 w-80 max-h-96 overflow-y-auto">
                   <div className="p-2 space-y-1">
-                    {!isManager && (
-                      <label className="flex items-center gap-2 px-3 py-2 rounded hover:bg-blue-50 cursor-pointer transition-colors border-b border-slate-100">
-                        <input
-                          type="checkbox"
-                          checked={!selectedDepartment}
-                          onChange={() => {
-                            setSelectedDepartment('');
-                            setShowDeptDropdown(false);
-                            setCurrentPage(1);
-                          }}
-                          className="w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer"
-                        />
-                        <span className="text-sm font-semibold text-slate-700 flex-1">Tất cả đơn vị</span>
-                      </label>
-                    )}
-                    {(isManager ? [user?.department].filter(Boolean) : departmentNameOptions).map((dept) => {
+                    <label className="flex items-center gap-2 px-3 py-2 rounded hover:bg-blue-50 cursor-pointer transition-colors border-b border-slate-100">
+                      <input
+                        type="checkbox"
+                        checked={!selectedDepartment}
+                        onChange={() => {
+                          setSelectedDepartment('');
+                          setShowDeptDropdown(false);
+                          setCurrentPage(1);
+                        }}
+                        className="w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer"
+                      />
+                      <span className="text-sm font-semibold text-slate-700 flex-1">Tất cả đơn vị</span>
+                    </label>
+                    {departmentNameOptions.map((dept) => {
                       const active = selectedDepartment === dept;
                       return (
                         <label key={dept} className="flex items-center gap-2 px-3 py-2 rounded hover:bg-blue-50 cursor-pointer transition-colors">

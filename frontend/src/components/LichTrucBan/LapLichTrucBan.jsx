@@ -336,8 +336,8 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
   const hbOfficerOptions = useMemo(() => activeOfficers.filter((x) => x.vaiTro === 'Cán bộ'), [activeOfficers]);
   const commanderOptions = useMemo(() => activeOfficers.filter(commanderEligible), [activeOfficers]);
   const directorOptions = useMemo(() => activeOfficers.filter(directorEligible), [activeOfficers]);
-  const driverOptions = useMemo(() => activeOfficers.filter((x) => x.donVi === 'Đội lái xe' && x.vaiTro === 'Cán bộ'), [activeOfficers]);
-  const medicOptions = useMemo(() => activeOfficers.filter((x) => x.donVi === 'Đội bệnh xá' && x.vaiTro === 'Cán bộ'), [activeOfficers]);
+  const driverOptions = useMemo(() => activeOfficers.filter((x) => x.donVi === 'Đội lái xe' ), [activeOfficers]);
+  const medicOptions = useMemo(() => activeOfficers.filter((x) => x.donVi === 'Đội bệnh xá' ), [activeOfficers]);
 
   const renderDutyCell = (slot, emptyText = 'Chưa phân công') => (
     slot ? (

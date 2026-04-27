@@ -1,13 +1,118 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, Lock, User } from 'lucide-react';
 import apiClient from '../services/api';
 import logoSchool from '../assets/logo.png';
+
+const formatLocalDate = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const formatDDMM = (date) => `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+const formatDateWithDay = (date) => {
+  const options = { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' };
+  const formatted = date.toLocaleDateString('vi-VN', options);
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+};
+
+const formatDisplayTime = (timeValue) => {
+  const time = String(timeValue || '');
+  if (!/^\d{2}:\d{2}$/.test(time)) return time;
+  return time === '00:00' ? '12:00' : time;
+};
+
+const normalizeDutyItem = (duty) => ({
+  id: duty.id,
+  kieuTruc: duty.dutyType === 'director_weekly' ? 'giamdoc' : 'canbo',
+  tenCanBo: duty.officerName || duty.officerId || '',
+  viTri: duty.location || '',
+  dutyRole: duty.dutyRole || 'officer',
+  slotNo: Number(duty.slotNo || 1),
+  dutyType: duty.dutyType || '',
+  ngay: duty.date || '',
+});
+
+const getDutyLines = (items = []) => {
+  const sorted = [...items].sort((a, b) => {
+    if (a.kieuTruc !== b.kieuTruc) return a.kieuTruc === 'giamdoc' ? -1 : 1;
+    if (a.viTri !== b.viTri) {
+      const order = { 'Nhà hiệu bộ': 1, 'Lái xe': 2, 'Bệnh xá': 3, 'Trực ban Giám đốc': 0 };
+      return (order[a.viTri] || 99) - (order[b.viTri] || 99);
+    }
+    return Number(a.slotNo || 1) - Number(b.slotNo || 1);
+  });
+
+  const director = sorted.find((item) => item.kieuTruc === 'giamdoc');
+  const officers = sorted.filter((item) => item.kieuTruc === 'canbo');
+
+  return [
+    `Trực ban Giám đốc: ${director?.tenCanBo || 'Chưa phân công'}`,
+    'Trực ban cán bộ:',
+    ...(
+      officers.length > 0
+        ? officers.map((item) => {
+          if (item.viTri === 'Nhà hiệu bộ' && item.dutyRole === 'commander') return `HB - Chỉ huy: ${item.tenCanBo || 'Chưa phân công'}`;
+          if (item.viTri === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 1) return `HB - Cán bộ 1: ${item.tenCanBo || 'Chưa phân công'}`;
+          if (item.viTri === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 2) return `HB - Cán bộ 2: ${item.tenCanBo || 'Chưa phân công'}`;
+          return `${item.viTri || 'Trực ban'}: ${item.tenCanBo || 'Chưa phân công'}`;
+        })
+        : ['Chưa phân công']
+    ),
+  ];
+};
 
 const Login = ({ onLogin }) => {
   const [form, setForm] = useState({ username: '', password: '', remember: false });
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Today's schedule
+  const [todaySchedules, setTodaySchedules] = useState([]);
+  const [todayDuties, setTodayDuties] = useState([]);
+  const [todayHoliday, setTodayHoliday] = useState(null);
+  const [loadingSchedules, setLoadingSchedules] = useState(true);
+
+  // Fetch today's schedules and duties
+  useEffect(() => {
+    const fetchTodaySchedules = async () => {
+      try {
+        const today = formatLocalDate(new Date());
+        
+        // Fetch work schedules for today
+        const schedulesRes = await apiClient.workSchedules.list(1, 100, { 
+          startDate: today, 
+          endDate: today 
+        });
+        setTodaySchedules(schedulesRes?.data || []);
+        
+        // Fetch duty schedules for today
+        const dutiesRes = await apiClient.dutySchedules.list(1, 100, { 
+          startDate: today, 
+          endDate: today 
+        });
+        setTodayDuties((dutiesRes?.data || []).map(normalizeDutyItem));
+        
+        // Fetch holidays
+        try {
+          const holidaysRes = await apiClient.holidays.list({ status: 'active' });
+          const holiday = (holidaysRes?.data || []).find(h => h.ngay === today);
+          setTodayHoliday(holiday);
+        } catch (err) {
+          // Ignore holiday fetch error
+        }
+      } catch (err) {
+        console.error('Error fetching schedules:', err);
+      } finally {
+        setLoadingSchedules(false);
+      }
+    };
+
+    fetchTodaySchedules();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -50,9 +155,9 @@ const Login = ({ onLogin }) => {
       </div>
 
       {/* Main content */}
-      <div className="w-full max-w-[420px] relative z-10">
+      <div className="w-full max-w-6xl relative z-10">
         {/* Logo and title */}
-        <div className="flex flex-col items-center gap-4 mb-12 text-center">
+        <div className="flex flex-col items-center gap-4 mb-8 text-center">
           <img src={logoSchool} alt="Logo" className="w-16 h-16 drop-shadow-lg" />
           <div>
             <h1 className="text-white font-bold text-xl leading-snug">Học viện Kỹ thuật</h1>
@@ -60,13 +165,140 @@ const Login = ({ onLogin }) => {
           </div>
         </div>
 
-        {/* Login form */}
-        <div className="bg-white/[0.08] backdrop-blur-xl rounded-2xl border border-white/10 p-8 shadow-2xl">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white text-center">Đăng nhập</h2>
+        {/* Main content grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Today's Schedule Preview - Left side (desktop) / Top (mobile) */}
+          <div className="lg:col-span-2">
+            <div className="bg-white/[0.08] backdrop-blur-xl rounded-2xl border border-white/10 p-6 shadow-2xl">
+              <h2 className="text-lg font-bold text-white mb-6">
+                Lịch công tác hôm nay - {formatDDMM(new Date())}
+                {todayHoliday && <span className="text-red-300 text-sm ml-2">({todayHoliday.ten})</span>}
+              </h2>
+              
+              {loadingSchedules ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b-2 border-white/30">
+                        <th className="px-3 py-2 text-left font-bold text-white/80 bg-white/5 w-1/6">Ngày/Tháng/Năm</th>
+                        <th className="px-3 py-2 text-left font-bold text-white/80 bg-white/5 w-1/8">Buổi</th>
+                        <th className="px-3 py-2 text-left font-bold text-white/80 bg-white/5 w-1/8">Giờ</th>
+                        <th className="px-3 py-2 text-left font-bold text-white/80 bg-white/5 flex-1">Chi tiết nội dung</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-white/10 hover:bg-white/5 transition-colors">
+                        <td className="px-3 py-2 bg-white/5 font-bold text-white align-top">
+                          <div>{formatDateWithDay(new Date())}</div>
+                          {todayHoliday && <div className="text-[10px] text-red-300 mt-0.5">{todayHoliday.ten || todayHoliday.holidayName}</div>}
+                        </td>
+                        <td className="px-3 py-2 text-center align-top text-white">Sáng</td>
+                        <td className="px-3 py-2 text-slate-300 text-[10px] align-top">00:00</td>
+                        <td className="px-3 py-2 align-top text-white/90">
+                          {(() => {
+                            const sorted = [...todayDuties].sort((a, b) => {
+                              const slotA = Number(a.slotNo || 1);
+                              const slotB = Number(b.slotNo || 1);
+                              if (a.kieuTruc !== b.kieuTruc) return a.kieuTruc === 'giamdoc' ? -1 : 1;
+                              if (a.viTri !== b.viTri) {
+                                const order = { 'Nhà hiệu bộ': 1, 'Lái xe': 2, 'Bệnh xá': 3, 'Trực ban Giám đốc': 0 };
+                                return (order[a.viTri] || 99) - (order[b.viTri] || 99);
+                              }
+                              return slotA - slotB;
+                            });
+
+                            const director = sorted.find((d) => d.kieuTruc === 'giamdoc');
+                            const officers = sorted.filter((d) => d.kieuTruc === 'canbo');
+
+                            const slotLabel = (item) => {
+                              if (item.viTri === 'Nhà hiệu bộ' && item.dutyRole === 'commander') return 'HB - Chỉ huy';
+                              if (item.viTri === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 1) return 'HB - Cán bộ 1';
+                              if (item.viTri === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 2) return 'HB - Cán bộ 2';
+                              return item.viTri || 'Trực ban';
+                            };
+
+                            return (
+                              <div className="space-y-1">
+                                <div className="font-semibold">Trực ban Giám đốc: {director?.tenCanBo || 'Chưa phân công'}</div>
+                                <div className="font-semibold">Trực ban cán bộ:</div>
+                                {officers.length > 0 ? (
+                                  <div className="pl-4 space-y-1">
+                                    {officers.map((item) => (
+                                      <div key={`${item.viTri}-${item.dutyRole}-${item.slotNo}`} className="leading-5">
+                                        {slotLabel(item)}: {item.tenCanBo || 'Chưa phân công'}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="pl-4 text-slate-300">Chưa phân công</div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </td>
+                      </tr>
+
+                      {todaySchedules
+                        .filter((evt) => {
+                          const hour = parseInt(String(evt.gioBatDau || '00:00').split(':')[0]);
+                          return hour < 12;
+                        })
+                        .map((evt, idx) => (
+                          <tr key={`morning-${idx}`} className="border-b border-white/10 hover:bg-white/5 transition-colors">
+                            <td className="px-3 py-2 text-white/70"></td>
+                            <td className="px-3 py-2 text-center align-top text-white">Sáng</td>
+                            <td className="px-3 py-2 text-slate-300 text-[10px] font-semibold align-top">
+                              {formatDisplayTime(evt.gioBatDau)} - {formatDisplayTime(evt.gioKetThuc)}
+                            </td>
+                            <td className="px-3 py-2 align-top text-white/90 leading-6">
+                              {evt.tieuDe}{evt.diaDiem ? ` - ${evt.diaDiem}` : ''}{evt.donVi ? ` - ${evt.donVi}` : ''}
+                            </td>
+                          </tr>
+                        ))}
+
+                      <tr className="border-b border-white/10 hover:bg-white/5 transition-colors">
+                        <td className="px-3 py-2"></td>
+                        <td className="px-3 py-2 text-center align-top text-white">Chiều</td>
+                        <td className="px-3 py-2"></td>
+                        <td className="px-3 py-2"></td>
+                      </tr>
+
+                      {todaySchedules
+                        .filter((evt) => {
+                          const hour = parseInt(String(evt.gioBatDau || '00:00').split(':')[0]);
+                          return hour >= 12;
+                        })
+                        .map((evt, idx) => (
+                          <tr key={`afternoon-${idx}`} className="border-b border-white/10 hover:bg-white/5 transition-colors">
+                            <td className="px-3 py-2"></td>
+                            <td className="px-3 py-2 text-center align-top text-white">Chiều</td>
+                            <td className="px-3 py-2 text-slate-300 text-[10px] font-semibold align-top">
+                              {formatDisplayTime(evt.gioBatDau)} - {formatDisplayTime(evt.gioKetThuc)}
+                            </td>
+                            <td className="px-3 py-2 align-top text-white/90 leading-6">
+                              {evt.tieuDe}{evt.diaDiem ? ` - ${evt.diaDiem}` : ''}{evt.donVi ? ` - ${evt.donVi}` : ''}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Login Form - Right side (desktop) / Bottom (mobile) */}
+          <div className="lg:col-span-1">
+            <div className="bg-white/[0.08] backdrop-blur-xl rounded-2xl border border-white/10 p-8 shadow-2xl">
+              <div className="mb-8">
+                <h2 className="text-2xl font-bold text-white text-center">Đăng nhập</h2>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-4">
             {/* Username */}
             <div>
               <label className="text-sm font-medium text-slate-300 mb-2 block">Tên đăng nhập</label>
@@ -128,7 +360,9 @@ const Login = ({ onLogin }) => {
                 <span>Đăng nhập</span>
               )}
             </button>
-          </form>
+              </form>
+            </div>
+          </div>
         </div>
 
         {/* Footer text */}

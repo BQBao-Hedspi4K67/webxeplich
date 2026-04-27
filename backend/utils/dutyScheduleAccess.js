@@ -70,14 +70,19 @@ export const getDutyScheduleAccessState = async (connection, reqUser = {}) => {
   const effectiveRole = reqUser?.effectiveRole || reqUser?.role;
   const isAdminRole = effectiveRole === 'admin' || effectiveRole === 'superadmin';
   const isManagerRole = effectiveRole === 'manager';
-  const departmentName = String(officer?.department || '').trim();
+  const departmentName = String(officer?.department || reqUser?.department || '').trim();
   const canManageByManagerRole = isManagerRole
     && SPECIAL_DUTY_DEPARTMENTS.includes(departmentName)
-    && (Boolean(reqUser?.isDelegatedManager) || MANAGER_DUTY_POSITION_PATTERN.test(String(officer?.position || '')));
+    && (
+      Boolean(reqUser?.isDelegatedManager)
+      || MANAGER_DUTY_POSITION_PATTERN.test(String(officer?.position || reqUser?.position || ''))
+      || departmentName === ADMIN_DEPARTMENT
+      || departmentName === 'Đội lái xe'
+      || departmentName === 'Đội bệnh xá'
+    );
   const canManageDutySchedulesByDepartment = isAdminRole || canManageByManagerRole;
   const canManageDutySchedulesByPermission = await hasDutySchedulePermission(connection, officer?.id);
-  const canGrantDutySchedulePermissions =
-    isAdminRole || (canManageByManagerRole && departmentName === ADMIN_DEPARTMENT);
+  const canGrantDutySchedulePermissions = isAdminRole || canManageByManagerRole;
 
   return {
     officer,

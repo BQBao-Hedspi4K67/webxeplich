@@ -738,6 +738,48 @@ export const updateWorkSchedule = async (req, res, next) => {
         params
       );
 
+      // --- BAT DAU LOGIC GUI THONG BAO ---
+      await ensureNotificationTargetingSchema(connection);
+
+      // Lấy dữ liệu mới nhất để gửi thông báo chính xác
+      const [updatedRows] = await connection.execute(
+        'SELECT id, title, date, responsibleOfficerId, participants FROM work_schedules WHERE id = ?',
+        [id]
+      );
+      const updatedSchedule = updatedRows[0];
+
+      if (updatedSchedule) {
+        const recipientOfficerIds = new Set();
+        
+        // Thêm người phụ trách vào danh sách nhận
+        if (updatedSchedule.responsibleOfficerId) {
+          recipientOfficerIds.add(String(updatedSchedule.responsibleOfficerId));
+        }
+
+        // Thêm tất cả cán bộ thuộc các phòng ban tham gia (sử dụng hàm helper có sẵn của bạn)
+        const participantOfficerIds = await collectParticipantOfficerIds(connection, updatedSchedule.participants);
+        for (const offId of participantOfficerIds) {
+          if (offId) recipientOfficerIds.add(String(offId));
+        }
+
+        // Gửi thông báo đến từng user liên quan
+        for (const offId of recipientOfficerIds) {
+          const targetUserId = await resolveUserIdByOfficerId(connection, offId);
+          if (targetUserId) {
+            await createUserNotification(connection, {
+              title: 'Lịch công tác có thay đổi',
+              content: `Lịch: ${updatedSchedule.title} (${updatedSchedule.date}) đã được cập nhật nội dung mới.`,
+              type: 'info',
+              module: 'lichcongtac',
+              entityType: 'work_schedule',
+              entityId: id,
+              targetUserId,
+            });
+          }
+        }
+      }
+      // --- KET THUC LOGIC GUI THONG BAO ---
+
       await logActivity({
         actorUserId: req.user?.id,
         actorUsername: req.user?.username,

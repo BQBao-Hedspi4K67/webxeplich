@@ -433,8 +433,12 @@ function App() {
   const loadData = useCallback(async () => {
     try {
       setLoadingData(true);
+      
+      // For managers, don't use accessScope='system' to allow backend filtering by department
+      const officersFilter = user?.role === 'manager' ? {} : { accessScope: 'system' };
+      
       const [officersRes, workRes, dutyRes, leaveRes, notificationsRes, dashboardRes, exportHistoryRes, holidaysRes, departmentsRes] = await Promise.all([
-        apiClient.officers.list(1, 200, { accessScope: 'system' }),
+        apiClient.officers.list(1, 200, officersFilter),
         apiClient.workSchedules.list(1, 500),
         apiClient.dutySchedules.list(1, 500),
         apiClient.leaveRequests.list(1, 500),
@@ -603,7 +607,7 @@ function App() {
     } finally {
       setLoadingData(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (activePage) {
@@ -677,7 +681,7 @@ function App() {
     };
 
     restoreSession();
-  }, [loadData]);
+  }, []);
 
   const handleLogin = async (userData) => {
     setUser({
