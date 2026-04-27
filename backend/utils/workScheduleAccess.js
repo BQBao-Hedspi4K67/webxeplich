@@ -89,8 +89,9 @@ export const getWorkScheduleAccessState = async (connection, reqUser = {}) => {
   await ensureWorkScheduleAccessSchema(connection);
 
   const officer = await resolveRequesterOfficer(connection, reqUser);
-  const isDirector = reqUser?.role === 'admin';
-  const isDepartmentManager = reqUser?.role === 'manager';
+  const effectiveRole = reqUser?.effectiveRole || reqUser?.role;
+  const isDirector = effectiveRole === 'admin' || effectiveRole === 'superadmin';
+  const isDepartmentManager = effectiveRole === 'manager';
   const departmentName = String(officer?.department || '').trim();
   const canGrantWorkSchedulePermissions = isDirector || (isDepartmentManager && departmentName === ADMIN_DEPARTMENT);
 

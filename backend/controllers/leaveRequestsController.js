@@ -3,12 +3,12 @@ import { LEAVE_REQUEST_STATUS } from '../config/constants.js';
 import { logActivity } from '../utils/activityLogger.js';
 import {
   ensureNotificationTargetingSchema,
-  createRoleNotification,
   createUserNotification,
   resolveUserIdByOfficerId,
 } from '../utils/notificationTargeting.js';
 
 const toDateOnly = (value) => String(value || '').slice(0, 10);
+const DEPARTMENT_REVIEWER_POSITION_PATTERN = /(Trưởng\s*phòng|Phó\s*trưởng\s*phòng|Trưởng\s*khoa|Phó\s*trưởng\s*khoa|Trưởng\s*đội|Phó\s*đội)/i;
 
 const hasOfficersUserIdColumn = async (connection) => {
   const [rows] = await connection.execute("SHOW COLUMNS FROM officers LIKE 'userId'");
@@ -48,24 +48,10 @@ const resolveRequesterOfficer = async (connection, reqUser = {}) => {
   return fallbackRows[0] || null;
 };
 
-const assertManagerCanReviewDepartment = async (connection, requesterOfficer) => {
-  if (!requesterOfficer?.department && !requesterOfficer?.departmentId) return false;
-
-  const hasHeadColumn = await hasDepartmentsHeadColumn(connection);
-  if (hasHeadColumn) {
-    const [rows] = requesterOfficer.departmentId
-      ? await connection.execute(
-        'SELECT id FROM departments WHERE id = ? AND headOfficerId = ? LIMIT 1',
-        [requesterOfficer.departmentId, requesterOfficer.id]
-      )
-      : await connection.execute(
-        'SELECT id FROM departments WHERE name = ? AND headOfficerId = ? LIMIT 1',
-        [requesterOfficer.department, requesterOfficer.id]
-      );
-    return rows.length > 0;
-  }
-
-  return requesterOfficer.role === 'manager';
+const isDepartmentReviewer = (officer) => {
+  if (!officer) return false;
+  if (officer.role !== 'manager') return false;
+  return DEPARTMENT_REVIEWER_POSITION_PATTERN.test(String(officer.position || ''));
 };
 
 export const getLeaveRequests = async (req, res, next) => {
@@ -86,14 +72,12 @@ export const getLeaveRequests = async (req, res, next) => {
 
       const whereConditions = [];
       const params = [];
+      const effectiveRole = req.user?.effectiveRole || req.user?.role;
+      const canActAsManager = effectiveRole === 'manager';
+      const hasManagerDelegation = Boolean(req.user?.isDelegatedManager);
 
-      if (req.user?.role === 'officer') {
-        if (requesterOfficer?.id) {
-          whereConditions.push('lr.officerId = ?');
-          params.push(requesterOfficer.id);
-        }
-      } else if (req.user?.role === 'manager') {
-        if (!requesterOfficer?.department) {
+      if (canActAsManager) {
+        if (!requesterOfficer?.department || (!hasManagerDelegation && !isDepartmentReviewer(requesterOfficer))) {
           return res.json({ success: true, data: [], pagination: { total: 0, page: parseInt(page, 10), limit: parseInt(limit, 10), pages: 0 } });
         }
         if (hasDepartmentId && requesterOfficer.departmentId) {
@@ -102,6 +86,12 @@ export const getLeaveRequests = async (req, res, next) => {
         } else {
           whereConditions.push('o.department = ?');
           params.push(requesterOfficer.department);
+        }
+      } else {
+        // Any role other than 'manager' (including 'admin') can only see their own leave requests
+        if (requesterOfficer?.id) {
+          whereConditions.push('lr.officerId = ?');
+          params.push(requesterOfficer.id);
         }
       }
 
@@ -271,18 +261,7 @@ export const createLeaveRequest = async (req, res, next) => {
       // ========== NOTIFICATIONS ==========
       await ensureNotificationTargetingSchema(connection);
 
-      // 1. Notify director about new leave request
-      await createRoleNotification(connection, {
-        title: 'Có đơn xin nghỉ để duyệt',
-        content: `Cán bộ ${officerId} vừa gửi đơn xin nghỉ trực ngày ${leaveDateOnly}.`,
-        type: 'info',
-        module: 'leave_request',
-        entityType: 'leave_request',
-        entityId: String(leaveRequestId),
-        targetRole: 'admin',
-      });
-
-      // 2. Notify department head/manager
+      // Notify department trưởng/phó phòng
       const [requestOfficerRows] = await connection.execute(
         'SELECT department, departmentId, role FROM officers WHERE id = ? LIMIT 1',
         [officerId]
@@ -290,40 +269,28 @@ export const createLeaveRequest = async (req, res, next) => {
       const requestOfficer = requestOfficerRows[0];
       const requestDepartment = requestOfficer?.department || '';
       const requestDepartmentId = requestOfficer?.departmentId || null;
-      const isManager = requestOfficer?.role === 'manager';
 
       if (requestDepartment) {
-        let managerOfficerId = null;
-        const hasHeadColumn = await hasDepartmentsHeadColumn(connection);
+        const [reviewerRows] = requestDepartmentId
+          ? await connection.execute(
+            `SELECT id
+             FROM officers
+             WHERE departmentId = ?
+               AND role = 'manager'
+               AND position REGEXP 'Trưởng phòng|Phó trưởng phòng|Trưởng khoa|Phó trưởng khoa|Trưởng đội|Phó đội'`,
+            [requestDepartmentId]
+          )
+          : await connection.execute(
+            `SELECT id
+             FROM officers
+             WHERE department = ?
+               AND role = 'manager'
+               AND position REGEXP 'Trưởng phòng|Phó trưởng phòng|Trưởng khoa|Phó trưởng khoa|Trưởng đội|Phó đội'`,
+            [requestDepartment]
+          );
 
-        if (hasHeadColumn) {
-          const [deptRows] = requestDepartmentId
-            ? await connection.execute('SELECT headOfficerId FROM departments WHERE id = ? LIMIT 1', [requestDepartmentId])
-            : await connection.execute('SELECT headOfficerId FROM departments WHERE name = ? LIMIT 1', [requestDepartment]);
-          managerOfficerId = deptRows[0]?.headOfficerId || null;
-        }
-
-        if (!managerOfficerId) {
-          const [managerRows] = requestDepartmentId
-            ? await connection.execute(
-              `SELECT id FROM officers
-               WHERE departmentId = ? AND role = 'manager'
-               ORDER BY id ASC
-               LIMIT 1`,
-              [requestDepartmentId]
-            )
-            : await connection.execute(
-              `SELECT id FROM officers
-               WHERE department = ? AND role = 'manager'
-               ORDER BY id ASC
-               LIMIT 1`,
-              [requestDepartment]
-            );
-          managerOfficerId = managerRows[0]?.id || null;
-        }
-
-        if (managerOfficerId) {
-          const managerUserId = await resolveUserIdByOfficerId(connection, managerOfficerId);
+        for (const reviewer of reviewerRows) {
+          const reviewerUserId = await resolveUserIdByOfficerId(connection, reviewer.id);
           await createUserNotification(connection, {
             title: 'Có đơn xin nghỉ để duyệt',
             content: `Cán bộ ${officerId} vừa gửi đơn xin nghỉ trực ngày ${leaveDateOnly}.`,
@@ -331,20 +298,7 @@ export const createLeaveRequest = async (req, res, next) => {
             module: 'leave_request',
             entityType: 'leave_request',
             entityId: String(leaveRequestId),
-            targetUserId: managerUserId,
-          });
-        }
-
-        // 3. If the requester is a manager, also notify director
-        if (isManager) {
-          await createRoleNotification(connection, {
-            title: 'Trưởng phòng xin nghỉ',
-            content: `Trưởng phòng ${officerId} (${requestDepartment}) vừa gửi đơn xin nghỉ trực ngày ${leaveDateOnly}.`,
-            type: 'info',
-            module: 'leave_request',
-            entityType: 'leave_request',
-            entityId: String(leaveRequestId),
-            targetRole: 'admin',
+            targetUserId: reviewerUserId,
           });
         }
       }
@@ -406,44 +360,40 @@ export const updateLeaveRequestStatus = async (req, res, next) => {
 
       const leaveRequest = rows[0];
 
-      if (req.user?.role === 'manager') {
-        if (!requesterOfficer) {
-          return res.status(403).json({
-            success: false,
-            error: 'Insufficient permissions',
-            code: 'FORBIDDEN',
-          });
-        }
+      const effectiveRole = req.user?.effectiveRole || req.user?.role;
+      const hasManagerDelegation = Boolean(req.user?.isDelegatedManager);
 
-        const canReviewDepartment = await assertManagerCanReviewDepartment(connection, requesterOfficer);
-        if (!canReviewDepartment) {
-          return res.status(403).json({
-            success: false,
-            error: 'Only department head can approve leave requests for their department',
-            code: 'FORBIDDEN',
-          });
-        }
+      if (
+        effectiveRole !== 'manager'
+        || !requesterOfficer
+        || (!hasManagerDelegation && !isDepartmentReviewer(requesterOfficer))
+      ) {
+        return res.status(403).json({
+          success: false,
+          error: 'Chỉ trưởng/phó phòng mới được phê duyệt đơn xin nghỉ.',
+          code: 'FORBIDDEN',
+        });
+      }
 
-        const [targetOfficerRows] = await connection.execute(
-          hasDepartmentId
-            ? 'SELECT department, departmentId FROM officers WHERE id = ? LIMIT 1'
-            : 'SELECT department, NULL AS departmentId FROM officers WHERE id = ? LIMIT 1',
-          [leaveRequest.officerId]
-        );
-        const targetDepartment = targetOfficerRows[0]?.department || '';
-        const targetDepartmentId = targetOfficerRows[0]?.departmentId || null;
+      const [targetOfficerRows] = await connection.execute(
+        hasDepartmentId
+          ? 'SELECT department, departmentId FROM officers WHERE id = ? LIMIT 1'
+          : 'SELECT department, NULL AS departmentId FROM officers WHERE id = ? LIMIT 1',
+        [leaveRequest.officerId]
+      );
+      const targetDepartment = targetOfficerRows[0]?.department || '';
+      const targetDepartmentId = targetOfficerRows[0]?.departmentId || null;
 
-        const sameDepartment = hasDepartmentId && requesterOfficer?.departmentId
-          ? Number(targetDepartmentId) === Number(requesterOfficer.departmentId)
-          : targetDepartment === requesterOfficer.department;
+      const sameDepartment = hasDepartmentId && requesterOfficer?.departmentId
+        ? Number(targetDepartmentId) === Number(requesterOfficer.departmentId)
+        : targetDepartment === requesterOfficer.department;
 
-        if (!targetDepartment || !sameDepartment) {
-          return res.status(403).json({
-            success: false,
-            error: 'Manager can only approve leave requests within their own department',
-            code: 'FORBIDDEN',
-          });
-        }
+      if (!targetDepartment || !sameDepartment) {
+        return res.status(403).json({
+          success: false,
+          error: 'Trưởng/phó phòng chỉ được duyệt đơn xin nghỉ trong chính phòng của mình.',
+          code: 'FORBIDDEN',
+        });
       }
 
       // UPDATE: Keep the record, just update status (don't delete)

@@ -193,6 +193,11 @@ const apiClient = {
     updateWorkSchedulePermission: (id, payload) =>
       apiClient.put(`/officers/${id}/work-schedule-permission`, payload),
 
+    getAdminDelegations: () => apiClient.get('/officers/admin-delegations'),
+
+    updateAdminDelegation: (id, enabled) =>
+      apiClient.put(`/officers/${id}/admin-delegation`, { enabled }),
+
     create: (data) => apiClient.post('/officers', data),
 
     update: (id, data) => apiClient.put(`/officers/${id}`, data),

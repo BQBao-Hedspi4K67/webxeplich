@@ -24,7 +24,7 @@ CREATE TABLE users (
   fullName VARCHAR(100) NOT NULL,
   militaryRank VARCHAR(100) NULL,
   email VARCHAR(100) UNIQUE,
-  role ENUM('admin', 'manager', 'officer') DEFAULT 'officer' NOT NULL,
+  role ENUM('superadmin', 'admin', 'leader', 'manager', 'officer') DEFAULT 'officer' NOT NULL,
   avatar VARCHAR(10),
   status ENUM('active', 'inactive') DEFAULT 'active',
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -319,140 +319,149 @@ CREATE TABLE auto_schedule_logs (
 -- Mat khau mac dinh cho tat ca tai khoan: 123456
 -- bcrypt hash: $2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm
 INSERT INTO users (username, passwordHash, fullName, email, role, avatar, status) VALUES
-('giamdoc1', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thiếu tướng Lê Minh Thảo', 'lmthao@hvktcnan.edu.vn', 'admin', 'LT', 'active'),
-('giamdoc2', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại tá Nguyễn Văn Căn', 'nvcan@hvktcnan.edu.vn', 'admin', 'NC', 'active'),
-('giamdoc3', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại tá Nguyễn Mạnh Cường', 'nmcuong@hvktcnan.edu.vn', 'admin', 'NC', 'active'),
-('giamdoc4', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại tá Phạm Thị Thúy Hằng', 'pthhang@hvktcnan.edu.vn', 'admin', 'PH', 'active'),
+('thaolm', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thiếu tướng Lê Minh Thảo', 'thaolm@hvktcnan.edu.vn', 'admin', 'LT', 'active'),
+('cannv', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại tá Nguyễn Văn Căn', 'cannv@hvktcnan.edu.vn', 'admin', 'NC', 'active'),
+('cuongnm', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại tá Nguyễn Mạnh Cường', 'cuongnm@hvktcnan.edu.vn', 'admin', 'NC', 'active'),
+('hangptt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại tá Phạm Thị Thúy Hằng', 'hangptt@hvktcnan.edu.vn', 'admin', 'PH', 'active'),
 
-('truongphong1', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Trần Văn Sơn', 'tvson@hvktcnan.edu.vn', 'manager', 'TS', 'active'),
-('truongphong2', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Lê Thị Mai', 'ltmai@hvktcnan.edu.vn', 'manager', 'LM', 'active'),
-('truongphong3', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Phạm Quang Huy', 'pqhuy@hvktcnan.edu.vn', 'manager', 'PH', 'active'),
-('truongphong4', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Hoàng Minh Đức', 'hmduc@hvktcnan.edu.vn', 'manager', 'HD', 'active'),
-('truongphong5', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Nguyễn Thị Lan', 'ntlan@hvktcnan.edu.vn', 'manager', 'NL', 'active'),
-('truongphong6', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Bùi Văn Nam', 'bvnam@hvktcnan.edu.vn', 'manager', 'BN', 'active'),
-('truongphong7', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Đặng Thị Hương', 'dthuong@hvktcnan.edu.vn', 'manager', 'DH', 'active'),
+('sontv', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Trần Văn Sơn', 'sontv@hvktcnan.edu.vn', 'manager', 'TS', 'active'),
+('mailt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Lê Thị Mai', 'mailt@hvktcnan.edu.vn', 'manager', 'LM', 'active'),
+('huypq', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Phạm Quang Huy', 'huypq@hvktcnan.edu.vn', 'manager', 'PH', 'active'),
+('duchm', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Hoàng Minh Đức', 'duchm@hvktcnan.edu.vn', 'manager', 'HD', 'active'),
+('lannt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Nguyễn Thị Lan', 'lannt@hvktcnan.edu.vn', 'manager', 'NL', 'active'),
+('nambv', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Bùi Văn Nam', 'nambv@hvktcnan.edu.vn', 'manager', 'BN', 'active'),
+('huongdt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Đặng Thị Hương', 'huongdt@hvktcnan.edu.vn', 'manager', 'DH', 'active'),
 
-('canbo1', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Võ Thanh Long', 'vtlong@hvktcnan.edu.vn', 'officer', 'VL', 'active'),
-('canbo2', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Trần Đức Anh', 'tdanh@hvktcnan.edu.vn', 'officer', 'TA', 'active'),
-('canbo3', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Nguyễn Gia Bảo', 'ngbao@hvktcnan.edu.vn', 'officer', 'NB', 'active'),
-('canbo4', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Lê Tuấn Kiệt', 'ltkiet@hvktcnan.edu.vn', 'officer', 'LK', 'active'),
-('canbo5', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Phạm Hữu Đạt', 'phdat@hvktcnan.edu.vn', 'officer', 'PD', 'active'),
-('canbo6', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Bùi Hải Nam', 'bhnam@hvktcnan.edu.vn', 'officer', 'BN', 'active'),
-('canbo7', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Hoàng Văn Tuấn', 'hvtuan@hvktcnan.edu.vn', 'officer', 'HT', 'active'),
-('canbo8', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Đỗ Minh Quân', 'dmquan@hvktcnan.edu.vn', 'officer', 'DQ', 'active'),
-('canbo9', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Trương Anh Vũ', 'tavu@hvktcnan.edu.vn', 'officer', 'TV', 'active'),
-('canbo10', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Nguyễn Thị Yến', 'ntyen@hvktcnan.edu.vn', 'officer', 'NY', 'active'),
-('canbo11', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Đặng Ngọc Hà', 'dnha@hvktcnan.edu.vn', 'officer', 'DH', 'active'),
-('canbo12', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng úy Nguyễn Quốc Bình', 'nqbinh@hvktcnan.edu.vn', 'officer', 'NB', 'active'),
-('canbo13', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng úy Trần Mai Chi', 'tmchi@hvktcnan.edu.vn', 'officer', 'TC', 'active'),
-('canbo14', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng úy Lê Hoàng Nam', 'lhnam@hvktcnan.edu.vn', 'officer', 'LN', 'active'),
-('laixe1', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung úy Phạm Quốc Hùng', 'pqhung@hvktcnan.edu.vn', 'officer', 'PH', 'active'),
-('laixe2', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng úy Lê Văn Tâm', 'lvtam@hvktcnan.edu.vn', 'officer', 'LT', 'active'),
-('laixe3', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thiếu úy Nguyễn Minh Phúc', 'nmphuc@hvktcnan.edu.vn', 'officer', 'NP', 'active'),
-('benhxa1', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung úy Nguyễn Văn Khoa', 'nvkhoa@hvktcnan.edu.vn', 'officer', 'NK', 'active'),
-('benhxa2', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng úy Trần Quốc Việt', 'tqviet@hvktcnan.edu.vn', 'officer', 'TV', 'active'),
-('benhxa3', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thiếu úy Lê Thị Hạnh', 'lthanh@hvktcnan.edu.vn', 'officer', 'LH', 'active');
+('longvt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Võ Thanh Long', 'longvt@hvktcnan.edu.vn', 'officer', 'VL', 'active'),
+('anhtd', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Trần Đức Anh', 'anhtd@hvktcnan.edu.vn', 'officer', 'TA', 'active'),
+('baong', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Nguyễn Gia Bảo', 'baong@hvktcnan.edu.vn', 'officer', 'NB', 'active'),
+('kietlt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Lê Tuấn Kiệt', 'kietlt@hvktcnan.edu.vn', 'officer', 'LK', 'active'),
+('datph', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Phạm Hữu Đạt', 'datph@hvktcnan.edu.vn', 'officer', 'PD', 'active'),
+('nambh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Bùi Hải Nam', 'nambh@hvktcnan.edu.vn', 'officer', 'BN', 'active'),
+('tuanhv', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Hoàng Văn Tuấn', 'tuanhv@hvktcnan.edu.vn', 'officer', 'HT', 'active'),
+('quandm', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Đỗ Minh Quân', 'quandm@hvktcnan.edu.vn', 'officer', 'DQ', 'active'),
+('vuta', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Trương Anh Vũ', 'vuta@hvktcnan.edu.vn', 'officer', 'TV', 'active'),
+('yennt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Nguyễn Thị Yến', 'yennt@hvktcnan.edu.vn', 'officer', 'NY', 'active'),
+('hadn', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Đặng Ngọc Hà', 'hadn@hvktcnan.edu.vn', 'officer', 'DH', 'active'),
+('binhnq', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng úy Nguyễn Quốc Bình', 'binhnq@hvktcnan.edu.vn', 'officer', 'NB', 'active'),
+('chitm', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng úy Trần Mai Chi', 'chitm@hvktcnan.edu.vn', 'officer', 'TC', 'active'),
+('namlh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng úy Lê Hoàng Nam', 'namlh@hvktcnan.edu.vn', 'officer', 'LN', 'active'),
+('hungpq', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung úy Phạm Quốc Hùng', 'hungpq@hvktcnan.edu.vn', 'officer', 'PH', 'active'),
+('tamlv', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng úy Lê Văn Tâm', 'tamlv@hvktcnan.edu.vn', 'officer', 'LT', 'active'),
+('phucnm', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thiếu úy Nguyễn Minh Phúc', 'phucnm@hvktcnan.edu.vn', 'officer', 'NP', 'active'),
+('khoanv', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung úy Nguyễn Văn Khoa', 'khoanv@hvktcnan.edu.vn', 'officer', 'NK', 'active'),
+('viettq', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng úy Trần Quốc Việt', 'viettq@hvktcnan.edu.vn', 'officer', 'TV', 'active'),
+('hanhlt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thiếu úy Lê Thị Hạnh', 'hanhlt@hvktcnan.edu.vn', 'officer', 'LH', 'active');
 
--- Bo sung user cho Pho truong phong va nhan su cac khoa
 INSERT INTO users (username, passwordHash, fullName, email, role, avatar, status) VALUES
-('ndhuy', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Nguyễn Đức Huy', 'ndhuy@hvktcnan.edu.vn', 'manager', 'NH', 'active'),
-('tqminh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Trần Quang Minh', 'tqminh@hvktcnan.edu.vn', 'manager', 'TM', 'active'),
-('lhdang', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Lưu Hải Đăng', 'lhdang@hvktcnan.edu.vn', 'manager', 'LD', 'active'),
-('vttha', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Vũ Thị Thu Hà', 'vttha@hvktcnan.edu.vn', 'manager', 'VH', 'active'),
-('pmtuan', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Phan Minh Tuấn', 'pmtuan@hvktcnan.edu.vn', 'manager', 'PT', 'active'),
-('nttrang', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Nguyễn Thu Trang', 'nttrang@hvktcnan.edu.vn', 'manager', 'NT', 'active'),
-('dvbinh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Đỗ Văn Bình', 'dvbinh@hvktcnan.edu.vn', 'manager', 'DB', 'active'),
+('huynd', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Nguyễn Đức Huy', 'huynd@hvktcnan.edu.vn', 'manager', 'NH', 'active'),
+('minhtq', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Trần Quang Minh', 'minhtq@hvktcnan.edu.vn', 'manager', 'TM', 'active'),
+('danglh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Lưu Hải Đăng', 'danglh@hvktcnan.edu.vn', 'manager', 'LD', 'active'),
+('havtt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Vũ Thị Thu Hà', 'havtt@hvktcnan.edu.vn', 'manager', 'VH', 'active'),
+('tuanpm', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Phan Minh Tuấn', 'tuanpm@hvktcnan.edu.vn', 'manager', 'PT', 'active'),
+('trangnt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Nguyễn Thu Trang', 'trangnt@hvktcnan.edu.vn', 'manager', 'NT', 'active'),
+('binhdv', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Đỗ Văn Bình', 'binhdv@hvktcnan.edu.vn', 'manager', 'DB', 'active'),
 
-('ndthanh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Nguyễn Đức Thành', 'ndthanh@hvktcnan.edu.vn', 'manager', 'NT', 'active'),
-('tthuong', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Trần Thu Hương', 'tthuong@hvktcnan.edu.vn', 'manager', 'TH', 'active'),
-('pmhoa', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Phạm Minh Hòa', 'pmhoa@hvktcnan.edu.vn', 'officer', 'PH', 'active'),
-('lqanh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Lê Quốc Anh', 'lqanh@hvktcnan.edu.vn', 'officer', 'LA', 'active'),
+('thanhnd', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Nguyễn Đức Thành', 'thanhnd@hvktcnan.edu.vn', 'manager', 'NT', 'active'),
+('huongtt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Trần Thu Hương', 'huongtt@hvktcnan.edu.vn', 'manager', 'TH', 'active'),
+('hoapm', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Phạm Minh Hòa', 'hoapm@hvktcnan.edu.vn', 'officer', 'PH', 'active'),
+('anhlq', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Lê Quốc Anh', 'anhlq@hvktcnan.edu.vn', 'officer', 'LA', 'active'),
 
-('bqvinh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Bùi Quang Vinh', 'bqvinh@hvktcnan.edu.vn', 'manager', 'BV', 'active'),
-('ntminh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Nguyễn Thị Minh', 'ntminh@hvktcnan.edu.vn', 'manager', 'NM', 'active'),
-('dtkien', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Đỗ Trọng Kiên', 'dtkien@hvktcnan.edu.vn', 'officer', 'DK', 'active'),
-('pquynh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Phạm Quỳnh', 'pquynh@hvktcnan.edu.vn', 'officer', 'PQ', 'active'),
+('vinhbq', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Bùi Quang Vinh', 'vinhbq@hvktcnan.edu.vn', 'manager', 'BV', 'active'),
+('minhnt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Nguyễn Thị Minh', 'minhnt@hvktcnan.edu.vn', 'manager', 'NM', 'active'),
+('kiendt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Đỗ Trọng Kiên', 'kiendt@hvktcnan.edu.vn', 'officer', 'DK', 'active'),
+('quynhp', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Phạm Quỳnh', 'quynhp@hvktcnan.edu.vn', 'officer', 'PQ', 'active'),
 
-('lmson', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Lý Minh Sơn', 'lmson@hvktcnan.edu.vn', 'manager', 'LS', 'active'),
-('hnhung', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Hà Ngọc Hùng', 'hnhung@hvktcnan.edu.vn', 'manager', 'HH', 'active'),
-('tbach', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Trần Bách', 'tbach@hvktcnan.edu.vn', 'officer', 'TB', 'active'),
-('ndmai', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Nguyễn Diệu Mai', 'ndmai@hvktcnan.edu.vn', 'officer', 'NM', 'active'),
+('sonlm', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Lý Minh Sơn', 'sonlm@hvktcnan.edu.vn', 'manager', 'LS', 'active'),
+('hunghn', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Hà Ngọc Hùng', 'hunghn@hvktcnan.edu.vn', 'manager', 'HH', 'active'),
+('bacht', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Trần Bách', 'bacht@hvktcnan.edu.vn', 'officer', 'TB', 'active'),
+('maind', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Nguyễn Diệu Mai', 'maind@hvktcnan.edu.vn', 'officer', 'NM', 'active'),
 
-('tqson', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Trần Quốc Sơn', 'tqson@hvktcnan.edu.vn', 'manager', 'TS', 'active'),
-('pttam', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Phạm Thị Tâm', 'pttam@hvktcnan.edu.vn', 'manager', 'PT', 'active'),
-('hvtien', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Hoàng Văn Tiến', 'hvtien@hvktcnan.edu.vn', 'officer', 'HT', 'active'),
-('dcvu', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Dương Công Vũ', 'dcvu@hvktcnan.edu.vn', 'officer', 'DV', 'active'),
+('sontq', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Trần Quốc Sơn', 'sontq@hvktcnan.edu.vn', 'manager', 'TS', 'active'),
+('tampt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Phạm Thị Tâm', 'tampt@hvktcnan.edu.vn', 'manager', 'PT', 'active'),
+('tienhv', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Hoàng Văn Tiến', 'tienhv@hvktcnan.edu.vn', 'officer', 'HT', 'active'),
+('vudc', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Dương Công Vũ', 'vudc@hvktcnan.edu.vn', 'officer', 'DV', 'active'),
 
-('lhlinh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Lê Hải Linh', 'lhlinh@hvktcnan.edu.vn', 'manager', 'LL', 'active'),
-('nmduc', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Nguyễn Minh Đức', 'nmduc@hvktcnan.edu.vn', 'manager', 'ND', 'active'),
-('dtnga', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Đỗ Thùy Nga', 'dtnga@hvktcnan.edu.vn', 'officer', 'DN', 'active'),
-('qtmanh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Quách Tuấn Mạnh', 'qtmanh@hvktcnan.edu.vn', 'officer', 'QM', 'active'),
+('linhlh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Lê Hải Linh', 'linhlh@hvktcnan.edu.vn', 'manager', 'LL', 'active'),
+('ducnm', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Nguyễn Minh Đức', 'ducnm@hvktcnan.edu.vn', 'manager', 'ND', 'active'),
+('ngadt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Đỗ Thùy Nga', 'ngadt@hvktcnan.edu.vn', 'officer', 'DN', 'active'),
+('manhqt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Quách Tuấn Mạnh', 'manhqt@hvktcnan.edu.vn', 'officer', 'QM', 'active'),
 
-('pvhieu', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Phạm Văn Hiếu', 'pvhieu@hvktcnan.edu.vn', 'manager', 'PH', 'active'),
-('ntanh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Nguyễn Tùng Anh', 'ntanh@hvktcnan.edu.vn', 'manager', 'NA', 'active'),
-('vhphong', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Vũ Hải Phong', 'vhphong@hvktcnan.edu.vn', 'officer', 'VP', 'active'),
-('lmnam', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Lương Minh Nam', 'lmnam@hvktcnan.edu.vn', 'officer', 'LN', 'active'),
+('hieupv', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Phạm Văn Hiếu', 'hieupv@hvktcnan.edu.vn', 'manager', 'PH', 'active'),
+('anhnt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Nguyễn Tùng Anh', 'anhnt@hvktcnan.edu.vn', 'manager', 'NA', 'active'),
+('phongvh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Vũ Hải Phong', 'phongvh@hvktcnan.edu.vn', 'officer', 'VP', 'active'),
+('namlm', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Lương Minh Nam', 'namlm@hvktcnan.edu.vn', 'officer', 'LN', 'active'),
 
-('ttlinh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Trần Thùy Linh', 'ttlinh@hvktcnan.edu.vn', 'manager', 'TL', 'active'),
-('nphuong', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Ngô Phương', 'nphuong@hvktcnan.edu.vn', 'manager', 'NP', 'active'),
-('pdthang', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Phạm Đức Thắng', 'pdthang@hvktcnan.edu.vn', 'officer', 'PT', 'active'),
-('hvha', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Hoàng Vũ Hà', 'hvha@hvktcnan.edu.vn', 'officer', 'HH', 'active'),
+('linhtt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Trần Thùy Linh', 'linhtt@hvktcnan.edu.vn', 'manager', 'TL', 'active'),
+('phuongn', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Ngô Phương', 'phuongn@hvktcnan.edu.vn', 'manager', 'NP', 'active'),
+('thangpd', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Phạm Đức Thắng', 'thangpd@hvktcnan.edu.vn', 'officer', 'PT', 'active'),
+('havv', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Hoàng Vũ Hà', 'havv@hvktcnan.edu.vn', 'officer', 'HH', 'active'),
 
-('btduong', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Bùi Trọng Dương', 'btduong@hvktcnan.edu.vn', 'manager', 'BD', 'active'),
-('ntphuc', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Nguyễn Thành Phúc', 'ntphuc@hvktcnan.edu.vn', 'manager', 'NF', 'active'),
-('hdthanh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Hà Đức Thành', 'hdthanh@hvktcnan.edu.vn', 'officer', 'HT', 'active'),
-('lmkhanh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Lê Minh Khánh', 'lmkhanh@hvktcnan.edu.vn', 'officer', 'LK', 'active'),
+('duongbt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Bùi Trọng Dương', 'duongbt@hvktcnan.edu.vn', 'manager', 'BD', 'active'),
+('phucnt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Nguyễn Thành Phúc', 'phucnt@hvktcnan.edu.vn', 'manager', 'NF', 'active'),
+('thanhhd', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Hà Đức Thành', 'thanhhd@hvktcnan.edu.vn', 'officer', 'HT', 'active'),
+('khanhlm', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Lê Minh Khánh', 'khanhlm@hvktcnan.edu.vn', 'officer', 'LK', 'active'),
 
-('dquang', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Đinh Quang', 'dquang@hvktcnan.edu.vn', 'manager', 'DQ', 'active'),
-('tthao', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Trần Thị Hảo', 'tthao@hvktcnan.edu.vn', 'manager', 'TH', 'active'),
-('nvvinh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Nguyễn Vũ Vinh', 'nvvinh@hvktcnan.edu.vn', 'officer', 'NV', 'active'),
-('lhgiang', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Lê Hồng Giang', 'lhgiang@hvktcnan.edu.vn', 'officer', 'LG', 'active'),
+('quangd', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Đinh Quang', 'quangd@hvktcnan.edu.vn', 'manager', 'DQ', 'active'),
+('haott', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Trần Thị Hảo', 'haott@hvktcnan.edu.vn', 'manager', 'TH', 'active'),
+('vinhnv', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Nguyễn Vũ Vinh', 'vinhnv@hvktcnan.edu.vn', 'officer', 'NV', 'active'),
+('gianglh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Lê Hồng Giang', 'gianglh@hvktcnan.edu.vn', 'officer', 'LG', 'active'),
 
-('ptnga', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Phạm Thu Nga', 'ptnga@hvktcnan.edu.vn', 'manager', 'PN', 'active'),
-('btngoc', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Bùi Thị Ngọc', 'btngoc@hvktcnan.edu.vn', 'manager', 'BN', 'active'),
-('nvduc', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Nguyễn Văn Đức', 'nvduc@hvktcnan.edu.vn', 'officer', 'ND', 'active'),
-('tqhien', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Trần Quốc Hiền', 'tqhien@hvktcnan.edu.vn', 'officer', 'TH', 'active'),
+('ngapt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Phạm Thu Nga', 'ngapt@hvktcnan.edu.vn', 'manager', 'PN', 'active'),
+('ngocbt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Bùi Thị Ngọc', 'ngocbt@hvktcnan.edu.vn', 'manager', 'BN', 'active'),
+('ducnv', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Nguyễn Văn Đức', 'ducnv@hvktcnan.edu.vn', 'officer', 'ND', 'active'),
+('hientq', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Trần Quốc Hiền', 'hientq@hvktcnan.edu.vn', 'officer', 'TH', 'active'),
 
-('lttuan', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Lê Thanh Tuấn', 'lttuan@hvktcnan.edu.vn', 'manager', 'LT', 'active'),
-('nhtrang', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Nguyễn Hà Trang', 'nhtrang@hvktcnan.edu.vn', 'manager', 'NT', 'active'),
-('dmngoc', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Dương Minh Ngọc', 'dmngoc@hvktcnan.edu.vn', 'officer', 'DN', 'active'),
-('ptminh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Phạm Trí Minh', 'ptminh@hvktcnan.edu.vn', 'officer', 'PM', 'active');
+('tuanlt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng tá Lê Thanh Tuấn', 'tuanlt@hvktcnan.edu.vn', 'manager', 'LT', 'active'),
+('trangnh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Nguyễn Hà Trang', 'trangnh@hvktcnan.edu.vn', 'manager', 'NT', 'active'),
+('ngocdm', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Dương Minh Ngọc', 'ngocdm@hvktcnan.edu.vn', 'officer', 'DN', 'active'),
+('minhpt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Phạm Trí Minh', 'minhpt@hvktcnan.edu.vn', 'officer', 'PM', 'active');
+
+INSERT INTO users (username, passwordHash, fullName, email, role, avatar, status) VALUES
+('admin1', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Super Admin 1', 'admin1@hvktcnan.edu.vn', 'superadmin', 'A1', 'active'),
+('admin2', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Super Admin 2', 'admin2@hvktcnan.edu.vn', 'superadmin', 'A2', 'active');
+
+INSERT INTO users (username, passwordHash, fullName, email, role, avatar, status) VALUES
+('anlv', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Lê Văn An', 'anlv@hvktcnan.edu.vn', 'manager', 'AL', 'active'),
+('binhnv', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Nguyễn Văn Bình', 'binhnv@hvktcnan.edu.vn', 'manager', 'NB', 'active'),
+('dunglv', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung tá Lê Văn Dũng', 'dunglv@hvktcnan.edu.vn', 'manager', 'LD', 'active'),
+('hantt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thiếu tá Trần Thị Hạnh', 'hantt@hvktcnan.edu.vn', 'manager', 'HT', 'active');
 
 -- ========== OFFICERS ==========
 INSERT INTO officers (id, userId, fullName, officerTitle, officerName, position, department, departmentGroup, phone, email, role, status, studyUntil) VALUES
-('CB001', 1, 'Thiếu tướng Lê Minh Thảo', 'Thiếu tướng', 'Lê Minh Thảo', 'Giám đốc Học viện', 'Ban Giám đốc', 'ban_giam_doc', '0911110001', 'lmthao@hvktcnan.edu.vn', 'leader', 'active', NULL),
-('CB002', 2, 'Đại tá Nguyễn Văn Căn', 'Đại tá', 'Nguyễn Văn Căn', 'Phó Giám đốc', 'Ban Giám đốc', 'ban_giam_doc', '0911110002', 'nvcan@hvktcnan.edu.vn', 'leader', 'active', NULL),
-('CB003', 3, 'Đại tá Nguyễn Mạnh Cường', 'Đại tá', 'Nguyễn Mạnh Cường', 'Phó Giám đốc', 'Ban Giám đốc', 'ban_giam_doc', '0911110003', 'nmcuong@hvktcnan.edu.vn', 'leader', 'active', NULL),
-('CB004', 4, 'Đại tá Phạm Thị Thúy Hằng', 'Đại tá', 'Phạm Thị Thúy Hằng', 'Phó Giám đốc', 'Ban Giám đốc', 'ban_giam_doc', '0911110004', 'pthhang@hvktcnan.edu.vn', 'leader', 'active', NULL),
+('CB001', 1, 'Thiếu tướng Lê Minh Thảo', 'Thiếu tướng', 'Lê Minh Thảo', 'Giám đốc Học viện', 'Ban Giám đốc', 'ban_giam_doc', '0911110001', 'thaolm@hvktcnan.edu.vn', 'leader', 'active', NULL),
+('CB002', 2, 'Đại tá Nguyễn Văn Căn', 'Đại tá', 'Nguyễn Văn Căn', 'Phó Giám đốc', 'Ban Giám đốc', 'ban_giam_doc', '0911110002', 'cannv@hvktcnan.edu.vn', 'leader', 'active', NULL),
+('CB003', 3, 'Đại tá Nguyễn Mạnh Cường', 'Đại tá', 'Nguyễn Mạnh Cường', 'Phó Giám đốc', 'Ban Giám đốc', 'ban_giam_doc', '0911110003', 'cuongnm@hvktcnan.edu.vn', 'leader', 'active', NULL),
+('CB004', 4, 'Đại tá Phạm Thị Thúy Hằng', 'Đại tá', 'Phạm Thị Thúy Hằng', 'Phó Giám đốc', 'Ban Giám đốc', 'ban_giam_doc', '0911110004', 'hangptt@hvktcnan.edu.vn', 'leader', 'active', NULL),
 
-('CB005', 5, 'Thượng tá Trần Văn Sơn', 'Thượng tá', 'Trần Văn Sơn', 'Trưởng phòng', 'Phòng hành chính tổng hợp', 'phong', '0911110005', 'tvson@hvktcnan.edu.vn', 'manager', 'active', NULL),
-('CB006', 6, 'Thượng tá Lê Thị Mai', 'Thượng tá', 'Lê Thị Mai', 'Trưởng phòng', 'Phòng chính trị', 'phong', '0911110006', 'ltmai@hvktcnan.edu.vn', 'manager', 'active', NULL),
-('CB007', 7, 'Thượng tá Phạm Quang Huy', 'Thượng tá', 'Phạm Quang Huy', 'Trưởng phòng', 'Phòng quản lý đào tạo và BDNC', 'phong', '0911110007', 'pqhuy@hvktcnan.edu.vn', 'manager', 'active', NULL),
-('CB008', 8, 'Thượng tá Hoàng Minh Đức', 'Thượng tá', 'Hoàng Minh Đức', 'Trưởng phòng', 'Phòng ĐBCL đào tạo', 'phong', '0911110008', 'hmduc@hvktcnan.edu.vn', 'manager', 'active', NULL),
-('CB009', 9, 'Thượng tá Nguyễn Thị Lan', 'Thượng tá', 'Nguyễn Thị Lan', 'Trưởng phòng', 'Phòng quản lý nghiên cứu khoa học', 'phong', '0911110009', 'ntlan@hvktcnan.edu.vn', 'manager', 'active', NULL),
-('CB010', 10, 'Thượng tá Bùi Văn Nam', 'Thượng tá', 'Bùi Văn Nam', 'Trưởng phòng', 'Phòng quản lý học viên', 'phong', '0911110010', 'bvnam@hvktcnan.edu.vn', 'manager', 'active', NULL),
-('CB011', 11, 'Thượng tá Đặng Thị Hương', 'Thượng tá', 'Đặng Thị Hương', 'Trưởng phòng', 'Phòng hậu cần', 'phong', '0911110011', 'dthuong@hvktcnan.edu.vn', 'manager', 'active', NULL),
+('CB005', 5, 'Thượng tá Trần Văn Sơn', 'Thượng tá', 'Trần Văn Sơn', 'Trưởng phòng', 'Phòng hành chính tổng hợp', 'phong', '0911110005', 'sontv@hvktcnan.edu.vn', 'manager', 'active', NULL),
+('CB006', 6, 'Thượng tá Lê Thị Mai', 'Thượng tá', 'Lê Thị Mai', 'Trưởng phòng', 'Phòng chính trị', 'phong', '0911110006', 'mailt@hvktcnan.edu.vn', 'manager', 'active', NULL),
+('CB007', 7, 'Thượng tá Phạm Quang Huy', 'Thượng tá', 'Phạm Quang Huy', 'Trưởng phòng', 'Phòng quản lý đào tạo và BDNC', 'phong', '0911110007', 'huypq@hvktcnan.edu.vn', 'manager', 'active', NULL),
+('CB008', 8, 'Thượng tá Hoàng Minh Đức', 'Thượng tá', 'Hoàng Minh Đức', 'Trưởng phòng', 'Phòng ĐBCL đào tạo', 'phong', '0911110008', 'duchm@hvktcnan.edu.vn', 'manager', 'active', NULL),
+('CB009', 9, 'Thượng tá Nguyễn Thị Lan', 'Thượng tá', 'Nguyễn Thị Lan', 'Trưởng phòng', 'Phòng quản lý nghiên cứu khoa học', 'phong', '0911110009', 'lannt@hvktcnan.edu.vn', 'manager', 'active', NULL),
+('CB010', 10, 'Thượng tá Bùi Văn Nam', 'Thượng tá', 'Bùi Văn Nam', 'Trưởng phòng', 'Phòng quản lý học viên', 'phong', '0911110010', 'nambv@hvktcnan.edu.vn', 'manager', 'active', NULL),
+('CB011', 11, 'Thượng tá Đặng Thị Hương', 'Thượng tá', 'Đặng Thị Hương', 'Trưởng phòng', 'Phòng hậu cần', 'phong', '0911110011', 'huongdt@hvktcnan.edu.vn', 'manager', 'active', NULL),
 
-('CB012', 12, 'Đại úy Võ Thanh Long', 'Đại úy', 'Võ Thanh Long', 'Cán bộ tổng hợp', 'Phòng hành chính tổng hợp', 'phong', '0911110012', 'vtlong@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB013', 13, 'Đại úy Trần Đức Anh', 'Đại úy', 'Trần Đức Anh', 'Cán bộ tổng hợp', 'Phòng hành chính tổng hợp', 'phong', '0911110013', 'tdanh@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB014', 14, 'Đại úy Nguyễn Gia Bảo', 'Đại úy', 'Nguyễn Gia Bảo', 'Cán bộ chính trị', 'Phòng chính trị', 'phong', '0911110014', 'ngbao@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB015', 15, 'Đại úy Lê Tuấn Kiệt', 'Đại úy', 'Lê Tuấn Kiệt', 'Cán bộ chính trị', 'Phòng chính trị', 'phong', '0911110015', 'ltkiet@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB016', 16, 'Đại úy Phạm Hữu Đạt', 'Đại úy', 'Phạm Hữu Đạt', 'Cán bộ đào tạo', 'Phòng quản lý đào tạo và BDNC', 'phong', '0911110016', 'phdat@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB017', 17, 'Đại úy Bùi Hải Nam', 'Đại úy', 'Bùi Hải Nam', 'Cán bộ đào tạo', 'Phòng quản lý đào tạo và BDNC', 'phong', '0911110017', 'bhnam@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB018', 18, 'Đại úy Hoàng Văn Tuấn', 'Đại úy', 'Hoàng Văn Tuấn', 'Cán bộ kiểm định', 'Phòng ĐBCL đào tạo', 'phong', '0911110018', 'hvtuan@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB019', 19, 'Đại úy Đỗ Minh Quân', 'Đại úy', 'Đỗ Minh Quân', 'Cán bộ kiểm định', 'Phòng ĐBCL đào tạo', 'phong', '0911110019', 'dmquan@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB020', 20, 'Đại úy Trương Anh Vũ', 'Đại úy', 'Trương Anh Vũ', 'Cán bộ nghiên cứu', 'Phòng quản lý nghiên cứu khoa học', 'phong', '0911110020', 'tavu@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB021', 21, 'Đại úy Nguyễn Thị Yến', 'Đại úy', 'Nguyễn Thị Yến', 'Cán bộ nghiên cứu', 'Phòng quản lý nghiên cứu khoa học', 'phong', '0911110021', 'ntyen@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB022', 22, 'Đại úy Đặng Ngọc Hà', 'Đại úy', 'Đặng Ngọc Hà', 'Cán bộ quản lý học viên', 'Phòng quản lý học viên', 'phong', '0911110022', 'dnha@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB023', 23, 'Thượng úy Nguyễn Quốc Bình', 'Thượng úy', 'Nguyễn Quốc Bình', 'Cán bộ quản lý học viên', 'Phòng quản lý học viên', 'phong', '0911110023', 'nqbinh@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB024', 24, 'Thượng úy Trần Mai Chi', 'Thượng úy', 'Trần Mai Chi', 'Cán bộ hậu cần', 'Phòng hậu cần', 'phong', '0911110024', 'tmchi@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB025', 25, 'Thượng úy Lê Hoàng Nam', 'Thượng úy', 'Lê Hoàng Nam', 'Cán bộ hậu cần', 'Phòng hậu cần', 'phong', '0911110025', 'lhnam@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB026', 26, 'Trung úy Phạm Quốc Hùng', 'Trung úy', 'Phạm Quốc Hùng', 'Cán bộ lái xe', 'Đội lái xe', 'doi', '0911110026', 'pqhung@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB027', 27, 'Trung úy Nguyễn Văn Khoa', 'Trung úy', 'Nguyễn Văn Khoa', 'Cán bộ quân y', 'Đội bệnh xá', 'doi', '0911110027', 'nvkhoa@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB028', 28, 'Thượng úy Lê Văn Tâm', 'Thượng úy', 'Lê Văn Tâm', 'Cán bộ lái xe', 'Đội lái xe', 'doi', '0911110028', 'lvtam@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB029', 29, 'Thiếu úy Nguyễn Minh Phúc', 'Thiếu úy', 'Nguyễn Minh Phúc', 'Cán bộ lái xe', 'Đội lái xe', 'doi', '0911110029', 'nmphuc@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB030', 30, 'Thượng úy Trần Quốc Việt', 'Thượng úy', 'Trần Quốc Việt', 'Cán bộ quân y', 'Đội bệnh xá', 'doi', '0911110030', 'tqviet@hvktcnan.edu.vn', 'officer', 'active', NULL),
-('CB031', 31, 'Thiếu úy Lê Thị Hạnh', 'Thiếu úy', 'Lê Thị Hạnh', 'Cán bộ quân y', 'Đội bệnh xá', 'doi', '0911110031', 'lthanh@hvktcnan.edu.vn', 'officer', 'active', NULL);
+('CB012', 12, 'Đại úy Võ Thanh Long', 'Đại úy', 'Võ Thanh Long', 'Cán bộ tổng hợp', 'Phòng hành chính tổng hợp', 'phong', '0911110012', 'longvt@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB013', 13, 'Đại úy Trần Đức Anh', 'Đại úy', 'Trần Đức Anh', 'Cán bộ tổng hợp', 'Phòng hành chính tổng hợp', 'phong', '0911110013', 'anhtd@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB014', 14, 'Đại úy Nguyễn Gia Bảo', 'Đại úy', 'Nguyễn Gia Bảo', 'Cán bộ chính trị', 'Phòng chính trị', 'phong', '0911110014', 'baong@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB015', 15, 'Đại úy Lê Tuấn Kiệt', 'Đại úy', 'Lê Tuấn Kiệt', 'Cán bộ chính trị', 'Phòng chính trị', 'phong', '0911110015', 'kietlt@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB016', 16, 'Đại úy Phạm Hữu Đạt', 'Đại úy', 'Phạm Hữu Đạt', 'Cán bộ đào tạo', 'Phòng quản lý đào tạo và BDNC', 'phong', '0911110016', 'datph@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB017', 17, 'Đại úy Bùi Hải Nam', 'Đại úy', 'Bùi Hải Nam', 'Cán bộ đào tạo', 'Phòng quản lý đào tạo và BDNC', 'phong', '0911110017', 'nambh@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB018', 18, 'Đại úy Hoàng Văn Tuấn', 'Đại úy', 'Hoàng Văn Tuấn', 'Cán bộ kiểm định', 'Phòng ĐBCL đào tạo', 'phong', '0911110018', 'tuanhv@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB019', 19, 'Đại úy Đỗ Minh Quân', 'Đại úy', 'Đỗ Minh Quân', 'Cán bộ kiểm định', 'Phòng ĐBCL đào tạo', 'phong', '0911110019', 'quandm@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB020', 20, 'Đại úy Trương Anh Vũ', 'Đại úy', 'Trương Anh Vũ', 'Cán bộ nghiên cứu', 'Phòng quản lý nghiên cứu khoa học', 'phong', '0911110020', 'vuta@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB021', 21, 'Đại úy Nguyễn Thị Yến', 'Đại úy', 'Nguyễn Thị Yến', 'Cán bộ nghiên cứu', 'Phòng quản lý nghiên cứu khoa học', 'phong', '0911110021', 'yennt@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB022', 22, 'Đại úy Đặng Ngọc Hà', 'Đại úy', 'Đặng Ngọc Hà', 'Cán bộ quản lý học viên', 'Phòng quản lý học viên', 'phong', '0911110022', 'hadn@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB023', 23, 'Thượng úy Nguyễn Quốc Bình', 'Thượng úy', 'Nguyễn Quốc Bình', 'Cán bộ quản lý học viên', 'Phòng quản lý học viên', 'phong', '0911110023', 'binhnq@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB024', 24, 'Thượng úy Trần Mai Chi', 'Thượng úy', 'Trần Mai Chi', 'Cán bộ hậu cần', 'Phòng hậu cần', 'phong', '0911110024', 'chitm@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB025', 25, 'Thượng úy Lê Hoàng Nam', 'Thượng úy', 'Lê Hoàng Nam', 'Cán bộ hậu cần', 'Phòng hậu cần', 'phong', '0911110025', 'namlh@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB026', 26, 'Trung úy Phạm Quốc Hùng', 'Trung úy', 'Phạm Quốc Hùng', 'Cán bộ lái xe', 'Đội lái xe', 'doi', '0911110026', 'hungpq@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB027', 27, 'Trung úy Nguyễn Văn Khoa', 'Trung úy', 'Nguyễn Văn Khoa', 'Cán bộ quân y', 'Đội bệnh xá', 'doi', '0911110027', 'khoanv@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB028', 28, 'Thượng úy Lê Văn Tâm', 'Thượng úy', 'Lê Văn Tâm', 'Cán bộ lái xe', 'Đội lái xe', 'doi', '0911110028', 'tamlv@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB029', 29, 'Thiếu úy Nguyễn Minh Phúc', 'Thiếu úy', 'Nguyễn Minh Phúc', 'Cán bộ lái xe', 'Đội lái xe', 'doi', '0911110029', 'phucnm@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB030', 30, 'Thượng úy Trần Quốc Việt', 'Thượng úy', 'Trần Quốc Việt', 'Cán bộ quân y', 'Đội bệnh xá', 'doi', '0911110030', 'viettq@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB031', 31, 'Thiếu úy Lê Thị Hạnh', 'Thiếu úy', 'Lê Thị Hạnh', 'Cán bộ quân y', 'Đội bệnh xá', 'doi', '0911110031', 'hanhlt@hvktcnan.edu.vn', 'officer', 'active', NULL);
 
 INSERT INTO officers (id, userId, fullName, officerTitle, officerName, position, department, departmentGroup, phone, email, role, status, studyUntil) VALUES
 ('CB032', 32, 'Trung tá Nguyễn Đức Huy', 'Trung tá', 'Nguyễn Đức Huy', 'Phó trưởng phòng', 'Phòng hành chính tổng hợp', 'phong', '0911110032', 'ndhuy@hvktcnan.edu.vn', 'manager', 'active', NULL),
@@ -518,6 +527,12 @@ INSERT INTO officers (id, userId, fullName, officerTitle, officerName, position,
 ('CB081', 81, 'Đại úy Dương Minh Ngọc', 'Đại úy', 'Dương Minh Ngọc', 'Cán bộ khoa', 'Khoa Y Dược', 'khoa', '0911110081', 'dmngoc@hvktcnan.edu.vn', 'officer', 'active', NULL),
 ('CB082', 82, 'Đại úy Phạm Trí Minh', 'Đại úy', 'Phạm Trí Minh', 'Cán bộ khoa', 'Khoa Y Dược', 'khoa', '0911110082', 'ptminh@hvktcnan.edu.vn', 'officer', 'active', NULL);
 
+INSERT INTO officers (id, userId, fullName, officerTitle, officerName, position, department, departmentGroup, phone, email, role, status, studyUntil) VALUES
+('CB083', 85, 'Trung tá Lê Văn An', 'Trung tá', 'Lê Văn An', 'Trưởng đội', 'Đội lái xe', 'doi', '0911110083', 'anlv@hvktcnan.edu.vn', 'manager', 'active', NULL),
+('CB084', 86, 'Trung tá Nguyễn Văn Bình', 'Trung tá', 'Nguyễn Văn Bình', 'Phó đội', 'Đội lái xe', 'doi', '0911110084', 'binhnv@hvktcnan.edu.vn', 'manager', 'active', NULL),
+('CB085', 87, 'Trung tá Lê Văn Dũng', 'Trung tá', 'Lê Văn Dũng', 'Trưởng đội', 'Đội bệnh xá', 'doi', '0911110085', 'dunglv@hvktcnan.edu.vn', 'manager', 'active', NULL),
+('CB086', 88, 'Thiếu tá Trần Thị Hạnh', 'Thiếu tá', 'Trần Thị Hạnh', 'Phó đội', 'Đội bệnh xá', 'doi', '0911110086', 'hantt@hvktcnan.edu.vn', 'manager', 'active', NULL);
+
 -- Chuan hoa du lieu ten: tach quan ham khoi fullName neu du lieu cu dang gop chung
 UPDATE officers
 SET fullName = TRIM(REPLACE(fullName, CONCAT(officerTitle, ' '), ''))
@@ -536,50 +551,30 @@ SET
     ELSE u.fullName
   END;
 
--- Chuan hoa username theo quy tac: ten + chu cai dau cua ho/ten dem (vd: Le Minh Thao -> thaolm)
+
+
+-- Dong bo username theo email noi bo (vd: le van an -> anlv)
 UPDATE users
-SET username = CASE id
-  WHEN 1 THEN 'thaolm'
-  WHEN 2 THEN 'cannv'
-  WHEN 3 THEN 'cuongnm'
-  WHEN 4 THEN 'hangptt'
-  WHEN 5 THEN 'sontv'
-  WHEN 6 THEN 'mailt'
-  WHEN 7 THEN 'huypq'
-  WHEN 8 THEN 'duchm'
-  WHEN 9 THEN 'lannt'
-  WHEN 10 THEN 'nambv'
-  WHEN 11 THEN 'huongdt'
-  WHEN 12 THEN 'longvt'
-  WHEN 13 THEN 'anhtd'
-  WHEN 14 THEN 'baong'
-  WHEN 15 THEN 'kietlt'
-  WHEN 16 THEN 'datph'
-  WHEN 17 THEN 'nambh'
-  WHEN 18 THEN 'tuanhv'
-  WHEN 19 THEN 'quandm'
-  WHEN 20 THEN 'vuta'
-  WHEN 21 THEN 'yennt'
-  WHEN 22 THEN 'hadn'
-  WHEN 23 THEN 'binhnq'
-  WHEN 24 THEN 'chitm'
-  WHEN 25 THEN 'namlh'
-  WHEN 26 THEN 'hungpq'
-  WHEN 27 THEN 'khoanv'
-  WHEN 28 THEN 'tamlv'
-  WHEN 29 THEN 'phucnm'
-  WHEN 30 THEN 'viettq'
-  WHEN 31 THEN 'hanhlt'
-  ELSE username
-END;
+SET username = LOWER(SUBSTRING_INDEX(email, '@', 1))
+WHERE email IS NOT NULL
+  AND email <> '';
+
+-- Chuan hoa chuc vu: tat ca role can bo se de la "Cán bộ"
+UPDATE officers
+SET position = 'Cán bộ'
+WHERE role = 'officer';
 
 -- Seed quyền mặc định theo vai trò
--- 1) Lịch trực ban: admin + manager
+-- 1) Lịch trực ban: chỉ Trưởng/Phó phòng HC-TH, Trưởng/Phó đội lái xe, Trưởng/Phó đội bệnh xá
+DELETE FROM duty_schedule_permissions;
+
 INSERT INTO duty_schedule_permissions (officerId, canManageDutySchedules, grantedByUserId)
 SELECT o.id, 1, 1
 FROM officers o
 JOIN users u ON u.id = o.userId
-WHERE u.role IN ('admin', 'manager')
+WHERE u.role = 'manager'
+  AND o.department IN ('Phòng hành chính tổng hợp', 'Đội lái xe', 'Đội bệnh xá')
+  AND o.position REGEXP 'Trưởng phòng|Phó trưởng phòng|Trưởng đội|Phó đội'
 ON DUPLICATE KEY UPDATE
   canManageDutySchedules = VALUES(canManageDutySchedules),
   grantedByUserId = VALUES(grantedByUserId),
@@ -649,9 +644,11 @@ SET headOfficerId = CASE name
   WHEN 'Khoa Hồ sơ - Lưu trữ' THEN 'CB071'
   WHEN 'Khoa Hậu cần' THEN 'CB075'
   WHEN 'Khoa Y Dược' THEN 'CB079'
+  WHEN 'Đội lái xe' THEN 'CB083'
+  WHEN 'Đội bệnh xá' THEN 'CB085'
   ELSE headOfficerId
 END
-WHERE departmentType = 'khoa';
+WHERE departmentType IN ('khoa', 'doi');
 
 UPDATE work_schedules ws
 JOIN departments d ON d.name = ws.department
@@ -860,6 +857,8 @@ INSERT INTO export_logs (userId, username, role, exportType, exportScope, export
 (1, 'thaolm', 'admin', 'both', 'week', 'pdf', 41),
 (5, 'sontv', 'manager', 'trucban', 'week', 'pdf', 36),
 (5, 'sontv', 'manager', 'trucban', 'week', 'pdf', 36);
+
+
 
 -- Verify tables were created
 SELECT 'Database initialized successfully (seeded, except leave_requests/notification_reads)!' AS status;

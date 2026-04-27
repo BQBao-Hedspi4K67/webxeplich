@@ -16,7 +16,7 @@ const tabRules = [
     canbo: 'Chỉ xem',
   },
   {
-    tab: 'Lập lịch công tác',
+    tab: 'Lịch sự kiện',
     chucNang: 'Tạo và cập nhật lịch họp/công tác theo tuần, xem dạng bảng hoặc danh sách.',
     admin: 'Thêm / Sửa / Xóa',
     quanly: 'Thêm / Sửa / Xóa',
@@ -58,7 +58,7 @@ const tabRules = [
     canbo: 'Không hiển thị',
   },
   {
-    tab: 'Quản trị tài khoản',
+    tab: 'Thông tin tài khoản',
     chucNang: 'Xem thông tin tài khoản và danh mục quyền hiện tại.',
     admin: 'Xem',
     quanly: 'Không hiển thị',

@@ -9,7 +9,7 @@ router.use(verifyToken);
 router.get('/', leaveRequestsCtrl.getLeaveRequests);
 router.get('/:id', leaveRequestsCtrl.getLeaveRequestById);
 router.post('/', leaveRequestsCtrl.createLeaveRequest);
-router.put('/:id', requireRole('admin', 'manager'), leaveRequestsCtrl.updateLeaveRequestStatus);
+router.put('/:id', leaveRequestsCtrl.updateLeaveRequestStatus);
 router.delete('/:id', requireRole('admin'), leaveRequestsCtrl.deleteLeaveRequest);
 
 export default router;

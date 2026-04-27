@@ -6,11 +6,13 @@ import schoolLogo from '../../assets/logo.png';
 const MainLayout = ({
   activePage,
   onNavigate,
+  allowedPages = [],
   user,
   onLogout,
   notifications = [],
   onMarkNotificationRead,
   onMarkAllNotificationsRead,
+  approvalPendingCount = 0,
   children,
 }) => {
   return (
@@ -24,10 +26,11 @@ const MainLayout = ({
           backgroundPosition: 'center',
         }}
       />
-      <Sidebar activePage={activePage} onNavigate={onNavigate} user={user} onLogout={onLogout} />
+      <Sidebar activePage={activePage} onNavigate={onNavigate} allowedPages={allowedPages} user={user} onLogout={onLogout} approvalPendingCount={approvalPendingCount} />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative z-10">
         <Topbar
           activePage={activePage}
+          allowedPages={allowedPages}
           user={user}
           onLogout={onLogout}
           onNavigate={onNavigate}

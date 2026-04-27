@@ -51,7 +51,7 @@ Hệ thống có 3 vai trò chính:
 
 1. Admin
 - Toàn quyền nghiệp vụ.
-- Quản trị tài khoản nội bộ.
+- Thông tin tài khoản nội bộ.
 - Duyệt/từ chối ý kiến trực ban.
 
 2. Manager
@@ -74,7 +74,7 @@ Hệ thống hiện đã triển khai các nhóm chức năng sau:
 - Tra cứu lịch tổng hợp.
 - Xuất/In lịch (preview, download, lịch sử xuất).
 - Ý kiến trực ban (gửi, duyệt, từ chối).
-- Quản trị tài khoản nội bộ.
+- Thông tin tài khoản nội bộ.
 - Thông báo theo đối tượng nhận.
 
 ## 6. Cơ chế thông báo theo mục tiêu

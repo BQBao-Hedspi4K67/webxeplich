@@ -217,7 +217,7 @@ const Dashboard = ({
             <table className="w-full min-w-[860px]">
               <thead>
                 <tr>
-                  {['Quân hàm + Họ và tên', 'Vị trí trực', 'Vai trò', 'Thời gian'].map((h) => (
+                  {['Họ và tên', 'Vị trí trực', 'Vai trò', 'Thời gian'].map((h) => (
                     <th key={h} className="table-th">{h}</th>
                   ))}
                 </tr>
@@ -255,7 +255,7 @@ const Dashboard = ({
           <table className="w-full min-w-[980px]">
             <thead>
               <tr>
-                {['Quân hàm + Họ và tên', 'Chức vụ', 'Đơn vị', 'Liên hệ', 'Vai trò', 'Trạng thái'].map(h => (
+                {['Họ và tên', 'Chức vụ', 'Đơn vị', 'Liên hệ', 'Vai trò', 'Trạng thái'].map(h => (
                   <th key={h} className="table-th">{h}</th>
                 ))}
               </tr>

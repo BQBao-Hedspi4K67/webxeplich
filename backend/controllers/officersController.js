@@ -13,6 +13,10 @@ import {
   createUserNotification,
   resolveUserIdByOfficerId,
 } from '../utils/notificationTargeting.js';
+import {
+  ensureAdminDelegationSchema,
+  listDelegatedOfficerIdsByAdmin,
+} from '../utils/adminDelegation.js';
 
 const USER_ROLE_TO_OFFICER_ROLE = {
   admin: 'leader',
@@ -222,23 +226,6 @@ export const getOfficers = async (req, res, next) => {
       let params = [];
 
       const isSystemScope = String(accessScope).toLowerCase() === 'system';
-
-      if (!isSystemScope && req.user?.role === 'manager') {
-        if (!requesterOfficer?.department) {
-          return res.json({
-            success: true,
-            data: [],
-            pagination: { total: 0, page: parseInt(page), limit: parseInt(limit), pages: 0 },
-          });
-        }
-        if (hasDepartmentIdColumn && requesterOfficer.departmentId) {
-          whereConditions.push('departmentId = ?');
-          params.push(requesterOfficer.departmentId);
-        } else {
-          whereConditions.push('department = ?');
-          params.push(requesterOfficer.department);
-        }
-      }
 
       if (!isSystemScope && req.user?.role === 'officer') {
         if (!requesterOfficer?.id) {
@@ -605,6 +592,173 @@ export const updateWorkSchedulePermission = async (req, res, next) => {
         message: nextCanCreate || nextCanApprove
           ? 'Đã cập nhật quyền lịch công tác.'
           : 'Đã thu hồi quyền lịch công tác.',
+      });
+    } finally {
+      connection.release();
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getAdminDelegations = async (req, res, next) => {
+  try {
+    const effectiveRole = req.user?.effectiveRole || req.user?.role;
+    if (!['admin', 'manager'].includes(effectiveRole)) {
+      return res.status(403).json({ success: false, error: 'Insufficient permissions', code: 'FORBIDDEN' });
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      await ensureAdminDelegationSchema(connection);
+      const delegatedOfficerIds = await listDelegatedOfficerIdsByAdmin(connection, req.user.id);
+      return res.json({ success: true, data: { delegatedOfficerIds } });
+    } finally {
+      connection.release();
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const updateAdminDelegation = async (req, res, next) => {
+  try {
+    const effectiveRole = req.user?.effectiveRole || req.user?.role;
+    if (!['admin', 'manager'].includes(effectiveRole)) {
+      return res.status(403).json({ success: false, error: 'Insufficient permissions', code: 'FORBIDDEN' });
+    }
+
+    const { id } = req.params;
+    const enabled = Boolean(req.body?.enabled);
+    const connection = await pool.getConnection();
+
+    try {
+      await ensureAdminDelegationSchema(connection);
+      const hasDepartmentIdColumn = await hasOfficersDepartmentIdColumn(connection);
+      const requesterOfficer = await resolveRequesterOfficer(connection, req.user || {});
+
+      const [officerRows] = await connection.execute(
+        `SELECT o.id,
+                o.userId,
+                o.fullName,
+                ${hasDepartmentIdColumn ? 'o.departmentId,' : 'NULL AS departmentId,'}
+                o.department,
+                u.role AS userRole
+         FROM officers o
+         LEFT JOIN users u ON u.id = o.userId
+         WHERE o.id = ?
+         LIMIT 1`,
+        [id]
+      );
+
+      if (!officerRows.length) {
+        return res.status(404).json({ success: false, error: 'Officer not found', code: 'OFFICER_NOT_FOUND' });
+      }
+
+      const officer = officerRows[0];
+      if (!officer.userId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Cán bộ chưa có tài khoản người dùng để ủy quyền.',
+          code: 'INVALID_DELEGATION_TARGET',
+        });
+      }
+
+      if (['admin', 'superadmin'].includes(String(officer.userRole || '').toLowerCase())) {
+        return res.status(400).json({
+          success: false,
+          error: 'Không thể ủy quyền cho tài khoản admin/superadmin.',
+          code: 'INVALID_DELEGATION_TARGET',
+        });
+      }
+
+      if (Number(officer.userId) === Number(req.user.id)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Không thể tự ủy quyền cho chính mình.',
+          code: 'INVALID_DELEGATION_TARGET',
+        });
+      }
+
+      const requesterDepartmentMatches = hasDepartmentIdColumn && requesterOfficer?.departmentId
+        ? Number(officer.departmentId || 0) === Number(requesterOfficer.departmentId || 0)
+        : String(officer.department || '').trim() === String(requesterOfficer?.department || '').trim();
+
+      if (effectiveRole === 'manager') {
+        if (String(officer.userRole || '').toLowerCase() !== 'officer') {
+          return res.status(400).json({
+            success: false,
+            error: 'Quản lý chỉ được ủy quyền cho cán bộ trong đơn vị của mình.',
+            code: 'INVALID_DELEGATION_TARGET',
+          });
+        }
+
+        if (!requesterDepartmentMatches) {
+          return res.status(403).json({
+            success: false,
+            error: 'Quản lý chỉ được ủy quyền cho cán bộ cùng phòng/khoa.',
+            code: 'FORBIDDEN',
+          });
+        }
+      }
+
+      if (effectiveRole === 'admin' && req.user?.role !== 'admin' && !requesterDepartmentMatches) {
+        return res.status(403).json({
+          success: false,
+          error: 'Người được ủy quyền admin chỉ được ủy quyền cho thành viên cùng phòng/khoa.',
+          code: 'FORBIDDEN',
+        });
+      }
+
+      if (enabled) {
+        await connection.execute(
+          `INSERT INTO admin_delegations (delegatorUserId, delegateUserId, delegateOfficerId, isActive)
+           VALUES (?, ?, ?, 1)
+           ON DUPLICATE KEY UPDATE
+             delegateOfficerId = VALUES(delegateOfficerId),
+             isActive = 1,
+             updatedAt = CURRENT_TIMESTAMP`,
+          [req.user.id, officer.userId, officer.id]
+        );
+      } else {
+        await connection.execute(
+          `UPDATE admin_delegations
+           SET isActive = 0,
+               updatedAt = CURRENT_TIMESTAMP
+           WHERE delegatorUserId = ?
+             AND delegateUserId = ?`,
+          [req.user.id, officer.userId]
+        );
+      }
+
+      await createUserNotification(connection, {
+        title: enabled ? 'Bạn đã được ủy quyền quyền hạn' : 'Bạn đã bị thu hồi quyền hạn được ủy quyền',
+        content: enabled ? 'Bạn vừa được cấp quyền hạn thay thế từ người quản lý trực tiếp.' : 'Quyền hạn được ủy quyền của bạn đã bị thu hồi.',
+        type: enabled ? 'info' : 'warning',
+        module: 'canbo',
+        entityType: 'admin_delegation',
+        entityId: officer.id,
+        targetUserId: officer.userId,
+      });
+
+      await logActivity({
+        actorUserId: req.user?.id,
+        actorUsername: req.user?.username,
+        actorRole: req.user?.role,
+        module: 'canbo',
+        action: enabled ? 'grant_permission' : 'revoke_permission',
+        entityType: 'admin_delegation',
+        entityId: officer.id,
+        summary: `${enabled ? 'Ủy quyền' : 'Bỏ ủy quyền'} quyền cho ${officer.fullName}`,
+      });
+
+      return res.json({
+        success: true,
+        data: {
+          officerId: officer.id,
+          delegated: enabled,
+        },
+        message: enabled ? 'Đã ủy quyền thành công.' : 'Đã Bỏ ủy quyền.',
       });
     } finally {
       connection.release();

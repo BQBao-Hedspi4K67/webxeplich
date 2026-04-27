@@ -56,16 +56,29 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
   const canCreate = Boolean(
     user?.canCreateWorkSchedules
     || user?.backendRole === 'admin'
+    || user?.backendRole === 'superadmin'
     || user?.backendRole === 'manager'
   );
   const canEdit = ['Quản trị viên', 'Quản lý'].includes(user?.role);
 
   const [data, setData] = useState(lichCongTacData);
   const [officerOptions, setOfficerOptions] = useState(canBoData || []);
-  const [viewMode, setViewMode] = useState('month'); // 'week' | 'month'
-  const [weekOffset, setWeekOffset] = useState(0);
-  const [monthOffset, setMonthOffset] = useState(0);
+  const [viewMode, setViewMode] = useState(() => sessionStorage.getItem('lapLichCongTacViewMode') || 'month'); // 'week' | 'month'
+  const [weekOffset, setWeekOffset] = useState(() => Number(sessionStorage.getItem('lapLichCongTacWeekOffset')) || 0);
+  const [monthOffset, setMonthOffset] = useState(() => Number(sessionStorage.getItem('lapLichCongTacMonthOffset')) || 0);
   const [showModal, setShowModal] = useState(false);
+
+  useEffect(() => {
+    sessionStorage.setItem('lapLichCongTacViewMode', viewMode);
+  }, [viewMode]);
+
+  useEffect(() => {
+    sessionStorage.setItem('lapLichCongTacWeekOffset', String(weekOffset));
+  }, [weekOffset]);
+
+  useEffect(() => {
+    sessionStorage.setItem('lapLichCongTacMonthOffset', String(monthOffset));
+  }, [monthOffset]);
   const [form, setForm] = useState(initialForm);
   const [editId, setEditId] = useState(null);
   const [selectedDay, setSelectedDay] = useState(null);
@@ -319,158 +332,94 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
       )}
 
       {viewMode === 'week' ? (
-        /* Weekly calendar view */
         <div className="card-lg p-0 overflow-hidden">
-          {/* Day headers */}
-          <div className="grid grid-cols-8 border-b border-slate-100">
-            <div className="p-3 bg-slate-50 border-r border-slate-100" />
-            {WEEK_DAYS.map((day, i) => {
-              const isToday = toDateOnly(weekDates[i]) === toDateOnly(new Date());
-              const events = getEventsForDate(i);
-              const holiday = HOLIDAYS[toDateOnly(weekDates[i])];
-              return (
-                <div key={i} className={`p-3 text-center border-r border-slate-100 last:border-r-0 ${isToday ? 'bg-blue-50' : 'bg-slate-50'}`}>
-                  <div className={`text-xs font-semibold ${isToday ? 'text-blue-600' : 'text-slate-500'}`}>{day}</div>
-                  <div className={`text-lg font-extrabold mt-0.5 ${isToday ? 'text-blue-600' : 'text-slate-800'}`}>
-                    {String(weekDates[i].getDate()).padStart(2, '0')}
-                  </div>
-                  {holiday && <div className="text-[10px] text-red-600 font-semibold line-clamp-1">{holiday}</div>}
-                  {events.length > 0 && (
-                    <div className={`text-[10px] mt-0.5 font-medium ${isToday ? 'text-blue-500' : 'text-slate-400'}`}>
-                      {events.length} lịch
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 className="text-base font-bold text-slate-800">Lịch tuần</h3>
+            {canCreate && (
+              <button onClick={() => openAdd(0)} className="btn-primary !py-1.5 !px-3 text-sm">
+                <Plus size={14} /> Thêm lịch
+              </button>
+            )}
           </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[980px]">
+              <thead>
+                <tr>
+                  {['Ngày', 'Buổi', 'Giờ', 'Nội dung', 'Địa điểm', 'Đơn vị', 'Trạng thái'].map((h) => (
+                    <th key={h} className="table-th">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {weekDates.flatMap((dayDate, dayIdx) => {
+                  const dayStr = toDateOnly(dayDate);
+                  const holiday = HOLIDAYS[dayStr];
+                  const rows = weekData
+                    .filter((x) => x.ngay === dayStr)
+                    .sort((a, b) => String(a.gioBatDau || '').localeCompare(String(b.gioBatDau || '')));
 
-          {/* Time grid - continuous layout */}
-          <div className="overflow-y-auto max-h-[600px] relative">
-            {/* Time labels and grid lines */}
-            <div className="grid grid-cols-8 relative">
-              <div className="col-span-1">
-                {HOURS.map((hour, hi) => (
-                  <div key={hi} className="h-16 p-2 text-[11px] text-slate-400 font-medium border-r border-slate-100 border-b border-slate-50 bg-slate-50/50 flex items-start">
-                    {hour}
-                  </div>
-                ))}
-              </div>
-              
-              {/* Day columns with events */}
-              {[0,1,2,3,4,5,6].map(dayIdx => {
-                const dayEvents = getEventsForDate(dayIdx);
-                const isToday = toDateOnly(weekDates[dayIdx]) === toDateOnly(new Date());
-                
-                // Xử lý overlapping events - gán column cho mỗi event
-                const processedEvents = dayEvents.map((evt, idx) => {
-                  const startHour = parseInt(evt.gioBatDau.split(':')[0]);
-                  const startMin = parseInt(evt.gioBatDau.split(':')[1]);
-                  const endHour = parseInt(evt.gioKetThuc.split(':')[0]);
-                  const endMin = parseInt(evt.gioKetThuc.split(':')[1]);
-                  const startTotalMin = startHour * 60 + startMin;
-                  const endTotalMin = endHour * 60 + endMin;
-                  
-                  return {
-                    ...evt,
-                    startTotalMin,
-                    endTotalMin,
-                    originalIndex: idx
-                  };
-                }).sort((a, b) => a.startTotalMin - b.startTotalMin);
-                
-                // Tìm overlapping events và gán column
-                const columns = [];
-                processedEvents.forEach(evt => {
-                  let columnIdx = 0;
-                  for (let col of columns) {
-                    const overlapping = col.some(e => 
-                      !(e.endTotalMin <= evt.startTotalMin || e.startTotalMin >= evt.endTotalMin)
-                    );
-                    if (!overlapping) {
-                      columnIdx = Math.max(columnIdx, columns.indexOf(col) + 1);
-                    }
+                  if (!rows.length) {
+                    return [
+                      <tr key={`${dayStr}-empty`} className="hover:bg-slate-50/50">
+                        <td className="table-td">
+                          <div className="font-semibold text-slate-700">{WEEK_DAYS[dayIdx]} {formatDDMM(dayDate)}</div>
+                          {holiday && <div className="text-xs text-red-600">{holiday}</div>}
+                        </td>
+                        <td className="table-td text-slate-400">-</td>
+                        <td className="table-td text-slate-400">-</td>
+                        <td className="table-td text-slate-400">Không có lịch</td>
+                        <td className="table-td text-slate-400">-</td>
+                        <td className="table-td text-slate-400">-</td>
+                        <td className="table-td text-slate-400">-</td>
+                      </tr>,
+                    ];
                   }
-                  
-                  if (!columns[columnIdx]) columns[columnIdx] = [];
-                  columns[columnIdx].push({ ...evt, columnIdx });
-                });
-                
-                const totalColumns = columns.length || 1;
-                const eventsWithLayout = processedEvents.map(evt => {
-                  const col = columns.find(c => c.some(e => e.id === evt.id));
-                  const columnIdx = col ? col[0].columnIdx : 0;
-                  return { ...evt, columnIdx, totalColumns };
-                });
-                
-                return (
-                  <div key={dayIdx} className={`relative col-span-1 border-r border-slate-100 last:border-r-0 ${isToday ? 'bg-blue-50/30' : 'bg-white'}`}>
-                    {canCreate && (
-                      <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openAdd(dayIdx);
-                          }}
-                          className={`pointer-events-auto inline-flex items-center justify-center w-12 h-12 rounded-full border-2 shadow-md transition-all hover:scale-105 ${isToday
-                            ? 'border-blue-300 bg-white text-blue-600 hover:bg-blue-50'
-                            : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800'
-                          }`}
-                          title={`Thêm lịch ngày ${formatDDMM(weekDates[dayIdx])}`}
-                          aria-label={`Thêm lịch ngày ${formatDDMM(weekDates[dayIdx])}`}
-                        >
-                          <Plus size={22} strokeWidth={2.5} />
-                        </button>
-                      </div>
-                    )}
-                    {/* Hour grid lines */}
-                    {HOURS.map((hour, hi) => (
-                      <div key={hi} className="h-16 border-b border-slate-50 relative" />
-                    ))}
-                    
-                    {/* Events overlay */}
-                    <div className="absolute inset-0 pointer-events-none">
-                      {eventsWithLayout.map(evt => {
-                        const colorInfo = LOAI_LICH_COLORS[evt.loai] || LOAI_LICH_COLORS.hop;
-                        
-                        const firstHour = parseInt(HOURS[0].split(':')[0]);
-                        const firstHourTotalMin = firstHour * 60;
-                        const offsetMin = evt.startTotalMin - firstHourTotalMin;
-                        const topOffset = (offsetMin / 60) * 64;
-                        
-                        const durationMin = evt.endTotalMin - evt.startTotalMin;
-                        const height = Math.max(40, (durationMin / 60) * 64);
-                        
-                        // Tính left và width dựa trên column
-                        const widthPercent = (100 / evt.totalColumns);
-                        const leftPercent = (evt.columnIdx * widthPercent);
-                        
-                        return (
-                          <div
-                            key={evt.id}
-                            onClick={canEdit ? (e => { e.stopPropagation(); openEdit(evt); }) : undefined}
-                            className={`absolute p-2 rounded-lg cursor-pointer hover:opacity-90 transition-opacity border border-current border-opacity-30 pointer-events-auto overflow-hidden ${colorInfo.bg} ${colorInfo.text}`}
-                            style={{
-                              top: `${topOffset}px`,
-                              height: `${height}px`,
-                              minHeight: '40px',
-                              left: `${leftPercent}%`,
-                              right: `${100 - (leftPercent + widthPercent)}%`,
-                              margin: '2px'
-                            }}
-                            title={evt.tieuDe}
-                          >
-                            <div className="text-[10px] font-bold leading-tight line-clamp-2">{evt.tieuDe}</div>
-                            <div className="text-[9px] opacity-70 mt-0.5">{formatDisplayTime(evt.gioBatDau)}–{formatDisplayTime(evt.gioKetThuc)}</div>
+
+                  return rows.map((evt, idx) => {
+                    const startHour = Number(String(evt.gioBatDau || '00:00').slice(0, 2));
+                    const buoi = startHour < 12 ? 'Sáng' : startHour < 18 ? 'Chiều' : 'Tối';
+                    const colorInfo = LOAI_LICH_COLORS[evt.loai] || LOAI_LICH_COLORS.hop;
+                    const isPending = evt.trangThaiDuyet === 'pending';
+
+                    return (
+                      <tr
+                        key={evt.id}
+                        className={`hover:bg-slate-50/70 ${isPending ? 'bg-amber-50/40' : ''}`}
+                        onClick={canEdit ? () => openEdit(evt) : undefined}
+                      >
+                        <td className="table-td">
+                          {idx === 0 ? (
+                            <>
+                              <div className="font-semibold text-slate-700">{WEEK_DAYS[dayIdx]} {formatDDMM(dayDate)}</div>
+                              {holiday && <div className="text-xs text-red-600">{holiday}</div>}
+                            </>
+                          ) : null}
+                        </td>
+                        <td className="table-td text-sm text-slate-700">{buoi}</td>
+                        <td className="table-td text-sm font-semibold text-slate-700">
+                          {formatDisplayTime(evt.gioBatDau)} - {formatDisplayTime(evt.gioKetThuc)}
+                        </td>
+                        <td className="table-td">
+                          <div className={`rounded-lg px-2.5 py-2 border border-current border-opacity-30 ${colorInfo.bg} ${colorInfo.text} ${isPending ? 'opacity-70 border-dashed' : ''}`}>
+                            <div className="font-semibold text-sm">{evt.tieuDe}</div>
+                            {evt.ghiChu && <div className="text-xs mt-0.5 opacity-80">{evt.ghiChu}</div>}
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                        </td>
+                        <td className="table-td text-sm text-slate-700">{evt.diaDiem || '-'}</td>
+                        <td className="table-td text-sm text-slate-700">{evt.donVi || '-'}</td>
+                        <td className="table-td">
+                          {isPending ? (
+                            <span className="badge bg-amber-100 text-amber-700">Chưa duyệt</span>
+                          ) : (
+                            <span className="badge bg-emerald-100 text-emerald-700">Đã duyệt</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  });
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       ) : viewMode === 'month' ? (
@@ -530,10 +479,11 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                       {dayEvents.slice(0, 3).map((evt, eIdx) => {
                         const colorInfo = LOAI_LICH_COLORS[evt.loai] || LOAI_LICH_COLORS.hop;
                         const timeDisplay = evt.gioBatDau ? `${evt.gioBatDau.slice(0, 5)}` : '';
+                        const isPending = evt.trangThaiDuyet === 'pending';
                         return (
                           <div 
                             key={evt.id}
-                            className={`text-[11px] px-2 py-1 rounded-md transition-all duration-150 cursor-pointer hover:shadow-sm border border-current border-opacity-30 group/evt ${colorInfo.bg} ${colorInfo.text}`}
+                            className={`text-[11px] px-2 py-1 rounded-md transition-all duration-150 cursor-pointer hover:shadow-sm border border-current border-opacity-30 group/evt ${colorInfo.bg} ${colorInfo.text} ${isPending ? 'opacity-65 border-dashed' : ''}`}
                             onClick={(e) => { e.stopPropagation(); openEdit(evt); }}
                             title={evt.tieuDe}>
                             <div className="flex items-start gap-1">
@@ -542,6 +492,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                               )}
                               <span className="font-medium flex-1 group-hover/evt:underline">{evt.tieuDe}</span>
                             </div>
+                            {isPending && <div className="text-[9px] font-bold mt-0.5 text-amber-700">Chưa duyệt</div>}
                           </div>
                         );
                       })}

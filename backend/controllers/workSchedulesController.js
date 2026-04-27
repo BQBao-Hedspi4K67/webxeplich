@@ -93,6 +93,57 @@ const resolveRequesterOfficer = async (connection, reqUser = {}) => {
   return rowsByProfile[0] || null;
 };
 
+const normalizeParticipantPayload = (participants) => {
+  if (!participants) return { units: [], boardMembers: [] };
+  if (typeof participants === 'string') {
+    try {
+      const parsed = JSON.parse(participants);
+      return {
+        units: Array.isArray(parsed?.units) ? parsed.units : [],
+        boardMembers: Array.isArray(parsed?.boardMembers) ? parsed.boardMembers : [],
+      };
+    } catch {
+      return { units: [], boardMembers: [] };
+    }
+  }
+
+  return {
+    units: Array.isArray(participants?.units) ? participants.units : [],
+    boardMembers: Array.isArray(participants?.boardMembers) ? participants.boardMembers : [],
+  };
+};
+
+const collectParticipantOfficerIds = async (connection, participants) => {
+  const normalized = normalizeParticipantPayload(participants);
+  const officerIds = new Set();
+
+  for (const officerId of normalized.boardMembers) {
+    if (officerId) officerIds.add(String(officerId));
+  }
+
+  const units = normalized.units
+    .map((x) => String(x || '').trim())
+    .filter(Boolean)
+    .filter((x) => x !== 'Ban Giám đốc');
+
+  if (!units.length) return Array.from(officerIds);
+
+  const placeholders = units.map(() => '?').join(', ');
+  const [rows] = await connection.execute(
+    `SELECT id
+     FROM officers
+     WHERE status = 'active'
+       AND department IN (${placeholders})`,
+    units
+  );
+
+  for (const row of rows) {
+    if (row?.id) officerIds.add(String(row.id));
+  }
+
+  return Array.from(officerIds);
+};
+
 const buildQuery = (filters = {}, options = {}) => {
   const {
     search = '',
@@ -190,6 +241,9 @@ export const getWorkSchedules = async (req, res, next) => {
 
     try {
       await ensureWorkScheduleApprovalSchema(connection);
+      await ensureWorkScheduleAccessSchema(connection);
+      const accessState = await getWorkScheduleAccessState(connection, req.user || {});
+      const requesterOfficer = await resolveRequesterOfficer(connection, req.user || {});
 
       const { whereClause, params } = buildQuery({
         search,
@@ -202,6 +256,18 @@ export const getWorkSchedules = async (req, res, next) => {
         role: req.user?.role,
       });
 
+      let visibilityClause = '';
+      const visibilityParams = [];
+      if (!accessState.canApproveWorkSchedules) {
+        visibilityClause = `${whereClause ? ' AND' : ' WHERE'} (ws.approvalStatus = 'approved' OR (ws.approvalStatus = 'pending' AND (ws.createdByUserId = ?${requesterOfficer?.id ? ' OR ws.createdByOfficerId = ?' : ''})))`;
+        visibilityParams.push(req.user?.id || 0);
+        if (requesterOfficer?.id) {
+          visibilityParams.push(requesterOfficer.id);
+        }
+      }
+
+      const queryParams = [...params, ...visibilityParams];
+
       const [countRows] = await connection.execute(
         `SELECT COUNT(*) as total
          FROM work_schedules ws
@@ -209,16 +275,16 @@ export const getWorkSchedules = async (req, res, next) => {
          LEFT JOIN officers o1 ON o1.id = ws.officer1Id
          LEFT JOIN officers o2 ON o2.id = ws.officer2Id
          LEFT JOIN officers cmd ON cmd.id = ws.commanderOfficerId
-         ${whereClause}`,
-        params
+         ${whereClause}${visibilityClause}`,
+        queryParams
       );
 
       const [rows] = await connection.execute(
         `${scheduleSelect}
-         ${whereClause}
+         ${whereClause}${visibilityClause}
          ORDER BY ws.date ASC
          LIMIT ${parseInt(limit, 10)} OFFSET ${offset}`,
-        params
+        queryParams
       );
 
       res.json({
@@ -248,11 +314,18 @@ export const getWorkScheduleById = async (req, res, next) => {
       await ensureWorkScheduleApprovalSchema(connection);
       await ensureWorkScheduleAccessSchema(connection);
       const accessState = await getWorkScheduleAccessState(connection, req.user || {});
-      const canViewPending = Boolean(accessState.canCreateWorkSchedules || accessState.canApproveWorkSchedules);
+      const requesterOfficer = await resolveRequesterOfficer(connection, req.user || {});
+      const canViewPending = Boolean(accessState.canApproveWorkSchedules);
+      const ownPendingClause = requesterOfficer?.id
+        ? " OR (ws.approvalStatus = 'pending' AND (ws.createdByUserId = ? OR ws.createdByOfficerId = ?))"
+        : " OR (ws.approvalStatus = 'pending' AND ws.createdByUserId = ?)";
+      const ownPendingParams = requesterOfficer?.id
+        ? [req.user?.id || 0, requesterOfficer.id]
+        : [req.user?.id || 0];
 
       const [rows] = await connection.execute(
-        `${scheduleSelect} WHERE ws.id = ?${canViewPending ? '' : " AND ws.approvalStatus = 'approved'"}`,
-        [id]
+        `${scheduleSelect} WHERE ws.id = ?${canViewPending ? '' : ` AND (ws.approvalStatus = 'approved'${ownPendingClause})`}`,
+        canViewPending ? [id] : [id, ...ownPendingParams]
       );
 
       if (!rows.length) {
@@ -337,9 +410,9 @@ export const createWorkSchedule = async (req, res, next) => {
       );
       const nextNum = (maxIdRows[0].maxNum || 0) + 1;
       const newId = `LCT${String(nextNum).padStart(3, '0')}`;
-      const approvalStatus = 'pending';
-      const approvedByUserId = null;
-      const approvedAt = null;
+      const approvalStatus = accessState.canApproveWorkSchedules ? 'approved' : 'pending';
+      const approvedByUserId = accessState.canApproveWorkSchedules ? req.user?.id || null : null;
+      const approvedAt = accessState.canApproveWorkSchedules ? new Date() : null;
       const requesterOfficer = await resolveRequesterOfficer(connection, req.user || {});
       const departmentRef = departmentId
         ? await resolveDepartmentRef(connection, { departmentId, department })
@@ -378,6 +451,25 @@ export const createWorkSchedule = async (req, res, next) => {
 
       await ensureNotificationTargetingSchema(connection);
 
+      const recipientOfficerIds = new Set([resolvedResponsibleOfficerId]);
+      const participantOfficerIds = await collectParticipantOfficerIds(connection, participants);
+      for (const officerId of participantOfficerIds) {
+        if (officerId) recipientOfficerIds.add(officerId);
+      }
+
+      for (const officerId of recipientOfficerIds) {
+        const targetUserId = await resolveUserIdByOfficerId(connection, officerId);
+        await createUserNotification(connection, {
+          title: 'Bạn có lịch công tác mới',
+          content: `${title} (${date})`,
+          type: 'info',
+          module: 'lichcongtac',
+          entityType: 'work_schedule',
+          entityId: newId,
+          targetUserId,
+        });
+      }
+
       if (approvalStatus === 'pending') {
         await createRoleNotification(connection, {
           title: 'Có lịch công tác chờ duyệt',
@@ -411,17 +503,6 @@ export const createWorkSchedule = async (req, res, next) => {
             targetUserId: row.userId,
           });
         }
-      } else {
-        const targetUserId = await resolveUserIdByOfficerId(connection, resolvedResponsibleOfficerId);
-        await createUserNotification(connection, {
-          title: 'Bạn được phân công lịch công tác mới',
-          content: `${title} (${date})`,
-          type: 'info',
-          module: 'lichcongtac',
-          entityType: 'work_schedule',
-          entityId: newId,
-          targetUserId,
-        });
       }
 
       await logActivity({
@@ -594,6 +675,7 @@ export const updateWorkSchedule = async (req, res, next) => {
         });
       }
 
+      const accessState = await getWorkScheduleAccessState(connection, req.user || {});
       const fields = [];
       const params = [];
       const [currentRows] = await connection.execute(
@@ -636,7 +718,7 @@ export const updateWorkSchedule = async (req, res, next) => {
         addField('commanderOfficerId', null);
       }
 
-      if (req.user?.role !== 'admin' && currentStatus === 'approved') {
+      if (!accessState.canApproveWorkSchedules && currentStatus === 'approved') {
         addField('approvalStatus', 'pending');
         addField('approvedByUserId', null);
         addField('approvedAt', null);

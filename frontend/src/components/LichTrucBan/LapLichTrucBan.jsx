@@ -43,7 +43,7 @@ const formatDDMM = (value) => {
 const commanderEligible = (cb) => {
   if (!cb) return false;
   const position = String(cb.chucVu || '');
-  return cb.vaiTro === 'Quản lý' || /(PT\s*Kh[oó]a|Ph[oó]\s*tr[uư][oở]ng\s*kh[oó]a|Tr[uư][oở]ng\s*ph[oò]ng)/i.test(position);
+  return cb.vaiTro === 'Quản lý' || /(PT\s*Kh[oó]a|Ph[oó]\s*tr[uư][oở]ng\s*kh[oó]a|Tr[uư][oở]ng\s*ph[oò]ng|Trưởng\s*đội)/i.test(position);
 };
 
 const directorEligible = (cb) => {
@@ -66,10 +66,11 @@ const MODE_STORAGE_KEY = 'lap-lich-truc-ban-mode';
 const WEEK_OFFSET_STORAGE_KEY = 'lap-lich-truc-ban-week-offset';
 
 const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayData = [], reloadData }) => {
-  const canEdit = Boolean(user?.canManageDutySchedules) || user?.backendRole === 'admin' || user?.role === 'admin' || user?.role === 'Quản trị viên';
+  const canEdit = Boolean(user?.canManageDutySchedules) || user?.backendRole === 'admin' || user?.backendRole === 'superadmin' || user?.role === 'admin' || user?.role === 'Quản trị viên';
   const canGrantPermission =
     Boolean(user?.canGrantDutySchedulePermissions)
     || user?.backendRole === 'admin'
+    || user?.backendRole === 'superadmin'
     || user?.role === 'Quản trị viên'
     || String(user?.department || '').trim() === 'Phòng hành chính tổng hợp';
 
@@ -714,7 +715,7 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
           <table className="w-full min-w-[800px]">
             <thead>
               <tr>
-                <th className="table-th">Quân hàm + Họ và tên</th>
+                <th className="table-th">Họ và tên</th>
                 <th className="table-th">Chức vụ</th>
                 <th className="table-th">Đơn vị</th>
                 <th className="table-th text-center">Ngày thường</th>
@@ -826,7 +827,7 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
           <table className="w-full min-w-[960px]">
             <thead>
               <tr>
-                <th className="table-th">Quân hàm + Họ và tên</th>
+                <th className="table-th">Họ và tên</th>
                 <th className="table-th">Chức vụ</th>
                 <th className="table-th">Đơn vị</th>
                 <th className="table-th">Loại quyền</th>

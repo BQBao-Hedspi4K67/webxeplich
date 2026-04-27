@@ -3,23 +3,23 @@ import Login from './pages/Login';
 import MainLayout from './components/Layout/MainLayout';
 import Dashboard from './components/Dashboard/Dashboard';
 import QuanLyCanBo from './components/CanBo/QuanLyCanBo';
-import LapLichCongTac from './components/LichCongTac/LapLichCongTac';
-import LapLichTrucBan from './components/LichTrucBan/LapLichTrucBan';
+import LichTongHop from './components/LichTongHop/LichTongHop';
 import LichCuaToi from './components/LichCuaToi/LichCuaToi';
-import TraCuuLich from './components/TraCuu/TraCuuLich';
-import XuatLich from './components/XuatLich/XuatLich';
 import QuanLyNgayLe from './components/NgayLe/QuanLyNgayLe';
 import QuanLyPhongBan from './components/PhongBan/QuanLyPhongBan';
-import YKienPhanHoi from './components/YKien/YKienPhanHoi';
 import BangQuyTrinh from './components/QuyTrinh/BangQuyTrinh';
 import TatCaThongBao from './components/ThongBao/TatCaThongBao';
+import YKienPhanHoi from './components/YKien/YKienPhanHoi';
 import apiClient from './services/api';
 
 const BACKEND_TO_UI_ROLE = {
+  superadmin: 'Quản trị viên',
   admin: 'Quản trị viên',
   manager: 'Quản lý',
   officer: 'Cán bộ',
 };
+
+const SUPERADMIN_PAGES = ['canbo', 'ngayle', 'phongban', 'taikhoan'];
 
 const OFFICER_ROLE_TO_UI = {
   leader: 'Lãnh đạo',
@@ -270,7 +270,7 @@ const TaiKhoan = ({ user, onUserContactUpdated }) => {
   return (
     <div className="max-w-4xl mx-auto space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-800">Quản trị tài khoản</h2>
+        <h2 className="text-xl font-bold text-slate-800">Thông tin tài khoản</h2>
       </div>
       <div className="card">
         <div className="flex items-center gap-4 pb-4 border-b border-slate-100 mb-4">
@@ -388,27 +388,36 @@ const PAGE_COMPONENTS = {
   dashboard: Dashboard,
   thongbao: TatCaThongBao,
   canbo: QuanLyCanBo,
-  lichcongtac: LapLichCongTac,
-  lichtrucan: LapLichTrucBan,
+  lichcongtac: LichTongHop,
   lichcuatoi: LichCuaToi,
-  tracuu: TraCuuLich,
-  xuat: XuatLich,
   ngayle: QuanLyNgayLe,
   phongban: QuanLyPhongBan,
   ykien: YKienPhanHoi,
-  quytrinh: BangQuyTrinh,
   taikhoan: TaiKhoan,
 };
 
 const PAGE_ACCESS = {
-  'Quản trị viên': ['dashboard', 'thongbao', 'canbo', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ngayle', 'phongban', 'ykien', 'quytrinh', 'taikhoan'],
-  'Quản lý': ['dashboard', 'thongbao', 'canbo', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ngayle', 'ykien', 'quytrinh', 'taikhoan'],
-  'Cán bộ': ['dashboard', 'thongbao', 'lichcongtac', 'lichtrucan', 'lichcuatoi', 'tracuu', 'xuat', 'ykien', 'quytrinh', 'taikhoan'],
+  'Quản trị viên': ['dashboard', 'thongbao', 'canbo', 'lichcongtac', 'lichcuatoi', 'ykien', 'taikhoan'],
+  'Quản lý': ['dashboard', 'thongbao', 'canbo', 'lichcongtac', 'lichcuatoi', 'ykien', 'taikhoan'],
+  'Cán bộ': ['dashboard', 'thongbao', 'canbo', 'lichcongtac', 'lichcuatoi', 'ykien', 'taikhoan'],
+};
+
+const resolveAllowedPages = (currentUser) => {
+  if (currentUser?.backendRole === 'superadmin') {
+    return SUPERADMIN_PAGES;
+  }
+  if (currentUser?.isDelegatedAdmin) {
+    return PAGE_ACCESS['Quản trị viên'] || ['dashboard'];
+  }
+  if (currentUser?.isDelegatedManager) {
+    return PAGE_ACCESS['Quản lý'] || ['dashboard'];
+  }
+  return PAGE_ACCESS[currentUser?.role] || ['dashboard'];
 };
 
 function App() {
   const [user, setUser] = useState(null);
-  const [activePage, setActivePage] = useState('dashboard');
+  const [activePage, setActivePage] = useState(() => sessionStorage.getItem('activePage') || 'dashboard');
   const [loadingData, setLoadingData] = useState(false);
   const [canBoData, setCanBoData] = useState([]);
   const [lichCongTacData, setLichCongTacData] = useState([]);
@@ -597,6 +606,12 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (activePage) {
+      sessionStorage.setItem('activePage', activePage);
+    }
+  }, [activePage]);
+
+  useEffect(() => {
     const token = apiClient.getAuthToken();
     if (!token) return;
 
@@ -613,8 +628,12 @@ function App() {
           name: profile.fullName,
           email: profile.email,
           phone: profile.phone || '',
-          role: BACKEND_TO_UI_ROLE[profile.role] || 'Cán bộ',
-          backendRole: profile.role,
+          role: BACKEND_TO_UI_ROLE[profile.effectiveRole || profile.backendRole || profile.role] || 'Cán bộ',
+          baseRole: BACKEND_TO_UI_ROLE[profile.role] || 'Cán bộ',
+          backendRole: profile.backendRole || profile.effectiveRole || profile.role,
+          effectiveBackendRole: profile.effectiveRole || profile.backendRole || profile.role,
+          isDelegatedAdmin: Boolean(profile.isDelegatedAdmin),
+          isDelegatedManager: Boolean(profile.isDelegatedManager),
           avatar: profile.avatar,
           position: profile.position || '',
           department: profile.department || '',
@@ -668,8 +687,12 @@ function App() {
       name: userData.fullName,
       email: userData.email,
       phone: userData.phone || '',
-      role: BACKEND_TO_UI_ROLE[userData.role] || 'Cán bộ',
-      backendRole: userData.role,
+      role: BACKEND_TO_UI_ROLE[userData.effectiveRole || userData.backendRole || userData.role] || 'Cán bộ',
+      baseRole: BACKEND_TO_UI_ROLE[userData.role] || 'Cán bộ',
+      backendRole: userData.backendRole || userData.effectiveRole || userData.role,
+      effectiveBackendRole: userData.effectiveRole || userData.backendRole || userData.role,
+      isDelegatedAdmin: Boolean(userData.isDelegatedAdmin),
+      isDelegatedManager: Boolean(userData.isDelegatedManager),
       avatar: userData.avatar,
       position: userData.position || '',
       department: userData.department || '',
@@ -719,13 +742,33 @@ function App() {
     return <Login onLogin={handleLogin} />;
   }
 
-  const allowedPages = PAGE_ACCESS[user.role] || ['dashboard'];
-  const safeActivePage = allowedPages.includes(activePage) ? activePage : 'dashboard';
+  const allowedPages = resolveAllowedPages(user);
+  const defaultPage = allowedPages[0] || 'dashboard';
+  const safeActivePage = allowedPages.includes(activePage) ? activePage : defaultPage;
   const navigateSafe = (page) => {
     if (allowedPages.includes(page)) setActivePage(page);
   };
 
-  const PageComponent = PAGE_COMPONENTS[safeActivePage] || Dashboard;
+  const PageComponent = PAGE_COMPONENTS[safeActivePage] || PAGE_COMPONENTS[defaultPage] || Dashboard;
+  const canReviewLeaveRequests = Boolean(
+    user?.isDelegatedManager
+    || (user?.role === 'Quản lý' && /(Trưởng\s*phòng|Phó\s*trưởng\s*phòng|Trưởng\s*khoa|Phó\s*trưởng\s*khoa|Trưởng\s*đội|Phó\s*đội)/i.test(String(user?.position || '')))
+  );
+  const canReviewWorkSchedules = Boolean(
+    user?.canApproveWorkSchedules
+    || user?.canApproveWorkSchedulesByRole
+    || user?.canApproveWorkSchedulesByPermission
+    || user?.backendRole === 'admin'
+    || user?.backendRole === 'superadmin'
+    || user?.isDelegatedAdmin
+  );
+  const pendingLeaveCount = canReviewLeaveRequests
+    ? yKienData.filter((x) => x.trangThai === 'pending').length
+    : 0;
+  const pendingWorkCount = canReviewWorkSchedules
+    ? lichCongTacData.filter((x) => x.trangThaiDuyet === 'pending').length
+    : 0;
+  const approvalPendingCount = pendingLeaveCount + pendingWorkCount;
 
   const pageProps = {
     user,
@@ -757,6 +800,8 @@ function App() {
       await loadData();
     },
     reloadData: loadData,
+    approvalPendingCount,
+    canReviewLeaveRequests,
     // Pass lichCongTacData to YKienPhanHoi for work schedule approval tab
     ...(safeActivePage === 'ykien' ? { lichCongTacData } : {}),
   };
@@ -765,9 +810,11 @@ function App() {
     <MainLayout
       activePage={safeActivePage}
       onNavigate={navigateSafe}
+      allowedPages={allowedPages}
       user={user}
       onLogout={handleLogout}
       notifications={thongBaoData}
+      approvalPendingCount={approvalPendingCount}
       onMarkNotificationRead={async (id) => {
         await apiClient.notifications.markRead(id);
         await loadData();

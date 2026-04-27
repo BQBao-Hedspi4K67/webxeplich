@@ -28,7 +28,7 @@ const LOCATION_ALIAS = {
   'Trạm xá': LOCATION.MEDIC,
 };
 
-const COMMANDER_POSITION_PATTERN = /(PT\s*Kh[oó]a|Ph[oó]\s*tr[uư][oở]ng\s*kh[oó]a|Tr[uư][oở]ng\s*ph[oò]ng)/i;
+const COMMANDER_POSITION_PATTERN = /(PT\s*Kh[oó]a|Ph[oó]\s*tr[uư][oở]ng\s*kh[oó]a|Tr[uư][oở]ng\s*ph[oò]ng|Tr[uư][oở]ng\s*phòng\s*đội|Trưởng đội)/i;
 
 const SHIFT_LABELS = {
   sang: 'Ca sáng',

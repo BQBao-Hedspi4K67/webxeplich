@@ -8,39 +8,52 @@ const statusUI = {
   rejected: { label: 'Từ chối', cls: 'bg-red-100 text-red-700', icon: AlertCircle },
 };
 
-const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], lichCongTacData = [], reloadData }) => {
+const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], lichCongTacData = [], reloadData, canReviewLeaveRequests }) => {
   const [danhSach, setDanhSach] = useState(yKienData);
   const [noiDung, setNoiDung] = useState('');
   const [ngayNghi, setNgayNghi] = useState('');
   const [selectedDutyId, setSelectedDutyId] = useState('');
   const [phanHoiMap, setPhanHoiMap] = useState({});
 
+  const isAdminLike = user?.role === 'Quản trị viên' || user?.isDelegatedAdmin;
   const hasWorkScheduleApprove = Boolean(
     user?.canApproveWorkSchedules ||
     user?.canApproveWorkSchedulesByRole ||
     user?.canApproveWorkSchedulesByPermission ||
-    user?.backendRole === 'admin'
+    user?.backendRole === 'admin' ||
+    user?.backendRole === 'superadmin' ||
+    user?.isDelegatedAdmin
   );
-  const [approvalTab, setApprovalTab] = useState('leave'); // 'leave' | 'work'
+  const [approvalTab, setApprovalTab] = useState(() => {
+    if (isAdminLike && !canReviewLeaveRequests && hasWorkScheduleApprove) {
+      return 'work';
+    }
+    return 'leave';
+  }); // 'leave' | 'work'
 
   useEffect(() => {
     setDanhSach(yKienData);
   }, [yKienData]);
 
-  const canReview = ['Quản trị viên', 'Quản lý'].includes(user?.role);
+  const canReview = Boolean(canReviewLeaveRequests);
   const isCanBo = user?.role === 'Cán bộ';
+  const today = new Date().toISOString().slice(0, 10);
 
   const myItems = useMemo(() => {
     if (!user?.id) return [];
-    return danhSach.filter(x => x.canBoId === user.id).sort((a, b) => (a.ngayNghi < b.ngayNghi ? 1 : -1));
-  }, [danhSach, user]);
+    return danhSach
+      .filter((x) => x.canBoId === user.id && String(x.ngayNghi || '') >= today)
+      .sort((a, b) => (a.ngayNghi < b.ngayNghi ? 1 : -1));
+  }, [danhSach, user, today]);
 
   const myDutyItems = useMemo(() => {
     if (!user?.id) return [];
     return lichTrucBanData
-      .filter((x) => x.canBoId === user.id && x.kieuTruc === 'canbo')
+      .filter((x) => x.canBoId === user.id && x.kieuTruc === 'canbo' && String(x.ngay || '') >= today)
       .sort((a, b) => (a.ngay > b.ngay ? 1 : -1));
-  }, [lichTrucBanData, user]);
+  }, [lichTrucBanData, user, today]);
+
+  const visibleLeaveItems = (canReview ? danhSach : myItems).filter((x) => String(x.ngayNghi || '') >= today);
 
   const handleGui = async () => {
     if (!noiDung.trim() || !user?.id || !ngayNghi || !selectedDutyId) return;
@@ -104,12 +117,14 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], lichCongTacD
 
 
       <div className="flex gap-2 mb-4">
-        <button
-          className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${approvalTab === 'leave' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-          onClick={() => setApprovalTab('leave')}
-        >
-          Đơn xin nghỉ
-        </button>
+        {!(isAdminLike && !canReviewLeaveRequests) && (
+          <button
+            className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${approvalTab === 'leave' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+            onClick={() => setApprovalTab('leave')}
+          >
+            Đơn xin nghỉ
+          </button>
+        )}
         {hasWorkScheduleApprove && (
           <button
             className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${approvalTab === 'work' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
@@ -177,19 +192,19 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], lichCongTacD
           <div className="card-lg p-0 overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-base font-bold text-slate-800">Danh sách đơn xin nghỉ</h3>
-              <span className="text-xs text-slate-500">{canReview ? danhSach.length : myItems.length} mục</span>
+              <span className="text-xs text-slate-500">{visibleLeaveItems.length} mục</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[900px]">
                 <thead>
                   <tr>
-                    {['Mã', 'Quân hàm + Họ và tên', 'Ngày nghỉ', 'Lý do', 'Trạng thái', 'Phản hồi duyệt', ''].map(h => (
+                    {['Mã', 'Họ và tên', 'Ngày nghỉ', 'Lý do', 'Trạng thái', 'Phản hồi duyệt', ''].map(h => (
                       <th key={h} className="table-th">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {(canReview ? danhSach : myItems).map(item => {
+                  {visibleLeaveItems.map(item => {
                     const ui = statusUI[item.trangThai];
                     const Icon = ui.icon;
                     return (
@@ -224,7 +239,7 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], lichCongTacD
                       </tr>
                     );
                   })}
-                  {(canReview ? danhSach : myItems).length === 0 && (
+                  {visibleLeaveItems.length === 0 && (
                     <tr>
                       <td colSpan={7} className="text-center py-12 text-slate-400">
                         <MessageSquare size={30} className="mx-auto mb-2 opacity-40" />

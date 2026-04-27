@@ -10,14 +10,17 @@ router.use(verifyToken);
 // Get officers (all roles can view)
 router.get('/', officersCtrl.getOfficers);
 
+// Get delegation list for current delegator (admin/manager/delegated admin manager)
+router.get('/admin-delegations', officersCtrl.getAdminDelegations);
+
 // Get single officer
 router.get('/:id', officersCtrl.getOfficerById);
 
-// Create officer (admin, manager)
-router.post('/', requireRole('admin', 'manager'), officersCtrl.createOfficer);
+// Create officer (superadmin only)
+router.post('/', requireRole('superadmin'), officersCtrl.createOfficer);
 
-// Update officer (admin, manager)
-router.put('/:id', requireRole('admin', 'manager'), officersCtrl.updateOfficer);
+// Update officer (superadmin only)
+router.put('/:id', requireRole('superadmin'), officersCtrl.updateOfficer);
 
 // Grant/revoke duty schedule management permission
 router.put('/:id/duty-schedule-permission', officersCtrl.updateDutySchedulePermission);
@@ -25,7 +28,10 @@ router.put('/:id/duty-schedule-permission', officersCtrl.updateDutySchedulePermi
 // Grant/revoke work schedule create/approve permissions
 router.put('/:id/work-schedule-permission', officersCtrl.updateWorkSchedulePermission);
 
-// Delete officer (admin, manager)
-router.delete('/:id', requireRole('admin', 'manager'), officersCtrl.deleteOfficer);
+// Update delegation (admin/manager/delegated admin manager via controller checks)
+router.put('/:id/admin-delegation', officersCtrl.updateAdminDelegation);
+
+// Delete officer (superadmin only)
+router.delete('/:id', requireRole('superadmin'), officersCtrl.deleteOfficer);
 
 export default router;

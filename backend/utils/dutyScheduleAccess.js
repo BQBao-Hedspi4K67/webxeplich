@@ -1,4 +1,6 @@
 const ADMIN_DEPARTMENT = 'Phòng hành chính tổng hợp';
+const SPECIAL_DUTY_DEPARTMENTS = ['Phòng hành chính tổng hợp', 'Đội lái xe', 'Đội bệnh xá'];
+const MANAGER_DUTY_POSITION_PATTERN = /(Trưởng\s*phòng|Phó\s*trưởng\s*phòng|Trưởng\s*đội|Phó\s*đội)/i;
 
 const hasOfficersUserIdColumn = async (connection) => {
   const [rows] = await connection.execute("SHOW COLUMNS FROM officers LIKE 'userId'");
@@ -65,13 +67,17 @@ export const getDutyScheduleAccessState = async (connection, reqUser = {}) => {
   await ensureDutyScheduleAccessSchema(connection);
 
   const officer = await resolveRequesterOfficer(connection, reqUser);
-  const isAdminRole = reqUser?.role === 'admin';
-  const isManagerRole = reqUser?.role === 'manager';
+  const effectiveRole = reqUser?.effectiveRole || reqUser?.role;
+  const isAdminRole = effectiveRole === 'admin' || effectiveRole === 'superadmin';
+  const isManagerRole = effectiveRole === 'manager';
   const departmentName = String(officer?.department || '').trim();
-  const canManageDutySchedulesByDepartment = isAdminRole || isManagerRole;
+  const canManageByManagerRole = isManagerRole
+    && SPECIAL_DUTY_DEPARTMENTS.includes(departmentName)
+    && (Boolean(reqUser?.isDelegatedManager) || MANAGER_DUTY_POSITION_PATTERN.test(String(officer?.position || '')));
+  const canManageDutySchedulesByDepartment = isAdminRole || canManageByManagerRole;
   const canManageDutySchedulesByPermission = await hasDutySchedulePermission(connection, officer?.id);
   const canGrantDutySchedulePermissions =
-    isAdminRole || (isManagerRole && departmentName === ADMIN_DEPARTMENT);
+    isAdminRole || (canManageByManagerRole && departmentName === ADMIN_DEPARTMENT);
 
   return {
     officer,

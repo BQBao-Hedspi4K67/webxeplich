@@ -5,7 +5,7 @@ const pageTitles = {
   dashboard: 'Dashboard',
   thongbao: 'Thông báo',
   canbo: 'Quản lý cán bộ',
-  lichcongtac: 'Lập lịch công tác tuần',
+  lichcongtac: 'Lịch sự kiện tuần',
   lichtrucan: 'Lập lịch trực ban',
   lichcuatoi: 'Lịch của tôi',
   tracuu: 'Tra cứu lịch',
@@ -14,10 +14,10 @@ const pageTitles = {
   phongban: 'Quản lý phòng ban',
   ykien: 'Phê duyệt',
   quytrinh: 'Quy trình chức năng',
-  taikhoan: 'Quản trị tài khoản',
+  taikhoan: 'Thông tin tài khoản',
 };
 
-const Topbar = ({ activePage, user, onLogout, onNavigate, notificationsData = [], onMarkRead, onMarkAllRead }) => {
+const Topbar = ({ activePage, allowedPages = [], user, onLogout, onNavigate, notificationsData = [], onMarkRead, onMarkAllRead }) => {
   const [showNotif, setShowNotif] = useState(false);
   const [showUser, setShowUser] = useState(false);
   const [notifications, setNotifications] = useState(notificationsData);
@@ -44,6 +44,15 @@ const Topbar = ({ activePage, user, onLogout, onNavigate, notificationsData = []
     if (onMarkAllRead) {
       await onMarkAllRead();
     }
+  };
+
+  const safeNavigate = (page) => {
+    if (!onNavigate) return;
+    if (!allowedPages.length || allowedPages.includes(page)) {
+      onNavigate(page);
+      return;
+    }
+    onNavigate(allowedPages[0] || 'dashboard');
   };
 
   const resolvePageFromNotification = (notification) => {
@@ -103,9 +112,7 @@ const Topbar = ({ activePage, user, onLogout, onNavigate, notificationsData = []
       await onMarkRead(notification.id);
     }
 
-    if (onNavigate) {
-      onNavigate(resolvePageFromNotification(notification));
-    }
+    safeNavigate(resolvePageFromNotification(notification));
 
     setShowNotif(false);
   };
@@ -180,7 +187,7 @@ const Topbar = ({ activePage, user, onLogout, onNavigate, notificationsData = []
             <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50/50">
               <button
                 onClick={() => {
-                  if (onNavigate) onNavigate('thongbao');
+                  safeNavigate('thongbao');
                   setShowNotif(false);
                 }}
                 className="text-xs text-blue-600 hover:text-blue-700 font-medium w-full text-center"
@@ -217,8 +224,8 @@ const Topbar = ({ activePage, user, onLogout, onNavigate, notificationsData = []
               {[
                 { icon: User, label: 'Thông tin tài khoản', page: 'taikhoan' },
                 { icon: Settings, label: 'Cài đặt hệ thống', page: 'taikhoan' },
-              ].filter(item => ['Quản trị viên', 'Quản lý'].includes(user?.role)).map((item, i) => (
-                <button key={i} onClick={() => { onNavigate(item.page); setShowUser(false); }}
+              ].filter(item => ['Quản trị viên', 'Quản lý'].includes(user?.role) && (!allowedPages.length || allowedPages.includes(item.page))).map((item, i) => (
+                <button key={i} onClick={() => { safeNavigate(item.page); setShowUser(false); }}
                   className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors">
                   <item.icon size={14} className="text-slate-400" />
                   {item.label}

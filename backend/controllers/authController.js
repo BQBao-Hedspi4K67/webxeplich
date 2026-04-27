@@ -6,6 +6,10 @@ import {
   getDutyScheduleAccessState,
 } from '../utils/dutyScheduleAccess.js';
 import { getWorkScheduleAccessState } from '../utils/workScheduleAccess.js';
+import {
+  ensureAdminDelegationSchema,
+  getDelegationByDelegateUserId,
+} from '../utils/adminDelegation.js';
 
 const ALLOWED_DEPARTMENTS = [
   'Ban Giám đốc',
@@ -83,6 +87,16 @@ const hasUsersMilitaryRankColumn = async (connection) => {
   return rows.length > 0;
 };
 
+const ensureUsersRoleSchema = async (connection) => {
+  const [rows] = await connection.execute("SHOW COLUMNS FROM users LIKE 'role'");
+  const roleType = String(rows[0]?.Type || rows[0]?.type || '').toLowerCase();
+  if (roleType.includes("'leader'")) return;
+
+  await connection.execute(
+    "ALTER TABLE users MODIFY COLUMN role ENUM('superadmin', 'admin', 'leader', 'manager', 'officer') DEFAULT 'officer' NOT NULL"
+  );
+};
+
 const ensureUsersMilitaryRankColumn = async (connection) => {
   const hasColumn = await hasUsersMilitaryRankColumn(connection);
   if (!hasColumn) {
@@ -129,6 +143,7 @@ const buildUsernameBase = (fullName = '') => {
   if (!tokens.length) return 'user';
   if (tokens.length === 1) return tokens[0].slice(0, 40);
 
+  // Format: lastname + initials (e.g., "Le Minh Thao" -> "thaolm")
   const lastName = tokens[tokens.length - 1];
   const initials = tokens.slice(0, -1).map((token) => token[0]).join('');
   const base = `${lastName}${initials}`;
@@ -202,6 +217,7 @@ export const login = async (req, res, next) => {
     const connection = await pool.getConnection();
 
     try {
+      await ensureUsersRoleSchema(connection);
       await ensureUsersMilitaryRankColumn(connection);
 
       // Find user
@@ -255,6 +271,24 @@ export const login = async (req, res, next) => {
       const resolvedMilitaryRank = officerProfile?.officerTitle || user.militaryRank || '';
       const displayName = buildDisplayName(resolvedMilitaryRank, user.fullName);
 
+      let effectiveRole = user.role;
+      let isDelegatedAdmin = false;
+      let isDelegatedManager = false;
+      let delegatedByUserId = null;
+      if (!['superadmin'].includes(user.role)) {
+        await ensureAdminDelegationSchema(connection);
+        const delegation = await getDelegationByDelegateUserId(connection, user.id);
+        if (delegation) {
+          const delegatedRole = String(delegation.delegatorRole || '').toLowerCase();
+          if (delegatedRole === 'admin' || delegatedRole === 'manager') {
+            effectiveRole = delegatedRole;
+          }
+          isDelegatedAdmin = delegatedRole === 'admin';
+          isDelegatedManager = delegatedRole === 'manager';
+          delegatedByUserId = delegation.delegatorUserId || null;
+        }
+      }
+
       // Compare password
       const passwordMatch = await bcrypt.compare(password, user.passwordHash);
 
@@ -274,6 +308,8 @@ export const login = async (req, res, next) => {
         fullName: user.fullName,
         email: user.email,
         role: user.role,
+        effectiveRole,
+        isDelegatedManager,
       });
       const workAccessState = await getWorkScheduleAccessState(connection, {
         id: user.id,
@@ -281,6 +317,8 @@ export const login = async (req, res, next) => {
         fullName: user.fullName,
         email: user.email,
         role: user.role,
+        effectiveRole,
+        isDelegatedManager,
       });
 
       res.json({
@@ -294,6 +332,10 @@ export const login = async (req, res, next) => {
             militaryRank: resolvedMilitaryRank,
             email: user.email,
             role: user.role,
+            effectiveRole,
+            isDelegatedAdmin,
+            isDelegatedManager,
+            delegatedByUserId,
             avatar: user.avatar,
             officerId: officerProfile?.id || null,
             position: officerProfile?.position || '',
@@ -329,6 +371,7 @@ export const getProfile = async (req, res, next) => {
     const connection = await pool.getConnection();
 
     try {
+      await ensureUsersRoleSchema(connection);
       await ensureUsersMilitaryRankColumn(connection);
       await ensureDutyScheduleAccessSchema(connection);
       const hasUserIdColumn = await hasOfficersUserIdColumn(connection);
@@ -420,8 +463,22 @@ export const getProfile = async (req, res, next) => {
       const resolvedMilitaryRank = profile.officerTitle || profile.militaryRank || '';
       const displayName = buildDisplayName(resolvedMilitaryRank, profile.fullName);
 
-      const accessState = await getDutyScheduleAccessState(connection, profile);
-      const workAccessState = await getWorkScheduleAccessState(connection, profile);
+      const effectiveRole = req.user?.effectiveRole || profile.role;
+      const isDelegatedAdmin = Boolean(req.user?.isDelegatedAdmin);
+      const isDelegatedManager = Boolean(req.user?.isDelegatedManager);
+
+      const accessStateByEffectiveRole = await getDutyScheduleAccessState(connection, {
+        ...profile,
+        role: profile.role,
+        effectiveRole,
+        isDelegatedManager,
+      });
+      const workAccessStateByEffectiveRole = await getWorkScheduleAccessState(connection, {
+        ...profile,
+        role: profile.role,
+        effectiveRole,
+        isDelegatedManager,
+      });
 
       res.json({
         success: true,
@@ -429,17 +486,22 @@ export const getProfile = async (req, res, next) => {
           ...profile,
           fullName: displayName,
           militaryRank: resolvedMilitaryRank,
-          canManageDutySchedules: accessState.canManageDutySchedules,
-          canManageDutySchedulesByDepartment: accessState.canManageDutySchedulesByDepartment,
-          canManageDutySchedulesByPermission: accessState.canManageDutySchedulesByPermission,
-          canGrantDutySchedulePermissions: accessState.canGrantDutySchedulePermissions,
-          canCreateWorkSchedules: workAccessState.canCreateWorkSchedules,
-          canApproveWorkSchedules: workAccessState.canApproveWorkSchedules,
-          canCreateWorkSchedulesByRole: workAccessState.canCreateWorkSchedulesByRole,
-          canApproveWorkSchedulesByRole: workAccessState.canApproveWorkSchedulesByRole,
-          canCreateWorkSchedulesByPermission: workAccessState.canCreateWorkSchedulesByPermission,
-          canApproveWorkSchedulesByPermission: workAccessState.canApproveWorkSchedulesByPermission,
-          canGrantWorkSchedulePermissions: workAccessState.canGrantWorkSchedulePermissions,
+          backendRole: effectiveRole,
+          effectiveRole,
+          isDelegatedAdmin,
+          isDelegatedManager,
+          delegatedByUserId: req.user?.delegatedByUserId || null,
+          canManageDutySchedules: accessStateByEffectiveRole.canManageDutySchedules,
+          canManageDutySchedulesByDepartment: accessStateByEffectiveRole.canManageDutySchedulesByDepartment,
+          canManageDutySchedulesByPermission: accessStateByEffectiveRole.canManageDutySchedulesByPermission,
+          canGrantDutySchedulePermissions: accessStateByEffectiveRole.canGrantDutySchedulePermissions,
+          canCreateWorkSchedules: workAccessStateByEffectiveRole.canCreateWorkSchedules,
+          canApproveWorkSchedules: workAccessStateByEffectiveRole.canApproveWorkSchedules,
+          canCreateWorkSchedulesByRole: workAccessStateByEffectiveRole.canCreateWorkSchedulesByRole,
+          canApproveWorkSchedulesByRole: workAccessStateByEffectiveRole.canApproveWorkSchedulesByRole,
+          canCreateWorkSchedulesByPermission: workAccessStateByEffectiveRole.canCreateWorkSchedulesByPermission,
+          canApproveWorkSchedulesByPermission: workAccessStateByEffectiveRole.canApproveWorkSchedulesByPermission,
+          canGrantWorkSchedulePermissions: workAccessStateByEffectiveRole.canGrantWorkSchedulePermissions,
         },
       });
     } finally {
@@ -474,6 +536,9 @@ export const createUserAccount = async (req, res, next) => {
       status = 'active',
       businessTripStartDate = null,
       businessTripEndDate = null,
+      canManageDutySchedulesByPermission = false,
+      canCreateWorkSchedulesByPermission = false,
+      canApproveWorkSchedulesByPermission = false,
     } = req.body;
 
     const splitTitleAndName = (name = '') => {
@@ -512,6 +577,7 @@ export const createUserAccount = async (req, res, next) => {
 
     const connection = await pool.getConnection();
     try {
+      await ensureUsersRoleSchema(connection);
       await ensureUsersMilitaryRankColumn(connection);
       await ensureOfficersStatusSchema(connection);
       await connection.beginTransaction();
@@ -539,8 +605,9 @@ export const createUserAccount = async (req, res, next) => {
         });
       }
 
-      const allowedRoles = req.user?.role === 'manager' ? ['officer'] : ['manager', 'officer'];
-      if (!allowedRoles.includes(role)) {
+      const normalizedRole = departmentRef.departmentType === 'ban_giam_doc' ? 'leader' : role;
+      const allowedRoles = req.user?.role === 'manager' ? ['officer'] : ['leader', 'manager', 'officer'];
+      if (!allowedRoles.includes(normalizedRole)) {
         return res.status(400).json({
           success: false,
           error: 'Invalid role for current user',
@@ -572,7 +639,7 @@ export const createUserAccount = async (req, res, next) => {
       const [result] = await connection.execute(
         `INSERT INTO users (username, passwordHash, fullName, militaryRank, email, role, avatar, status)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [username, passwordHash, fullName, militaryRank || null, email, role, avatar, userAccountStatus]
+        [username, passwordHash, fullName, militaryRank || null, email, normalizedRole, avatar, userAccountStatus]
       );
 
       const [maxOfficerIdRows] = await connection.execute(
@@ -581,7 +648,7 @@ export const createUserAccount = async (req, res, next) => {
       const nextOfficerNum = (maxOfficerIdRows[0].maxNum || 0) + 1;
       const newOfficerId = `CB${String(nextOfficerNum).padStart(3, '0')}`;
 
-      const officerPosition = position || (role === 'manager' ? 'Quản lý' : 'Cán bộ');
+      const officerPosition = position || (normalizedRole === 'leader' ? 'Lãnh đạo' : normalizedRole === 'manager' ? 'Quản lý' : 'Cán bộ');
       const officerDepartment = departmentRef.name;
       const split = splitTitleAndName(fullName);
       const resolvedOfficerTitle = String(militaryRank || '').trim() || split.officerTitle;
@@ -603,7 +670,7 @@ export const createUserAccount = async (req, res, next) => {
               departmentRef.departmentType || 'phong',
               phone,
               email,
-              role,
+              normalizedRole,
               normalizedOfficerStatus,
               normalizedOfficerStatus === 'on_business_trip' ? businessTripStartDate : null,
               normalizedOfficerStatus === 'on_business_trip' ? businessTripEndDate : null,
@@ -624,7 +691,7 @@ export const createUserAccount = async (req, res, next) => {
               departmentRef.departmentType || 'phong',
               phone,
               email,
-              role,
+              normalizedRole,
               normalizedOfficerStatus,
               normalizedOfficerStatus === 'on_business_trip' ? businessTripStartDate : null,
               normalizedOfficerStatus === 'on_business_trip' ? businessTripEndDate : null,
@@ -645,10 +712,42 @@ export const createUserAccount = async (req, res, next) => {
             departmentRef.departmentType || 'phong',
             phone,
             email,
-            role,
+            normalizedRole,
             normalizedOfficerStatus,
             normalizedOfficerStatus === 'on_business_trip' ? businessTripStartDate : null,
             normalizedOfficerStatus === 'on_business_trip' ? businessTripEndDate : null,
+          ]
+        );
+      }
+
+      if (Boolean(canManageDutySchedulesByPermission)) {
+        await connection.execute(
+          `INSERT INTO duty_schedule_permissions (officerId, canManageDutySchedules, grantedByUserId)
+           VALUES (?, 1, ?)
+           ON DUPLICATE KEY UPDATE
+             canManageDutySchedules = VALUES(canManageDutySchedules),
+             grantedByUserId = VALUES(grantedByUserId),
+             grantedAt = CURRENT_TIMESTAMP,
+             updatedAt = CURRENT_TIMESTAMP`,
+          [newOfficerId, req.user?.id || null]
+        );
+      }
+
+      if (Boolean(canCreateWorkSchedulesByPermission) || Boolean(canApproveWorkSchedulesByPermission)) {
+        await connection.execute(
+          `INSERT INTO work_schedule_permissions (officerId, canCreateWorkSchedules, canApproveWorkSchedules, grantedByUserId)
+           VALUES (?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             canCreateWorkSchedules = VALUES(canCreateWorkSchedules),
+             canApproveWorkSchedules = VALUES(canApproveWorkSchedules),
+             grantedByUserId = VALUES(grantedByUserId),
+             grantedAt = CURRENT_TIMESTAMP,
+             updatedAt = CURRENT_TIMESTAMP`,
+          [
+            newOfficerId,
+            Boolean(canCreateWorkSchedulesByPermission) ? 1 : 0,
+            Boolean(canApproveWorkSchedulesByPermission) ? 1 : 0,
+            req.user?.id || null,
           ]
         );
       }

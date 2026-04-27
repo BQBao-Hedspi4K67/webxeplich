@@ -8,22 +8,36 @@ import {
 
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
-  { id: 'canbo', label: 'Quản lý cán bộ', icon: Users, badge: null, roles: ['Quản trị viên', 'Quản lý'] },
-  { id: 'lichcongtac', label: 'Lập lịch công tác', icon: CalendarDays, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
-  { id: 'lichtrucan', label: 'Lập lịch trực ban', icon: ClipboardList, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
+  { id: 'canbo', label: 'Quản lý cán bộ', icon: Users, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
+  { id: 'lichcongtac', label: 'Lịch sự kiện', icon: CalendarDays, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'lichcuatoi', label: 'Lịch của tôi', icon: CalendarCheck, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
-  { id: 'tracuu', label: 'Tra cứu lịch', icon: Search, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'ykien', label: 'Phê duyệt', icon: MessageSquareQuote, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
-  { id: 'xuat', label: 'Xuất / In lịch', icon: Printer, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
-  { id: 'ngayle', label: 'Quản lý ngày lễ', icon: CalendarRange, badge: null, roles: ['Quản trị viên', 'Quản lý'] },
-  { id: 'phongban', label: 'Quản lý phòng ban', icon: Building2, badge: null, roles: ['Quản trị viên'] },
-  { id: 'quytrinh', label: 'Quy trình chức năng', icon: FileText, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
-  { id: 'taikhoan', label: 'Quản trị tài khoản', icon: Settings, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
+  { id: 'ngayle', label: 'Quản lý ngày lễ', icon: CalendarRange, badge: null, roles: ['Superadmin'] },
+  { id: 'phongban', label: 'Quản lý phòng ban', icon: Building2, badge: null, roles: ['Superadmin'] },
+  { id: 'taikhoan', label: 'Thông tin tài khoản', icon: Settings, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
 ];
 
-const Sidebar = ({ activePage, onNavigate, user, onLogout }) => {
+const Sidebar = ({ activePage, onNavigate, allowedPages = [], user, onLogout, approvalPendingCount = 0 }) => {
   const [collapsed, setCollapsed] = useState(false);
-  const visibleMenus = menuItems.filter(item => item.roles.includes(user?.role));
+  const visibleMenus = menuItems.map(item => {
+    if (item.id === 'ykien' && approvalPendingCount > 0) {
+      return { ...item, badge: approvalPendingCount };
+    }
+    return item;
+  }).filter((item) => {
+    const isSuperadminMenu = item.roles.includes('Superadmin');
+    if (isSuperadminMenu && user?.backendRole !== 'superadmin') return false;
+    
+    const effectiveUiRole = user?.isDelegatedAdmin
+      ? 'Quản trị viên'
+      : user?.isDelegatedManager
+        ? 'Quản lý'
+        : user?.role;
+    const roleMatched = isSuperadminMenu ? true : item.roles.includes(effectiveUiRole);
+    if (!roleMatched) return false;
+    if (!allowedPages.length) return true;
+    return allowedPages.includes(item.id);
+  });
 
   return (
     <aside className={`relative flex flex-col h-screen bg-gradient-to-b from-[#0d1f3c] to-[#0a1628] border-r border-white/8 transition-all duration-300 ${collapsed ? 'w-[72px]' : 'w-[240px]'} flex-shrink-0`}>

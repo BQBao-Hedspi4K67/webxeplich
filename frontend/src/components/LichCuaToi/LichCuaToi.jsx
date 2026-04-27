@@ -32,6 +32,7 @@ const buildMyIdentity = (user, canBoData = []) => {
     officerId: officer?.id || String(user?.id || ''),
     names: [user?.name, officer?.hoTen].filter(Boolean),
     emails: [user?.email, officer?.email].filter(Boolean),
+    department: officer?.donVi || user?.department || '',
   };
 };
 
@@ -44,20 +45,49 @@ const getAssigneeTokens = (assignedTo) => {
 };
 
 const LichCuaToi = ({ user, canBoData = [], lichCongTacData = [], lichTrucBanData = [] }) => {
-  const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7));
-  const [typeFilter, setTypeFilter] = useState('all');
+  const [monthFilter, setMonthFilter] = useState(() => sessionStorage.getItem('lichCuaToiMonth') || new Date().toISOString().slice(0, 7));
+  const [typeFilter, setTypeFilter] = useState(() => sessionStorage.getItem('lichCuaToiType') || 'all');
+
+  React.useEffect(() => {
+    sessionStorage.setItem('lichCuaToiMonth', monthFilter);
+  }, [monthFilter]);
+
+  React.useEffect(() => {
+    sessionStorage.setItem('lichCuaToiType', typeFilter);
+  }, [typeFilter]);
 
   const myIdentity = useMemo(() => buildMyIdentity(user, canBoData), [user, canBoData]);
 
   const myNameSet = useMemo(() => new Set(myIdentity.names.map(simplify).filter(Boolean)), [myIdentity]);
 
+  const myDepartment = useMemo(() => simplify(myIdentity.department), [myIdentity.department]);
+
   const myWorkSchedules = useMemo(() => (
     lichCongTacData.filter((item) => {
-      const assignees = getAssigneeTokens(item.nguoiPhuTrach);
-      if (!assignees.length) return false;
-      return assignees.some((name) => myNameSet.has(simplify(name)));
+      const assignees = [
+        ...getAssigneeTokens(item.nguoiPhuTrach),
+        ...getAssigneeTokens(item.canBo1),
+        ...getAssigneeTokens(item.canBo2),
+        ...getAssigneeTokens(item.canBoTrucChiHuy),
+      ];
+      if (assignees.some((name) => myNameSet.has(simplify(name)))) {
+        return true;
+      }
+      
+      if (item.participants?.boardMembers?.includes(myIdentity.officerId)) {
+        return true;
+      }
+      
+      if (myDepartment && item.participants?.units) {
+        const units = Array.isArray(item.participants.units) ? item.participants.units : [];
+        if (units.some(u => simplify(u) === myDepartment)) {
+          return true;
+        }
+      }
+
+      return false;
     })
-  ), [lichCongTacData, myNameSet]);
+  ), [lichCongTacData, myNameSet, myIdentity.officerId, myDepartment]);
 
   const myDutySchedules = useMemo(() => (
     lichTrucBanData.filter((item) => {

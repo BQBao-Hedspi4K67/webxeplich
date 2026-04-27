@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Search, Filter, Edit2, Trash2, Eye, X, UserCheck, Users, Phone, Mail, Building2, ChevronLeft, ChevronRight, ChevronDown, Plus } from 'lucide-react';
+import { Search, Filter, Edit2, Trash2, Eye, X, UserCheck, Users, Phone, Mail, Building2, ChevronLeft, ChevronRight, ChevronDown, Plus, Shield } from 'lucide-react';
 import apiClient from '../../services/api';
 import { DEPARTMENTS, SCHOOLS } from '../../data/uiConstants';
 
@@ -61,17 +61,28 @@ const initialCreateForm = {
   status: 'active',
   businessTripStartDate: '',
   businessTripEndDate: '',
+  canManageDutySchedulesByPermission: false,
+  canCreateWorkSchedulesByPermission: false,
+  canApproveWorkSchedulesByPermission: false,
 };
 
 const DEFAULT_UNIT_OPTIONS = ['Ban Giám đốc', ...DEPARTMENTS, ...SCHOOLS];
 
 const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) => {
-  const isAdmin = user?.role === 'Quản trị viên';
-  const isManager = user?.role === 'Quản lý';
-  const canEdit = ['Quản trị viên', 'Quản lý'].includes(user?.role);
-  const canProvisionUser = ['Quản trị viên', 'Quản lý'].includes(user?.role);
+  const isAdmin = user?.role === 'Quản trị viên' || Boolean(user?.isDelegatedAdmin);
+  const isManager = user?.role === 'Quản lý' || Boolean(user?.isDelegatedManager);
+  const canEdit = false;
+  const canProvisionUser = false;
+  const canManageDelegation = isAdmin || isManager;
   const canGrantDutyPermission = Boolean(user?.canGrantDutySchedulePermissions);
   const canGrantWorkPermission = Boolean(user?.canGrantWorkSchedulePermissions);
+  
+  // Admin can delegate to manager and officer; Manager can only delegate to officers in their department
+  const canDelegateToRole = (targetRole) => {
+    if (isAdmin) return true; // Admin can delegate to any role
+    if (isManager && targetRole === 'Cán bộ') return true; // Manager can only delegate to officers
+    return false;
+  };
   const unitOptions = (departmentData || []).length
     ? departmentData.map((d) => ({ id: d.id, name: d.name }))
     : DEFAULT_UNIT_OPTIONS.map((name, idx) => ({ id: idx + 1, name }));
@@ -100,16 +111,41 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
     setData(canBoData);
   }, [canBoData]);
 
-  useEffect(() => {
-    if (isManager) {
-      setSelectedDepartment(user?.department || '');
-      return;
-    }
+  const [delegatedIds, setDelegatedIds] = useState([]);
 
+  useEffect(() => {
+    if (canManageDelegation) {
+      apiClient.officers.getAdminDelegations().then(res => {
+        if (res.data?.success || res.success) {
+          const data = res.data?.data || res.data;
+          setDelegatedIds(data?.delegatedOfficerIds || []);
+        }
+      }).catch(console.error);
+    }
+  }, [canManageDelegation]);
+
+  const handleToggleDelegation = async (cb) => {
+    const isDelegated = delegatedIds.includes(cb.id);
+    try {
+      const res = await apiClient.officers.updateAdminDelegation(cb.id, !isDelegated);
+      if (res.data?.success || res.success) {
+        if (!isDelegated) {
+          setDelegatedIds(prev => [...prev, cb.id]);
+        } else {
+          setDelegatedIds(prev => prev.filter(id => id !== cb.id));
+        }
+        alert(res.data?.message || res.message || 'Cập nhật ủy quyền thành công');
+      }
+    } catch (err) {
+      alert(err?.response?.data?.error || err?.message || 'Lỗi khi cập nhật ủy quyền');
+    }
+  };
+
+  useEffect(() => {
     if (isAdmin && !selectedDepartment) {
       setSelectedDepartment('');
     }
-  }, [isAdmin, isManager, user?.department, selectedDepartment]);
+  }, [isAdmin, selectedDepartment]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -124,9 +160,6 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
   }, [showDeptdropdown]);
 
   const departmentScopedData = data.filter((cb) => {
-    if (isManager) {
-      return !user?.department || cb.donVi === user.department;
-    }
     if (isAdmin) {
       return !selectedDepartment || cb.donVi === selectedDepartment;
     }
@@ -162,11 +195,12 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
 
   const openCreateAccount = () => {
     const managerUnit = unitOptions.find((x) => x.name === user?.department);
+    const defaultRole = isManager ? 'officer' : 'officer';
     setCreateForm({
       ...initialCreateForm,
       departmentId: isManager ? String(managerUnit?.id || '') : '',
       department: isManager ? (managerUnit?.name || user?.department || '') : '',
-      role: isManager ? 'officer' : 'officer',
+      role: defaultRole,
     });
     setCreateResult({ type: '', message: '' });
     setShowCreateModal(true);
@@ -201,10 +235,13 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
         position: createForm.position.trim() || null,
         departmentId: Number(createForm.departmentId),
         department: createForm.department,
-        role: isManager ? 'officer' : createForm.role,
+        role: createForm.department === 'Ban Giám đốc' ? 'leader' : (isManager ? 'officer' : createForm.role),
         status: createForm.status,
         businessTripStartDate: createForm.status === 'on_business_trip' ? createForm.businessTripStartDate : null,
         businessTripEndDate: createForm.status === 'on_business_trip' ? createForm.businessTripEndDate : null,
+        canManageDutySchedulesByPermission: Boolean(createForm.canManageDutySchedulesByPermission),
+        canCreateWorkSchedulesByPermission: Boolean(createForm.canCreateWorkSchedulesByPermission),
+        canApproveWorkSchedulesByPermission: Boolean(createForm.canApproveWorkSchedulesByPermission),
       });
 
       if (reloadData) await reloadData();
@@ -406,17 +443,12 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
               <option value="inactive">Tạm nghỉ</option>
               <option value="studying">Đang học</option>
             </select>
-            {!isManager && !isAdmin && (
+            {!(isAdmin || isManager) && (
               <select value={filterDonVi} onChange={e => { setFilterDonVi(e.target.value); setCurrentPage(1); }}
                 className="input-field !w-auto !py-2 text-sm">
                 <option value="">Tất cả phòng/đơn vị</option>
                 {unitOptions.map((x) => <option key={x.id} value={x.name}>{x.name}</option>)}
               </select>
-            )}
-            {canProvisionUser && (
-              <button onClick={openCreateAccount} className="btn-primary !py-2 !px-3 text-sm">
-                <Plus size={14} /> Thêm cán bộ
-              </button>
             )}
           </div>
           <span className="text-xs text-slate-400 ml-auto">{filtered.length} kết quả</span>
@@ -427,7 +459,7 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
           <table className="w-full">
             <thead>
               <tr>
-                {['Quân hàm + Họ và tên', 'Chức vụ', 'Đơn vị', 'Liên hệ', 'Vai trò', 'Trạng thái', 'Thao tác'].map(h => (
+                {['Họ và tên', 'Chức vụ', 'Đơn vị', 'Liên hệ', 'Vai trò', 'Trạng thái', 'Thao tác'].map(h => (
                   <th key={h} className="table-th">{h}</th>
                 ))}
               </tr>
@@ -497,6 +529,16 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
                               <Trash2 size={14} />
                             </button>
                           </>
+                        )}
+                        {canManageDelegation && (
+                          (isAdmin && (cb.vaiTro === 'Cán bộ' || cb.vaiTro === 'Quản lý')) ||
+                          (isManager && cb.vaiTro === 'Cán bộ' && cb.donVi === user?.department)
+                        ) && (
+                          <button onClick={() => handleToggleDelegation(cb)}
+                            className={`px-2 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${delegatedIds.includes(cb.id) ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200' : 'bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600'}`}
+                            title={delegatedIds.includes(cb.id) ? 'Bỏ ủy quyền' : 'Ủy quyền'}>
+                            {delegatedIds.includes(cb.id) ? 'Bỏ ủy quyền' : 'Ủy quyền'}
+                          </button>
                         )}
                       </div>
                     </td>
@@ -614,6 +656,7 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
                         ...prev,
                         departmentId: e.target.value,
                         department: selected?.name || '',
+                        role: selected?.name === 'Ban Giám đốc' ? 'leader' : 'officer',
                       }));
                     }}
                     disabled={isManager}
@@ -626,15 +669,21 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Vai trò</label>
-                  <select
-                    className="input-field"
-                    value={createForm.role}
-                    onChange={(e) => setCreateForm((prev) => ({ ...prev, role: e.target.value }))}
-                    disabled={isManager}
-                  >
-                    <option value="officer">Cán bộ</option>
-                    {!isManager && <option value="manager">Quản lý</option>}
-                  </select>
+                  {createForm.department === 'Ban Giám đốc' ? (
+                    <select className="input-field" value="leader" disabled>
+                      <option value="leader">Lãnh đạo</option>
+                    </select>
+                  ) : (
+                    <select
+                      className="input-field"
+                      value={createForm.role}
+                      onChange={(e) => setCreateForm((prev) => ({ ...prev, role: e.target.value }))}
+                      disabled={isManager}
+                    >
+                      <option value="officer">Cán bộ</option>
+                      {!isManager && <option value="manager">Quản lý</option>}
+                    </select>
+                  )}
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Trạng thái</label>
@@ -673,6 +722,40 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
                   </div>
                 </div>
               )}
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-700">Phân quyền lịch</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">Chọn quyền cần cấp ngay khi tạo cán bộ.</p>
+                </div>
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(createForm.canManageDutySchedulesByPermission)}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, canManageDutySchedulesByPermission: e.target.checked }))}
+                    className="w-4 h-4 rounded border-slate-300 text-blue-600"
+                  />
+                  Cấp quyền lập/sửa lịch trực ban
+                </label>
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(createForm.canCreateWorkSchedulesByPermission)}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, canCreateWorkSchedulesByPermission: e.target.checked }))}
+                    className="w-4 h-4 rounded border-slate-300 text-blue-600"
+                  />
+                  Cấp quyền tạo lịch công tác
+                </label>
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(createForm.canApproveWorkSchedulesByPermission)}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, canApproveWorkSchedulesByPermission: e.target.checked }))}
+                    className="w-4 h-4 rounded border-slate-300 text-blue-600"
+                  />
+                  Cấp quyền duyệt lịch công tác
+                </label>
+              </div>
 
               {createResult.message && (
                 <div className={`text-sm rounded-xl px-3 py-2 ${createResult.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
