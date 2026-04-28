@@ -271,6 +271,10 @@ export const getOfficers = async (req, res, next) => {
       );
       const total = countRows[0].total;
 
+      // Prepare optional join to users table when officers.userId exists so we can
+      // exclude backend 'admin' accounts from duty-schedule management flags.
+      const joinUsers = hasDepartmentIdColumn && await hasOfficersUserIdColumn(connection) ? 'LEFT JOIN users u ON u.id = o.userId' : '';
+
       // Get paginated data
       const [officers] = await connection.execute(
         `SELECT o.*,
@@ -278,7 +282,8 @@ export const getOfficers = async (req, res, next) => {
                 COALESCE(wsp.canCreateWorkSchedules, 0) AS canCreateWorkSchedulesByPermission,
                 COALESCE(wsp.canApproveWorkSchedules, 0) AS canApproveWorkSchedulesByPermission,
                 CASE
-                  WHEN o.role = 'leader' OR o.role = 'manager' THEN 1
+                  WHEN o.role = 'leader' AND (u.role IS NULL OR u.role <> 'admin') THEN 1
+                  WHEN o.role = 'manager' AND o.department IN ('Phòng hành chính tổng hợp', 'Đội lái xe', 'Đội bệnh xá') THEN 1
                   ELSE 0
                 END AS canManageDutySchedulesByDepartment,
                 CASE
@@ -286,12 +291,11 @@ export const getOfficers = async (req, res, next) => {
                   ELSE 0
                 END AS canCreateWorkSchedulesByRole,
                 CASE
-                  WHEN o.role = 'leader' OR (o.role = 'manager' AND o.department = 'Phòng hành chính tổng hợp') THEN 1
+                  WHEN o.role = 'leader' THEN 1
                   ELSE 0
                 END AS canApproveWorkSchedulesByRole,
                 CASE
-                  WHEN (o.role = 'leader' OR o.role = 'manager')
-                       OR COALESCE(dsp.canManageDutySchedules, 0) = 1
+                  WHEN (o.role = 'leader' AND (u.role IS NULL OR u.role <> 'admin')) OR (o.role = 'manager' AND o.department IN ('Phòng hành chính tổng hợp', 'Đội lái xe', 'Đội bệnh xá')) OR COALESCE(dsp.canManageDutySchedules, 0) = 1
                   THEN 1 ELSE 0
                 END AS canManageDutySchedules,
                 CASE
@@ -299,7 +303,7 @@ export const getOfficers = async (req, res, next) => {
                   THEN 1 ELSE 0
                 END AS canCreateWorkSchedules,
                 CASE
-                  WHEN o.role = 'leader' OR (o.role = 'manager' AND o.department = 'Phòng hành chính tổng hợp') OR COALESCE(wsp.canApproveWorkSchedules, 0) = 1
+                  WHEN o.role = 'leader' OR COALESCE(wsp.canApproveWorkSchedules, 0) = 1
                   THEN 1 ELSE 0
                 END AS canApproveWorkSchedules,
                 dsp.grantedAt AS dutySchedulePermissionGrantedAt,
@@ -309,6 +313,7 @@ export const getOfficers = async (req, res, next) => {
          FROM officers o
          LEFT JOIN duty_schedule_permissions dsp ON dsp.officerId = o.id
          LEFT JOIN work_schedule_permissions wsp ON wsp.officerId = o.id
+         ${joinUsers}
          ${whereClause}
          ORDER BY
            CASE o.role
@@ -387,6 +392,7 @@ export const getOfficerById = async (req, res, next) => {
          FROM officers o
          LEFT JOIN duty_schedule_permissions dsp ON dsp.officerId = o.id
          LEFT JOIN work_schedule_permissions wsp ON wsp.officerId = o.id
+         ${joinUsers}
          WHERE o.id = ?`,
         [id]
       );

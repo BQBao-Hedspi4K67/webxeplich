@@ -189,9 +189,11 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
     setForm({
       ...cb,
       donViId: cb.donViId || unit?.id || '',
-      canManageDutySchedulesByPermission: Boolean(cb.canManageDutySchedules),
-      canCreateWorkSchedulesByPermission: Boolean(cb.canCreateWorkSchedules),
-      canApproveWorkSchedulesByPermission: Boolean(cb.canApproveWorkSchedules),
+      // Use the explicit permission flags returned from the API so checkbox reflects
+      // who currently has the granted permission (not combined role-based flag).
+      canManageDutySchedulesByPermission: Boolean(cb.canManageDutySchedulesByPermission),
+      canCreateWorkSchedulesByPermission: Boolean(cb.canCreateWorkSchedulesByPermission),
+      canApproveWorkSchedulesByPermission: Boolean(cb.canApproveWorkSchedulesByPermission),
       tuNgayCongTac: cb.tuNgayCongTac || '',
       denNgayCongTac: cb.denNgayCongTac || '',
     });
@@ -871,10 +873,10 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
                     </select>
                   </div>
                 </div>
-                {(canGrantDutyPermission || canGrantWorkPermission) && (
+                {(canGrantDutyPermission || canGrantWorkPermission || user?.backendRole === 'superadmin') && (
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
                     <h4 className="text-xs font-bold text-slate-700">Phân quyền lịch</h4>
-                    {canGrantDutyPermission && (
+                    {(canGrantDutyPermission || user?.backendRole === 'superadmin') && (
                       <label className="flex items-center gap-2 text-sm text-slate-700">
                         <input
                           type="checkbox"

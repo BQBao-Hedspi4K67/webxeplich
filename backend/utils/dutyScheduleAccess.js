@@ -80,9 +80,12 @@ export const getDutyScheduleAccessState = async (connection, reqUser = {}) => {
       || departmentName === 'Đội lái xe'
       || departmentName === 'Đội bệnh xá'
     );
-  const canManageDutySchedulesByDepartment = isAdminRole || canManageByManagerRole;
+  // Only managers of special departments (and leaders by role via officers table or explicit permission)
+  // are allowed to manage duty schedules by department. Admin backend role should NOT implicitly
+  // get duty-schedule management rights (request from product owner).
+  const canManageDutySchedulesByDepartment = canManageByManagerRole;
   const canManageDutySchedulesByPermission = await hasDutySchedulePermission(connection, officer?.id);
-  const canGrantDutySchedulePermissions = isAdminRole || canManageByManagerRole;
+  const canGrantDutySchedulePermissions = canManageByManagerRole;
 
   return {
     officer,

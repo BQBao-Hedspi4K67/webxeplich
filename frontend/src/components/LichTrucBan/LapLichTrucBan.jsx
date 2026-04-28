@@ -372,11 +372,11 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
             <div className="text-xs text-slate-400 font-mono">{slot.canBoId}</div>
           </div>
         </button>
-        {/* Nút bút chỉnh sửa */}
+        {/* Nút bút chỉnh sửa (hiển thị nhưng sẽ khóa nếu không có quyền) */}
         <button
           onClick={() => openEditSingle(slot)}
-          className="absolute top-1 right-1 p-1 rounded-full bg-white border border-slate-200 shadow hover:bg-blue-50 hover:text-blue-600 text-slate-400 group-hover:visible invisible"
-          title="Đổi người trực"
+          className={`absolute top-1 right-1 p-1 rounded-full bg-white border border-slate-200 shadow ${canEdit ? 'hover:bg-blue-50 hover:text-blue-600 text-slate-400' : 'opacity-50 cursor-not-allowed text-slate-300'} group-hover:visible invisible`}
+          title={canEdit ? 'Đổi người trực' : 'Bạn không có quyền sửa phân công'}
         >
           <Edit2 size={13} />
         </button>
@@ -1072,7 +1072,10 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
               <div className="text-sm text-slate-600">
                 {editItem.viTri || LOCATION.DIRECTOR} - {editItem.ngay}
               </div>
-              <select className="input-field" value={singleOfficerId} onChange={(e) => setSingleOfficerId(e.target.value)}>
+              {!canEdit && (
+                <div className="text-sm text-red-600 mb-2">Bạn không có quyền sửa phân công. Chế độ xem (read-only).</div>
+              )}
+              <select className="input-field" value={singleOfficerId} onChange={(e) => setSingleOfficerId(e.target.value)} disabled={!canEdit}>
                 <option value="">-- Chọn cán bộ --</option>
                 {getOptionsForSlot(editItem).map((cb) => (
                   <option key={cb.id} value={cb.id}>{cb.hoTen} - {cb.chucVu || cb.donVi}</option>
@@ -1110,9 +1113,11 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
                     }
                     return;
                   }
+                  if (!canEdit) return alert('Bạn không có quyền cập nhật phân công.');
                   await handleSaveSingle();
                 }}
                 className="btn-primary flex-1 justify-center"
+                disabled={!canEdit}
               >
                 Lưu
               </button>

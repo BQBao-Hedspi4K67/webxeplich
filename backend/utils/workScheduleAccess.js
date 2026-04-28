@@ -113,8 +113,10 @@ export const getWorkScheduleAccessState = async (connection, reqUser = {}) => {
   }
 
   const permissionState = await getWorkSchedulePermissionState(connection, officer?.id);
+  // Managers can create work schedules by role, but approval of work schedules is reserved
+  // for director/admin roles or explicit permission entries. Managers do not get approve-by-role.
   const canCreateWorkSchedulesByRole = isDepartmentManager;
-  const canApproveWorkSchedulesByRole = isDepartmentManager && departmentName === ADMIN_DEPARTMENT;
+  const canApproveWorkSchedulesByRole = false;
 
   return {
     officer,

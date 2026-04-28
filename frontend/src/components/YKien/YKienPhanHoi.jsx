@@ -95,7 +95,7 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], lichCongTacD
       await apiClient.workSchedules.approve(scheduleId, 'approved');
       if (reloadData) await reloadData();
     } catch (err) {
-      alert(err?.message || 'Không thể duyệt Lịch sự kiện.');
+      alert(err?.message || 'Không thể duyệt lịch công tác.');
     }
   };
 
@@ -108,7 +108,7 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], lichCongTacD
       await apiClient.workSchedules.approve(scheduleId, 'rejected');
       if (reloadData) await reloadData();
     } catch (err) {
-      alert(err?.message || 'Không thể từ chối Lịch sự kiện.');
+      alert(err?.message || 'Không thể từ chối lịch công tác.');
     }
   };
 
@@ -133,7 +133,7 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], lichCongTacD
             className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${approvalTab === 'work' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
             onClick={() => setApprovalTab('work')}
           >
-            Phê duyệt Lịch sự kiện
+            Phê duyệt lịch công tác
           </button>
         )}
       </div>
@@ -260,7 +260,7 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], lichCongTacD
       {approvalTab === 'work' && hasWorkScheduleApprove && (
         <div className="card-lg p-0 overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-800">Phê duyệt Lịch sự kiện</h3>
+            <h3 className="text-base font-bold text-slate-800">Phê duyệt lịch công tác</h3>
             <span className="text-xs text-slate-500">{
               (lichCongTacData?.filter?.(w => w.trangThaiDuyet === 'pending')?.length) || 0
             } lịch chờ duyệt</span>
@@ -300,7 +300,7 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], lichCongTacD
                 })}
                 {(lichCongTacData?.filter?.(w => w.trangThaiDuyet === 'pending')?.length === 0) && (
                   <tr>
-                    <td colSpan={6} className="text-center py-10 text-slate-400">Hiện không có Lịch sự kiện chờ duyệt.</td>
+                    <td colSpan={6} className="text-center py-10 text-slate-400">Hiện không có lịch công tác chờ duyệt.</td>
                   </tr>
                 )}
               </tbody>
