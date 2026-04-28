@@ -78,7 +78,7 @@ CREATE TABLE duty_schedule_permissions (
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ========== TABLE: work_schedule_permissions ==========
--- Quyền tạo/duyệt lịch công tác cấp riêng cho từng cán bộ (chỉ Giám đốc và Trưởng/Phó phòng Hành chính tổng hợp được cấp/thu hồi)
+-- Quyền tạo/duyệt Lịch sự kiện cấp riêng cho từng cán bộ (chỉ Giám đốc và Trưởng/Phó phòng Hành chính tổng hợp được cấp/thu hồi)
 CREATE TABLE work_schedule_permissions (
   officerId VARCHAR(10) PRIMARY KEY,
   canCreateWorkSchedules TINYINT(1) NOT NULL DEFAULT 1,
@@ -129,7 +129,7 @@ CREATE TABLE holidays (
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ========== TABLE: work_schedules ==========
--- Lịch công tác theo tuần (quản lý thêm, ban giám đốc phê duyệt)
+-- Lịch sự kiện theo tuần (quản lý thêm, ban giám đốc phê duyệt)
 CREATE TABLE work_schedules (
   id VARCHAR(20) PRIMARY KEY,
   title VARCHAR(200) NOT NULL,
@@ -564,43 +564,39 @@ UPDATE officers
 SET position = 'Cán bộ'
 WHERE role = 'officer';
 
--- Seed quyền mặc định theo vai trò
--- 1) Lịch trực ban: chỉ Trưởng/Phó phòng HC-TH, Trưởng/Phó đội lái xe, Trưởng/Phó đội bệnh xá
-DELETE FROM duty_schedule_permissions;
-
+-- ============================================================
+-- 1) DUTY SCHEDULE PERMISSIONS
+--    Chỉ manager thuộc: Phòng hành chính tổng hợp, Đội lái xe, Đội bệnh xá
+-- ============================================================
 INSERT INTO duty_schedule_permissions (officerId, canManageDutySchedules, grantedByUserId)
 SELECT o.id, 1, 1
 FROM officers o
 JOIN users u ON u.id = o.userId
 WHERE u.role = 'manager'
   AND o.department IN ('Phòng hành chính tổng hợp', 'Đội lái xe', 'Đội bệnh xá')
-  AND o.position REGEXP 'Trưởng phòng|Phó trưởng phòng|Trưởng đội|Phó đội'
 ON DUPLICATE KEY UPDATE
-  canManageDutySchedules = VALUES(canManageDutySchedules),
+  canManageDutySchedules = 1,
   grantedByUserId = VALUES(grantedByUserId),
   updatedAt = CURRENT_TIMESTAMP;
 
--- 2) Lịch công tác:
---    - Quyền tạo: admin + manager
---    - Quyền duyệt: admin + manager thuộc Phòng hành chính tổng hợp
+-- ============================================================
+-- 2) WORK SCHEDULE PERMISSIONS
+--    canCreate  : admin + manager (tất cả)
+--    canApprove : chỉ admin
+-- ============================================================
 INSERT INTO work_schedule_permissions (officerId, canCreateWorkSchedules, canApproveWorkSchedules, grantedByUserId)
-SELECT
-  o.id,
-  CASE WHEN u.role IN ('admin', 'manager') THEN 1 ELSE 0 END,
-  CASE
-    WHEN u.role = 'admin' THEN 1
-    WHEN u.role = 'manager' AND o.department = 'Phòng hành chính tổng hợp' THEN 1
-    ELSE 0
-  END,
+SELECT o.id,
+  1 AS canCreateWorkSchedules,
+  CASE WHEN u.role = 'admin' THEN 1 ELSE 0 END AS canApproveWorkSchedules,
   1
 FROM officers o
 JOIN users u ON u.id = o.userId
 WHERE u.role IN ('admin', 'manager')
 ON DUPLICATE KEY UPDATE
-  canCreateWorkSchedules = VALUES(canCreateWorkSchedules),
+  canCreateWorkSchedules  = VALUES(canCreateWorkSchedules),
   canApproveWorkSchedules = VALUES(canApproveWorkSchedules),
-  grantedByUserId = VALUES(grantedByUserId),
-  updatedAt = CURRENT_TIMESTAMP;
+  grantedByUserId         = VALUES(grantedByUserId),
+  updatedAt               = CURRENT_TIMESTAMP;
 
 -- ========== DEPARTMENTS ==========
 INSERT INTO departments (name, departmentType, headOfficerId, isActive) VALUES
@@ -765,18 +761,18 @@ INSERT INTO duty_schedules (id, officerId, dutyType, date, endDate, weekStartDat
 
 -- ========== ACTIVITY LOGS ==========
 INSERT INTO activity_logs (actorUserId, actorUsername, actorRole, module, action, entityType, entityId, summary, metadata) VALUES
-(1, 'thaolm', 'admin', 'lichcongtac', 'create', 'work_schedule', 'LCT001', 'Tạo lịch công tác LCT001', JSON_OBJECT('note', 'Khởi tạo lịch')),
-(7, 'huypq', 'manager', 'lichcongtac', 'create', 'work_schedule', 'LCT002', 'Tạo lịch công tác LCT002', JSON_OBJECT('note', 'Khởi tạo lịch')),
-(8, 'duchm', 'manager', 'lichcongtac', 'create', 'work_schedule', 'LCT003', 'Tạo lịch công tác LCT003', JSON_OBJECT('note', 'Khởi tạo lịch')),
-(2, 'cannv', 'admin', 'lichcongtac', 'update', 'work_schedule', 'LCT004', 'Cập nhật lịch công tác LCT004', JSON_OBJECT('note', 'Điều chỉnh lịch')),
+(1, 'thaolm', 'admin', 'lichcongtac', 'create', 'work_schedule', 'LCT001', 'Tạo Lịch sự kiện LCT001', JSON_OBJECT('note', 'Khởi tạo lịch')),
+(7, 'huypq', 'manager', 'lichcongtac', 'create', 'work_schedule', 'LCT002', 'Tạo Lịch sự kiện LCT002', JSON_OBJECT('note', 'Khởi tạo lịch')),
+(8, 'duchm', 'manager', 'lichcongtac', 'create', 'work_schedule', 'LCT003', 'Tạo Lịch sự kiện LCT003', JSON_OBJECT('note', 'Khởi tạo lịch')),
+(2, 'cannv', 'admin', 'lichcongtac', 'update', 'work_schedule', 'LCT004', 'Cập nhật Lịch sự kiện LCT004', JSON_OBJECT('note', 'Điều chỉnh lịch')),
 (1, 'thaolm', 'admin', 'lichtrucban', 'update', 'duty_schedule', 'TBGD015', 'Cập nhật lịch trực ban tuần 15', JSON_OBJECT('note', 'Điều chỉnh lịch')),
 (1, 'thaolm', 'admin', 'lichtrucban', 'update', 'duty_schedule', 'TBCB109', 'Cập nhật lịch trực ban TBCB109', NULL),
 (1, 'thaolm', 'admin', 'lichtrucban', 'create', 'duty_schedule', 'TBCB111,TBCB112,TBCB113,TBCB114,TBCB115,TBCB116,TB', 'Tự động xếp officer_daily (25 lịch)', NULL),
 (1, 'thaolm', 'admin', 'lichtrucban', 'create', 'duty_schedule', 'TBCB136,TBCB137,TBCB138,TBCB139,TBCB140,TBCB141,TB', 'Tự động xếp officer_daily (35 lịch)', NULL),
-(12, 'longvt', 'officer', 'lichcongtac', 'create', 'work_schedule', 'LCT006', 'Thêm mới lịch công tác LCT006 - a', NULL),
-(5, 'sontv', 'manager', 'lichcongtac', 'approve', 'work_schedule', 'LCT006', 'Duyệt lịch công tác LCT006', NULL),
-(5, 'sontv', 'manager', 'lichcongtac', 'create', 'work_schedule', 'LCT007', 'Thêm mới lịch công tác LCT007 - a', NULL),
-(5, 'sontv', 'manager', 'lichcongtac', 'approve', 'work_schedule', 'LCT007', 'Duyệt lịch công tác LCT007', NULL);
+(12, 'longvt', 'officer', 'lichcongtac', 'create', 'work_schedule', 'LCT006', 'Thêm mới Lịch sự kiện LCT006 - a', NULL),
+(5, 'sontv', 'manager', 'lichcongtac', 'approve', 'work_schedule', 'LCT006', 'Duyệt Lịch sự kiện LCT006', NULL),
+(5, 'sontv', 'manager', 'lichcongtac', 'create', 'work_schedule', 'LCT007', 'Thêm mới Lịch sự kiện LCT007 - a', NULL),
+(5, 'sontv', 'manager', 'lichcongtac', 'approve', 'work_schedule', 'LCT007', 'Duyệt Lịch sự kiện LCT007', NULL);
 
 -- ========== NOTIFICATIONS ==========
 INSERT INTO notifications (title, content, type, module, entityType, entityId, targetUserId, targetRole, isActive) VALUES
@@ -841,12 +837,12 @@ INSERT INTO notifications (title, content, type, module, entityType, entityId, t
 ('Bạn được phân công lịch trực ban', '2026-04-19 - Nhà hiệu bộ', 'info', 'lichtrucban', 'duty_schedule', 'TBCB168', 9, NULL, 1),
 ('Bạn được phân công lịch trực ban', '2026-04-19 - Lái xe', 'info', 'lichtrucban', 'duty_schedule', 'TBCB169', 27, NULL, 1),
 ('Bạn được phân công lịch trực ban', '2026-04-19 - Bệnh xá', 'info', 'lichtrucban', 'duty_schedule', 'TBCB170', 31, NULL, 1),
-('Có lịch công tác chờ duyệt', 'a (2026-04-02)', 'warning', 'lichcongtac', 'work_schedule', 'LCT006', NULL, 'admin', 1),
-('Lịch công tác đã được duyệt', 'a (2026-04-02)', 'success', 'lichcongtac', 'work_schedule', 'LCT006', 12, NULL, 1),
-('Lịch công tác đã được duyệt', 'a (2026-04-02)', 'success', 'lichcongtac', 'work_schedule', 'LCT006', 17, NULL, 1),
-('Có lịch công tác chờ duyệt', 'a (2026-04-02)', 'warning', 'lichcongtac', 'work_schedule', 'LCT007', NULL, 'admin', 1),
-('Lịch công tác đã được duyệt', 'a (2026-04-02)', 'success', 'lichcongtac', 'work_schedule', 'LCT007', 5, NULL, 1),
-('Lịch công tác đã được duyệt', 'a (2026-04-02)', 'success', 'lichcongtac', 'work_schedule', 'LCT007', 19, NULL, 1);
+('Có Lịch sự kiện chờ duyệt', 'a (2026-04-02)', 'warning', 'lichcongtac', 'work_schedule', 'LCT006', NULL, 'admin', 1),
+('Lịch sự kiện đã được duyệt', 'a (2026-04-02)', 'success', 'lichcongtac', 'work_schedule', 'LCT006', 12, NULL, 1),
+('Lịch sự kiện đã được duyệt', 'a (2026-04-02)', 'success', 'lichcongtac', 'work_schedule', 'LCT006', 17, NULL, 1),
+('Có Lịch sự kiện chờ duyệt', 'a (2026-04-02)', 'warning', 'lichcongtac', 'work_schedule', 'LCT007', NULL, 'admin', 1),
+('Lịch sự kiện đã được duyệt', 'a (2026-04-02)', 'success', 'lichcongtac', 'work_schedule', 'LCT007', 5, NULL, 1),
+('Lịch sự kiện đã được duyệt', 'a (2026-04-02)', 'success', 'lichcongtac', 'work_schedule', 'LCT007', 19, NULL, 1);
 
 -- ========== EXPORT LOGS ==========
 INSERT INTO export_logs (userId, username, role, exportType, exportScope, exportFormat, itemCount) VALUES

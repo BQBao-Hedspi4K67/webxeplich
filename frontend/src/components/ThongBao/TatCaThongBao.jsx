@@ -48,7 +48,7 @@ const TatCaThongBao = ({ thongBaoData = [], onMarkNotificationRead, onMarkAllNot
     const keywordRules = [
       { pattern: /(xin nghi|xin nghỉ|don xin nghi|đơn xin nghỉ|cho duyet|chờ duyệt)/, page: 'ykien' },
       { pattern: /(lich truc|lịch trực|truc ban|trực ban)/, page: 'lichtrucan' },
-      { pattern: /(lich cong tac|lịch công tác|cho duyet lich|duyet lich)/, page: 'lichcongtac' },
+      { pattern: /(lich cong tac|Lịch sự kiện|cho duyet lich|duyet lich)/, page: 'lichcongtac' },
       { pattern: /(can bo|cán bộ|phan quyen|phân quyền)/, page: 'canbo' },
       { pattern: /(phong ban|phòng ban|don vi|đơn vị)/, page: 'phongban' },
       { pattern: /(ngay le|ngày lễ|ky niem|kỷ niệm)/, page: 'ngayle' },

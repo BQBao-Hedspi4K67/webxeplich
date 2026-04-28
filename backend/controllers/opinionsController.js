@@ -387,7 +387,7 @@ export const updateOpinionStatus = async (req, res, next) => {
         if (!requesterOfficer) {
           return res.status(403).json({
             success: false,
-            error: 'Insufficient permissions',
+            error: 'Bạn không có quyền thực hiện',
             code: 'FORBIDDEN',
           });
         }

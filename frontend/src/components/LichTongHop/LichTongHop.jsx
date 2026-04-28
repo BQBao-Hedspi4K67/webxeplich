@@ -4,7 +4,7 @@ import LapLichTrucBan from '../LichTrucBan/LapLichTrucBan';
 import XuatLich from '../XuatLich/XuatLich';
 
 const TABS = [
-  { id: 'congtac', label: 'Lịch công tác' },
+  { id: 'congtac', label: 'Lịch sự kiện' },
   { id: 'trucban', label: 'Lịch trực ban' },
   { id: 'xuatin', label: 'Xuất / In lịch' },
 ];

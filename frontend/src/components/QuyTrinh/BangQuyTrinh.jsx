@@ -3,7 +3,7 @@ import React from 'react';
 const tabRules = [
   {
     tab: 'Dashboard',
-    chucNang: 'Tổng quan nhanh lịch công tác, trực ban, bảng cán bộ rút gọn, thông báo và hoạt động mới.',
+    chucNang: 'Tổng quan nhanh Lịch sự kiện, trực ban, bảng cán bộ rút gọn, thông báo và hoạt động mới.',
     admin: 'Xem',
     quanly: 'Xem',
     canbo: 'Xem',
@@ -31,7 +31,7 @@ const tabRules = [
   },
   {
     tab: 'Tra cứu lịch',
-    chucNang: 'Lọc theo từ khóa, tháng, trạng thái; xem lịch công tác và trực ban tổng hợp.',
+    chucNang: 'Lọc theo từ khóa, tháng, trạng thái; xem Lịch sự kiện và trực ban tổng hợp.',
     admin: 'Xem',
     quanly: 'Xem',
     canbo: 'Xem',
@@ -51,8 +51,8 @@ const tabRules = [
     canbo: 'Gửi đơn xin nghỉ',
   },
   {
-    tab: 'Phê duyệt lịch công tác',
-    chucNang: 'Quản lý/ban giám đốc duyệt hoặc từ chối các lịch công tác đang chờ duyệt ngay trong tab Lập lịch công tác.',
+    tab: 'Phê duyệt Lịch sự kiện',
+    chucNang: 'Quản lý/ban giám đốc duyệt hoặc từ chối các Lịch sự kiện đang chờ duyệt ngay trong tab Lập Lịch sự kiện.',
     admin: 'Duyệt',
     quanly: 'Duyệt (nếu có quyền)',
     canbo: 'Không hiển thị',

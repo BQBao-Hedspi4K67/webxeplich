@@ -205,7 +205,7 @@ const apiClient = {
     delete: (id) => apiClient.delete(`/officers/${id}`),
   },
 
-  // ========== Work Schedules / Lịch công tác ==========
+  // ========== Work Schedules / Lịch sự kiện ==========
   workSchedules: {
     list: (page = 1, limit = 20, filters = {}) =>
       apiClient.get('/work-schedules', { page, limit, ...filters }),

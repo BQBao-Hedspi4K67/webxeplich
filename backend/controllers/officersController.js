@@ -422,7 +422,7 @@ export const updateDutySchedulePermission = async (req, res, next) => {
 
       const allowed = await canGrantDutySchedulePermissions(connection, req.user || {});
       if (!allowed) {
-        return res.status(403).json({ success: false, error: 'Insufficient permissions', code: 'FORBIDDEN' });
+        return res.status(403).json({ success: false, error: 'Bạn không có quyền thực hiện', code: 'FORBIDDEN' });
       }
 
       const [officerRows] = await connection.execute(
@@ -518,7 +518,7 @@ export const updateWorkSchedulePermission = async (req, res, next) => {
 
       const allowed = await canGrantWorkSchedulePermissions(connection, req.user || {});
       if (!allowed) {
-        return res.status(403).json({ success: false, error: 'Insufficient permissions', code: 'FORBIDDEN' });
+        return res.status(403).json({ success: false, error: 'Bạn không có quyền thực hiện', code: 'FORBIDDEN' });
       }
 
       const [officerRows] = await connection.execute(
@@ -558,11 +558,11 @@ export const updateWorkSchedulePermission = async (req, res, next) => {
         if (!hadAnyPermission) {
           const targetUserId = await resolveUserIdByOfficerId(connection, id);
           const grantedLabels = [];
-          if (nextCanCreate) grantedLabels.push('tạo lịch công tác');
-          if (nextCanApprove) grantedLabels.push('duyệt lịch công tác');
+          if (nextCanCreate) grantedLabels.push('tạo Lịch sự kiện');
+          if (nextCanApprove) grantedLabels.push('duyệt Lịch sự kiện');
 
           await createUserNotification(connection, {
-            title: 'Bạn vừa được cấp quyền lịch công tác',
+            title: 'Bạn vừa được cấp quyền Lịch sự kiện',
             content: `Bạn đã được cấp quyền ${grantedLabels.join(' và ')}. Vui lòng đăng nhập lại nếu chưa thấy quyền mới.`,
             type: 'success',
             module: 'lichcongtac',
@@ -586,7 +586,7 @@ export const updateWorkSchedulePermission = async (req, res, next) => {
         action: nextCanCreate || nextCanApprove ? 'grant_permission' : 'revoke_permission',
         entityType: 'work_schedule_permission',
         entityId: id,
-        summary: `${nextCanCreate || nextCanApprove ? 'Cấp' : 'Thu hồi'} quyền lịch công tác cho ${officerRows[0].fullName}`,
+        summary: `${nextCanCreate || nextCanApprove ? 'Cấp' : 'Thu hồi'} quyền Lịch sự kiện cho ${officerRows[0].fullName}`,
       });
 
       return res.json({
@@ -597,8 +597,8 @@ export const updateWorkSchedulePermission = async (req, res, next) => {
           canApproveWorkSchedulesByPermission: nextCanApprove,
         },
         message: nextCanCreate || nextCanApprove
-          ? 'Đã cập nhật quyền lịch công tác.'
-          : 'Đã thu hồi quyền lịch công tác.',
+          ? 'Đã cập nhật quyền lịch sự kiện.'
+          : 'Đã thu hồi quyền lịch sự kiện.',
       });
     } finally {
       connection.release();
@@ -612,7 +612,7 @@ export const getAdminDelegations = async (req, res, next) => {
   try {
     const effectiveRole = req.user?.effectiveRole || req.user?.role;
     if (!['admin', 'manager'].includes(effectiveRole)) {
-      return res.status(403).json({ success: false, error: 'Insufficient permissions', code: 'FORBIDDEN' });
+      return res.status(403).json({ success: false, error: 'Bạn không có quyền thực hiện', code: 'FORBIDDEN' });
     }
 
     const connection = await pool.getConnection();
@@ -632,7 +632,7 @@ export const updateAdminDelegation = async (req, res, next) => {
   try {
     const effectiveRole = req.user?.effectiveRole || req.user?.role;
     if (!['admin', 'manager'].includes(effectiveRole)) {
-      return res.status(403).json({ success: false, error: 'Insufficient permissions', code: 'FORBIDDEN' });
+      return res.status(403).json({ success: false, error: 'Bạn không có quyền thực hiện', code: 'FORBIDDEN' });
     }
 
     const { id } = req.params;
@@ -847,7 +847,7 @@ export const createOfficer = async (req, res, next) => {
 
       if (req.user?.role === 'manager') {
         if (!requesterOfficer?.department && !requesterOfficer?.departmentId) {
-          return res.status(403).json({ success: false, error: 'Insufficient permissions', code: 'FORBIDDEN' });
+          return res.status(403).json({ success: false, error: 'Bạn không có quyền thực hiện', code: 'FORBIDDEN' });
         }
 
         if (role !== 'officer') {

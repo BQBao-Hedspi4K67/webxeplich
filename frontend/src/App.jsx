@@ -755,8 +755,8 @@ function App() {
 
   const PageComponent = PAGE_COMPONENTS[safeActivePage] || PAGE_COMPONENTS[defaultPage] || Dashboard;
   const canReviewLeaveRequests = Boolean(
-    user?.isDelegatedManager
-    || (user?.role === 'Quản lý' && /(Trưởng\s*phòng|Phó\s*trưởng\s*phòng|Trưởng\s*khoa|Phó\s*trưởng\s*khoa|Trưởng\s*đội|Phó\s*đội)/i.test(String(user?.position || '')))
+    user?.role === 'Quản lý'
+    && String(user?.department || '').trim() === 'Phòng hành chính tổng hợp'
   );
   const canReviewWorkSchedules = Boolean(
     user?.canApproveWorkSchedules

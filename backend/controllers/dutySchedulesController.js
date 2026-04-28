@@ -111,7 +111,7 @@ const requireDutyScheduleManagementAccess = async (connection, reqUser) => {
     return {
       ok: false,
       status: 403,
-      error: 'Insufficient permissions',
+      error: 'Bạn không có quyền thực hiện',
       code: 'FORBIDDEN',
     };
   }

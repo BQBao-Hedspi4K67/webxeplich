@@ -404,7 +404,7 @@ export const createWorkSchedule = async (req, res, next) => {
       if (!accessState.canCreateWorkSchedules) {
         return res.status(403).json({
           success: false,
-          error: 'Bạn không có quyền tạo lịch công tác.',
+          error: 'Bạn không có quyền tạo Lịch sự kiện.',
           code: 'FORBIDDEN',
         });
       }
@@ -464,7 +464,7 @@ export const createWorkSchedule = async (req, res, next) => {
       for (const officerId of recipientOfficerIds) {
         const targetUserId = await resolveUserIdByOfficerId(connection, officerId);
         await createUserNotification(connection, {
-          title: 'Bạn có lịch công tác mới',
+          title: 'Bạn có Lịch sự kiện mới',
           content: `${title} (${date})`,
           type: 'info',
           module: 'lichcongtac',
@@ -476,7 +476,7 @@ export const createWorkSchedule = async (req, res, next) => {
 
       if (approvalStatus === 'pending') {
         await createRoleNotification(connection, {
-          title: 'Có lịch công tác chờ duyệt',
+          title: 'Có Lịch sự kiện chờ duyệt',
           content: `${title} (${date})`,
           type: 'warning',
           module: 'lichcongtac',
@@ -498,7 +498,7 @@ export const createWorkSchedule = async (req, res, next) => {
         for (const row of approverRows) {
           if (!row.userId) continue;
           await createUserNotification(connection, {
-            title: 'Có lịch công tác chờ duyệt',
+            title: 'Có Lịch sự kiện chờ duyệt',
             content: `${title} (${date})`,
             type: 'warning',
             module: 'lichcongtac',
@@ -554,7 +554,7 @@ export const approveWorkSchedule = async (req, res, next) => {
       if (!accessState.canApproveWorkSchedules) {
         return res.status(403).json({
           success: false,
-          error: 'Bạn không có quyền duyệt lịch công tác.',
+          error: 'Bạn không có quyền duyệt Lịch sự kiện.',
           code: 'FORBIDDEN',
         });
       }
@@ -609,7 +609,7 @@ export const approveWorkSchedule = async (req, res, next) => {
 
       for (const targetUserId of notifiedUserIds) {
         await createUserNotification(connection, {
-          title: approvalStatus === 'approved' ? 'Lịch công tác đã được duyệt' : 'Lịch công tác không được duyệt và đã bị xóa',
+          title: approvalStatus === 'approved' ? 'Lịch sự kiện đã được duyệt' : 'Lịch sự kiện không được duyệt và đã bị xóa',
           content: `${schedule.title} (${schedule.date})`,
           type: approvalStatus === 'approved' ? 'success' : 'warning',
           module: 'lichcongtac',
@@ -771,7 +771,7 @@ export const updateWorkSchedule = async (req, res, next) => {
           const targetUserId = await resolveUserIdByOfficerId(connection, offId);
           if (targetUserId) {
             await createUserNotification(connection, {
-              title: 'Lịch công tác có thay đổi',
+              title: 'Lịch sự kiện có thay đổi',
               content: `Lịch: ${updatedSchedule.title} (${updatedSchedule.date}) đã được cập nhật nội dung mới.`,
               type: 'info',
               module: 'lichcongtac',

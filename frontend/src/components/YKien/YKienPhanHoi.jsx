@@ -8,6 +8,8 @@ const statusUI = {
   rejected: { label: 'Từ chối', cls: 'bg-red-100 text-red-700', icon: AlertCircle },
 };
 
+const ADMIN_DEPARTMENT = 'Phòng hành chính tổng hợp';
+
 const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], lichCongTacData = [], reloadData, canReviewLeaveRequests }) => {
   const [danhSach, setDanhSach] = useState(yKienData);
   const [noiDung, setNoiDung] = useState('');
@@ -37,6 +39,7 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], lichCongTacD
 
   const canReview = Boolean(canReviewLeaveRequests);
   const isCanBo = user?.role === 'Cán bộ';
+  const canCreateLeaveRequest = isCanBo || (user?.role === 'Quản lý' && !canReviewLeaveRequests);
   const today = new Date().toISOString().slice(0, 10);
 
   const myItems = useMemo(() => {
@@ -92,7 +95,7 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], lichCongTacD
       await apiClient.workSchedules.approve(scheduleId, 'approved');
       if (reloadData) await reloadData();
     } catch (err) {
-      alert(err?.message || 'Không thể duyệt lịch công tác.');
+      alert(err?.message || 'Không thể duyệt Lịch sự kiện.');
     }
   };
 
@@ -105,7 +108,7 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], lichCongTacD
       await apiClient.workSchedules.approve(scheduleId, 'rejected');
       if (reloadData) await reloadData();
     } catch (err) {
-      alert(err?.message || 'Không thể từ chối lịch công tác.');
+      alert(err?.message || 'Không thể từ chối Lịch sự kiện.');
     }
   };
 
@@ -130,18 +133,18 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], lichCongTacD
             className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${approvalTab === 'work' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
             onClick={() => setApprovalTab('work')}
           >
-            Phê duyệt lịch công tác
+            Phê duyệt Lịch sự kiện
           </button>
         )}
       </div>
 
       {approvalTab === 'leave' && (
         <>
-          {isCanBo && (
+          {canCreateLeaveRequest && (
             <div className="card">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-base font-bold text-slate-800">Tạo đơn xin nghỉ</h3>
-                <span className="badge bg-blue-100 text-blue-700">Gửi quản lý/ban giám đốc duyệt</span>
+                <span className="badge bg-blue-100 text-blue-700">Gửi quản lý duyệt</span>
               </div>
               <div className="mb-3">
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Chọn ngày trực để xin nghỉ</label>
@@ -257,7 +260,7 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], lichCongTacD
       {approvalTab === 'work' && hasWorkScheduleApprove && (
         <div className="card-lg p-0 overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-800">Phê duyệt lịch công tác</h3>
+            <h3 className="text-base font-bold text-slate-800">Phê duyệt Lịch sự kiện</h3>
             <span className="text-xs text-slate-500">{
               (lichCongTacData?.filter?.(w => w.trangThaiDuyet === 'pending')?.length) || 0
             } lịch chờ duyệt</span>
@@ -297,7 +300,7 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], lichCongTacD
                 })}
                 {(lichCongTacData?.filter?.(w => w.trangThaiDuyet === 'pending')?.length === 0) && (
                   <tr>
-                    <td colSpan={6} className="text-center py-10 text-slate-400">Hiện không có lịch công tác chờ duyệt.</td>
+                    <td colSpan={6} className="text-center py-10 text-slate-400">Hiện không có Lịch sự kiện chờ duyệt.</td>
                   </tr>
                 )}
               </tbody>

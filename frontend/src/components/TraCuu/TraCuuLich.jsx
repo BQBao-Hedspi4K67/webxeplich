@@ -71,7 +71,7 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
   const sortedDates = Object.keys(byDate).sort();
 
   const typeColors = { congtac: 'bg-blue-100 text-blue-700', trucban: 'bg-indigo-100 text-indigo-700' };
-  const typeLabels = { congtac: '📅 Lịch công tác', trucban: '🛡 Lịch trực ban' };
+  const typeLabels = { congtac: '📅 Lịch sự kiện', trucban: '🛡 Lịch trực ban' };
 
   return (
     <div className="max-w-7xl mx-auto space-y-5">
@@ -110,7 +110,7 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
             <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Loại lịch</label>
             <select value={filterLoai} onChange={e => { setFilterLoai(e.target.value); setCurrentPage(1); }} className="input-field">
               <option value="all">Tất cả</option>
-              <option value="congtac">Lịch công tác</option>
+              <option value="congtac">Lịch sự kiện</option>
               <option value="trucban">Lịch trực ban</option>
             </select>
           </div>

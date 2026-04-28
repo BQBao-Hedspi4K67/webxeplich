@@ -455,7 +455,7 @@ const XuatLich = ({ xuatLichHistory = [], reloadData }) => {
               <div>
                 <label className="text-xs font-semibold text-slate-500 mb-2 block">Loại lịch</label>
                 <div className="space-y-2">
-                  {[{ v: 'congtac', l: 'Lịch công tác', icon: CalendarDays },
+                  {[{ v: 'congtac', l: 'Lịch sự kiện', icon: CalendarDays },
                     { v: 'trucban', l: 'Lịch trực ban', icon: Shield },
                     { v: 'both', l: 'Cả hai loại', icon: FileText }].map(o => (
                     <label key={o.v} className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${exportType === o.v ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
@@ -555,14 +555,14 @@ const XuatLich = ({ xuatLichHistory = [], reloadData }) => {
                   <div className="bg-gradient-to-r from-[#0d2240] to-[#1a4a8a] px-6 py-4 text-white text-center">
                     <div className="text-[11px] uppercase tracking-wider text-blue-200 mb-1">BỘ CÔNG AN – HỌC VIỆN KỸ THUẬT VÀ CÔNG NGHỆ AN NINH</div>
                     <div className="text-base font-bold">
-                      {exportType === 'congtac' ? 'LỊCH CÔNG TÁC' : exportType === 'trucban' ? 'LỊCH TRỰC BAN' : 'LỊCH CÔNG TÁC & TRỰC BAN'}
+                      {exportType === 'congtac' ? 'Lịch sự kiện' : exportType === 'trucban' ? 'LỊCH TRỰC BAN' : 'Lịch sự kiện & TRỰC BAN'}
                     </div>
                     <div className="text-xs text-blue-200 mt-1">{previewBounds ? `(${formatDateVN(previewBounds.startDate)} - ${formatDateVN(previewBounds.endDate)})` : '(Theo phạm vi được chọn)'}</div>
                   </div>
                   <div className="p-4 space-y-5">
                     {exportType === 'congtac' && (
                       <div className="border border-slate-200 rounded-xl overflow-hidden">
-                        <div className="bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">LỊCH CÔNG TÁC TUẦN</div>
+                        <div className="bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">Lịch sự kiện TUẦN</div>
                         <table className="w-full text-xs table-fixed">
                           <thead>
                             <tr className="bg-slate-50">
@@ -620,7 +620,7 @@ const XuatLich = ({ xuatLichHistory = [], reloadData }) => {
 
                     {exportType === 'both' && (
                       <div className="border border-slate-200 rounded-xl overflow-hidden">
-                        <div className="bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">LỊCH CÔNG TÁC & TRỰC BAN TUẦN</div>
+                        <div className="bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">Lịch sự kiện & TRỰC BAN TUẦN</div>
                         <table className="w-full text-xs table-fixed">
                           <thead>
                             <tr className="bg-slate-50">

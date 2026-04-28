@@ -64,15 +64,14 @@ const emptyDayForm = (date, dutyType) => ({
 
 const MODE_STORAGE_KEY = 'lap-lich-truc-ban-mode';
 const WEEK_OFFSET_STORAGE_KEY = 'lap-lich-truc-ban-week-offset';
+const SPECIAL_DUTY_DEPARTMENTS = ['Phòng hành chính tổng hợp', 'Đội lái xe', 'Đội bệnh xá'];
 
 const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayData = [], reloadData }) => {
-  const canEdit = Boolean(user?.canManageDutySchedules) || user?.backendRole === 'admin' || user?.backendRole === 'superadmin' || user?.role === 'admin' || user?.role === 'Quản trị viên';
+  const isSpecialDutyManager = user?.role === 'Quản lý' && SPECIAL_DUTY_DEPARTMENTS.includes(String(user?.department || '').trim());
+  const canEdit = user?.backendRole === 'superadmin' || isSpecialDutyManager || (Boolean(user?.canManageDutySchedules) && user?.backendRole !== 'admin');
   const canGrantPermission =
-    Boolean(user?.canGrantDutySchedulePermissions)
-    || user?.backendRole === 'admin'
-    || user?.backendRole === 'superadmin'
-    || user?.role === 'Quản trị viên'
-    || String(user?.department || '').trim() === 'Phòng hành chính tổng hợp';
+    user?.backendRole === 'superadmin'
+    || (user?.role === 'Quản lý' && String(user?.department || '').trim() === 'Phòng hành chính tổng hợp');
 
   const [data, setData] = useState(lichTrucBanData);
   const [weekOffset, setWeekOffset] = useState(() => {
@@ -241,6 +240,25 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
     }),
     [data, weekDates]
   );
+
+  const directorWeekByDate = useMemo(() => {
+    const map = {};
+
+    directorWeekData.forEach((item) => {
+      const start = new Date(`${toDateOnly(item.ngay)}T00:00:00Z`);
+      const end = new Date(`${toDateOnly(item.denNgay || item.ngay)}T00:00:00Z`);
+
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
+
+      const cursor = new Date(start);
+      while (cursor <= end) {
+        map[toDateOnly(cursor)] = item;
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
+    });
+
+    return map;
+  }, [directorWeekData]);
 
   // Thống kê trực của từng cán bộ
   const dutyStats = useMemo(() => {
@@ -556,6 +574,7 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
                 <th className="table-th px-2 py-2.5">HB - Chỉ huy</th>
                 <th className="table-th px-2 py-2.5">Lái xe</th>
                 <th className="table-th px-2 py-2.5">Bệnh xá</th>
+                
                 <th className="table-th px-2 py-2.5 sticky right-0 z-20 bg-slate-50 text-center w-[76px]">Thao tác</th>
               </tr>
             </thead>
@@ -568,6 +587,9 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
                   if (isHoliday) return x.loaiTruc === 'holiday_daily';
                   return x.loaiTruc === 'officer_daily';
                 });
+                
+                const directorForDay = directorWeekByDate[date] || null;
+                
                 const slot1 = getSlot(dayItems, LOCATION.HB, 'officer', 1);
                 const slot2 = getSlot(dayItems, LOCATION.HB, 'officer', 2);
                 const slotCommander = getSlot(dayItems, LOCATION.HB, 'commander', 1);
@@ -589,6 +611,7 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
                     <td className="table-td px-2 py-2">{renderDutyCell(slotCommander)}</td>
                     <td className="table-td px-2 py-2">{renderDutyCell(slotDriver)}</td>
                     <td className="table-td px-2 py-2">{renderDutyCell(slotMedic)}</td>
+                    
                     <td className="table-td px-2 py-2 sticky right-0 z-10 bg-white group-hover:bg-slate-50/95 text-center">
                       {canEdit && (
                         <button

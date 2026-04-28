@@ -8,8 +8,8 @@ import {
 
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
-  { id: 'canbo', label: 'Quản lý cán bộ', icon: Users, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
-  { id: 'lichcongtac', label: 'Lịch sự kiện', icon: CalendarDays, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
+  { id: 'canbo', label: 'Quản lý cán bộ', icon: Users, badge: null, roles: ['Quản trị viên', 'Quản lý'] },
+  { id: 'lichcongtac', label: 'Lịch công tác', icon: CalendarDays, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'lichcuatoi', label: 'Lịch của tôi', icon: CalendarCheck, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'ykien', label: 'Phê duyệt', icon: MessageSquareQuote, badge: null, roles: ['Quản trị viên', 'Quản lý', 'Cán bộ'] },
   { id: 'ngayle', label: 'Quản lý ngày lễ', icon: CalendarRange, badge: null, roles: ['Superadmin'] },
@@ -19,6 +19,7 @@ const menuItems = [
 
 const Sidebar = ({ activePage, onNavigate, allowedPages = [], user, onLogout, approvalPendingCount = 0 }) => {
   const [collapsed, setCollapsed] = useState(false);
+
   const visibleMenus = menuItems.map(item => {
     if (item.id === 'ykien' && approvalPendingCount > 0) {
       return { ...item, badge: approvalPendingCount };

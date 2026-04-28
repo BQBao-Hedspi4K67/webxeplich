@@ -9,6 +9,7 @@ import {
 
 const toDateOnly = (value) => String(value || '').slice(0, 10);
 const DEPARTMENT_REVIEWER_POSITION_PATTERN = /(Trưởng\s*phòng|Phó\s*trưởng\s*phòng|Trưởng\s*khoa|Phó\s*trưởng\s*khoa|Trưởng\s*đội|Phó\s*đội)/i;
+const ADMIN_DEPARTMENT = 'Phòng hành chính tổng hợp';
 
 const hasOfficersUserIdColumn = async (connection) => {
   const [rows] = await connection.execute("SHOW COLUMNS FROM officers LIKE 'userId'");
@@ -48,6 +49,14 @@ const resolveRequesterOfficer = async (connection, reqUser = {}) => {
   return fallbackRows[0] || null;
 };
 
+// Only manager from "Phòng hành chính tổng hợp" can review/approve leave requests
+const canApproveLeaveRequest = (officer) => {
+  if (!officer) return false;
+  if (officer.role !== 'manager') return false;
+  return String(officer.department || '').trim() === ADMIN_DEPARTMENT;
+};
+
+// Other managers can create leave requests (for themselves or subordinates)
 const isDepartmentReviewer = (officer) => {
   if (!officer) return false;
   if (officer.role !== 'manager') return false;
@@ -77,18 +86,16 @@ export const getLeaveRequests = async (req, res, next) => {
       const hasManagerDelegation = Boolean(req.user?.isDelegatedManager);
 
       if (canActAsManager) {
-        if (!requesterOfficer?.department || (!hasManagerDelegation && !isDepartmentReviewer(requesterOfficer))) {
+        const isAdminDeptManager = canApproveLeaveRequest(requesterOfficer) || (hasManagerDelegation && String(requesterOfficer?.department || '').trim() === ADMIN_DEPARTMENT);
+        if (!isAdminDeptManager && requesterOfficer?.id) {
+          // Other managers behave like officers in this tab: they only see their own requests.
+          whereConditions.push('lr.officerId = ?');
+          params.push(requesterOfficer.id);
+        } else if (!isAdminDeptManager) {
           return res.json({ success: true, data: [], pagination: { total: 0, page: parseInt(page, 10), limit: parseInt(limit, 10), pages: 0 } });
         }
-        if (hasDepartmentId && requesterOfficer.departmentId) {
-          whereConditions.push('o.departmentId = ?');
-          params.push(requesterOfficer.departmentId);
-        } else {
-          whereConditions.push('o.department = ?');
-          params.push(requesterOfficer.department);
-        }
       } else {
-        // Any role other than 'manager' (including 'admin') can only see their own leave requests
+        // Any role other than 'manager' can only see their own leave requests
         if (requesterOfficer?.id) {
           whereConditions.push('lr.officerId = ?');
           params.push(requesterOfficer.id);
@@ -363,14 +370,15 @@ export const updateLeaveRequestStatus = async (req, res, next) => {
       const effectiveRole = req.user?.effectiveRole || req.user?.role;
       const hasManagerDelegation = Boolean(req.user?.isDelegatedManager);
 
+      // Only manager from "Phòng hành chính tổng hợp" can approve leave requests
       if (
         effectiveRole !== 'manager'
         || !requesterOfficer
-        || (!hasManagerDelegation && !isDepartmentReviewer(requesterOfficer))
+        || (!canApproveLeaveRequest(requesterOfficer) && !(hasManagerDelegation && String(requesterOfficer.department || '').trim() === ADMIN_DEPARTMENT))
       ) {
         return res.status(403).json({
           success: false,
-          error: 'Chỉ trưởng/phó phòng mới được phê duyệt đơn xin nghỉ.',
+          error: 'Chỉ Trưởng/Phó phòng Hành chính tổng hợp mới được phê duyệt đơn xin nghỉ.',
           code: 'FORBIDDEN',
         });
       }
@@ -381,18 +389,13 @@ export const updateLeaveRequestStatus = async (req, res, next) => {
           : 'SELECT department, NULL AS departmentId FROM officers WHERE id = ? LIMIT 1',
         [leaveRequest.officerId]
       );
-      const targetDepartment = targetOfficerRows[0]?.department || '';
-      const targetDepartmentId = targetOfficerRows[0]?.departmentId || null;
 
-      const sameDepartment = hasDepartmentId && requesterOfficer?.departmentId
-        ? Number(targetDepartmentId) === Number(requesterOfficer.departmentId)
-        : targetDepartment === requesterOfficer.department;
-
-      if (!targetDepartment || !sameDepartment) {
-        return res.status(403).json({
+      // Admin Dept manager can approve for any officer, no department restriction
+      if (!targetOfficerRows[0]) {
+        return res.status(404).json({
           success: false,
-          error: 'Trưởng/phó phòng chỉ được duyệt đơn xin nghỉ trong chính phòng của mình.',
-          code: 'FORBIDDEN',
+          error: 'Officer not found',
+          code: 'OFFICER_NOT_FOUND',
         });
       }
 

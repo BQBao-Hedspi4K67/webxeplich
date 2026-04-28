@@ -523,6 +523,15 @@ export const logout = (req, res) => {
 // Create user account (internal provisioning only)
 export const createUserAccount = async (req, res, next) => {
   try {
+    // Only superadmin (role === 'admin') can create officer accounts
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Chỉ Superadmin có quyền tạo cán bộ mới',
+        code: 'INSUFFICIENT_PERMISSIONS',
+      });
+    }
+
     let {
       fullName,
       militaryRank = '',
@@ -583,19 +592,10 @@ export const createUserAccount = async (req, res, next) => {
       await connection.beginTransaction();
       const hasUserIdColumn = await hasOfficersUserIdColumn(connection);
       const hasDepartmentIdColumn = await hasOfficersDepartmentIdColumn(connection);
-      const requesterOfficer = await resolveRequesterOfficer(connection, req.user || {});
-
-      if (req.user?.role === 'manager') {
-        if (!requesterOfficer?.department && !requesterOfficer?.departmentId) {
-          return res.status(403).json({ success: false, error: 'Insufficient permissions', code: 'FORBIDDEN' });
-        }
-        role = 'officer';
-        department = requesterOfficer.department;
-      }
 
       const departmentRef = await validateDepartment(connection, {
-        departmentId: req.user?.role === 'manager' ? requesterOfficer?.departmentId : departmentId,
-        department: req.user?.role === 'manager' ? requesterOfficer?.department : department,
+        departmentId: departmentId,
+        department: department,
       });
       if (!departmentRef) {
         return res.status(400).json({

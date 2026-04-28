@@ -103,6 +103,13 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
     setOfficerOptions(canBoData || []);
   }, [canBoData]);
 
+  const isDutyInDateRange = (duty, dateStr) => {
+    const startDate = toDateOnly(duty?.ngay || duty?.date);
+    const endDate = toDateOnly(duty?.denNgay || duty?.endDate || duty?.ngay || duty?.date);
+    if (!startDate || !endDate) return false;
+    return startDate <= dateStr && endDate >= dateStr;
+  };
+
 
   useEffect(() => {
     const loadDutySchedules = async () => {
@@ -315,7 +322,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
       if (reloadData) await reloadData();
       setShowModal(false);
     } catch (err) {
-      alert(err?.message || 'Không thể lưu lịch công tác.');
+      alert(err?.message || 'Không thể lưu Lịch sự kiện.');
     }
   };
 
@@ -324,7 +331,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-800">Lịch công tác</h2>
+          <h2 className="text-xl font-bold text-slate-800">Lịch sự kiện</h2>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setViewMode('week')}
@@ -419,9 +426,12 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                     return hour >= 12;
                   });
                   
-                  // Get duty schedules for this day
-                  const dayDuties = dutyData.filter(duty => {
-                    const dutyDate = duty.date || duty.ngay;
+                  // Get duty schedules for this day, including weekly director duties across the whole week
+                  const dayDuties = dutyData.filter((duty) => {
+                    const dutyDate = toDateOnly(duty.date || duty.ngay);
+                    if (duty.kieuTruc === 'giamdoc') {
+                      return isDutyInDateRange(duty, dateStr);
+                    }
                     return dutyDate === dateStr;
                   });
 
@@ -662,7 +672,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-fade-in-up">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-800">{editId ? 'Chỉnh sửa lịch công tác' : 'Thêm lịch công tác'}</h3>
+              <h3 className="text-base font-bold text-slate-800">{editId ? 'Chỉnh sửa Lịch sự kiện' : 'Thêm Lịch sự kiện'}</h3>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
             </div>
             <div className="p-6 space-y-4">
@@ -808,7 +818,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
             <div className="w-12 h-12 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <Trash2 size={22} className="text-red-500" />
             </div>
-            <h3 className="font-bold text-slate-800 mb-2">Xóa lịch công tác?</h3>
+            <h3 className="font-bold text-slate-800 mb-2">Xóa Lịch sự kiện?</h3>
             <p className="text-sm text-slate-500 mb-5">Bạn có chắc muốn xóa lịch <span className="font-semibold text-slate-700">"{deleteConfirm.tieuDe}"</span>?</p>
             <div className="flex gap-3">
               <button onClick={() => setDeleteConfirm(null)} className="btn-secondary flex-1 justify-center">Hủy</button>
@@ -819,7 +829,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                     if (reloadData) await reloadData();
                     setDeleteConfirm(null);
                   } catch (err) {
-                    alert(err?.message || 'Không thể xóa lịch công tác.');
+                    alert(err?.message || 'Không thể xóa Lịch sự kiện.');
                   }
                 }}
                 className="btn-danger flex-1 justify-center"

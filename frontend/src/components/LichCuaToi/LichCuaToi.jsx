@@ -156,7 +156,7 @@ const LichCuaToi = ({ user, canBoData = [], lichCongTacData = [], lichTrucBanDat
             <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Loại lịch</label>
             <select className="input-field" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
               <option value="all">Tất cả</option>
-              <option value="congtac">Lịch công tác</option>
+              <option value="congtac">Lịch sự kiện</option>
               <option value="trucban">Lịch trực ban</option>
             </select>
           </div>

@@ -69,11 +69,13 @@ const initialCreateForm = {
 const DEFAULT_UNIT_OPTIONS = ['Ban Giám đốc', ...DEPARTMENTS, ...SCHOOLS];
 
 const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) => {
+  const isSuperadmin = user?.backendRole === 'superadmin';
   const isAdmin = user?.role === 'Quản trị viên' || Boolean(user?.isDelegatedAdmin);
   const isManager = user?.role === 'Quản lý' || Boolean(user?.isDelegatedManager);
-  const canEdit = false;
+  const canEdit = isSuperadmin;
   const canProvisionUser = false;
-  const canManageDelegation = isAdmin || isManager;
+  const canManageDelegation = !isSuperadmin && (isAdmin || isManager);
+  const canCreateOfficer = isSuperadmin;
   const canGrantDutyPermission = Boolean(user?.canGrantDutySchedulePermissions);
   const canGrantWorkPermission = Boolean(user?.canGrantWorkSchedulePermissions);
   
@@ -162,6 +164,10 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
   const departmentScopedData = data.filter((cb) => {
     if (isAdmin) {
       return !selectedDepartment || cb.donVi === selectedDepartment;
+    }
+    if (isManager) {
+      // Managers may only view officers in their own department
+      return cb.donVi === (user?.department || '');
     }
     return true;
   });
@@ -336,7 +342,20 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Quản lý cán bộ</h2>
+            {isManager && (
+              <div className="text-sm text-slate-500 mt-1">Phòng quản lý: {user?.department || 'Chưa xác định'}</div>
+            )}
         </div>
+        {canCreateOfficer && (
+          <button
+            onClick={openCreateAccount}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+            title="Chỉ superadmin có thể tạo cán bộ"
+          >
+            <Plus size={18} />
+            Tạo cán bộ
+          </button>
+        )}
       </div>
 
       {showDepartmentFilter && (
@@ -744,7 +763,7 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
                     onChange={(e) => setCreateForm((prev) => ({ ...prev, canCreateWorkSchedulesByPermission: e.target.checked }))}
                     className="w-4 h-4 rounded border-slate-300 text-blue-600"
                   />
-                  Cấp quyền tạo lịch công tác
+                  Cấp quyền tạo Lịch sự kiện
                 </label>
                 <label className="flex items-center gap-2 text-sm text-slate-700">
                   <input
@@ -753,7 +772,7 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
                     onChange={(e) => setCreateForm((prev) => ({ ...prev, canApproveWorkSchedulesByPermission: e.target.checked }))}
                     className="w-4 h-4 rounded border-slate-300 text-blue-600"
                   />
-                  Cấp quyền duyệt lịch công tác
+                  Cấp quyền duyệt Lịch sự kiện
                 </label>
               </div>
 
@@ -875,7 +894,7 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
                             onChange={(e) => setForm({ ...form, canCreateWorkSchedulesByPermission: e.target.checked })}
                             className="w-4 h-4 rounded border-slate-300 text-blue-600"
                           />
-                          Cấp quyền tạo lịch công tác
+                          Cấp quyền tạo Lịch sự kiện
                         </label>
                         <label className="flex items-center gap-2 text-sm text-slate-700">
                           <input
@@ -884,7 +903,7 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
                             onChange={(e) => setForm({ ...form, canApproveWorkSchedulesByPermission: e.target.checked })}
                             className="w-4 h-4 rounded border-slate-300 text-blue-600"
                           />
-                          Cấp quyền duyệt lịch công tác
+                          Cấp quyền duyệt Lịch sự kiện
                         </label>
                       </>
                     )}

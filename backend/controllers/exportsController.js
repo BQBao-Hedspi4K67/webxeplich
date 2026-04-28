@@ -260,7 +260,7 @@ const buildWorkRowsByDay = (workRows, dateList) => {
 };
 
 const writeWorkSchedulePdf = (doc, selectedFont, workRows, bounds) => {
-  drawPdfTopHeader(doc, selectedFont, { title: 'LỊCH CÔNG TÁC TUẦN', bounds });
+  drawPdfTopHeader(doc, selectedFont, { title: 'LỊCH SỰ KIỆN TUẦN', bounds });
 
   const dateList = getDateListByBounds(bounds);
   const rows = buildWorkRowsByDay(workRows, dateList.length ? dateList : Array.from(new Set((workRows || []).map((x) => toDateOnly(x.date)))));
@@ -277,7 +277,7 @@ const writeWorkSchedulePdf = (doc, selectedFont, workRows, bounds) => {
 
   if (!rows.length) {
     doc.moveDown(1);
-    doc.fontSize(11).fillColor('#6b7280').text('Không có dữ liệu lịch công tác trong phạm vi đã chọn.', { align: 'center' });
+    doc.fontSize(11).fillColor('#6b7280').text('Không có dữ liệu lịch sự kiện trong phạm vi đã chọn.', { align: 'center' });
   }
 };
 

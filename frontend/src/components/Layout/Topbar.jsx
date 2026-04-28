@@ -5,7 +5,7 @@ const pageTitles = {
   dashboard: 'Dashboard',
   thongbao: 'Thông báo',
   canbo: 'Quản lý cán bộ',
-  lichcongtac: 'Lịch sự kiện tuần',
+  lichcongtac: 'Lịch công tác',
   lichtrucan: 'Lập lịch trực ban',
   lichcuatoi: 'Lịch của tôi',
   tracuu: 'Tra cứu lịch',
@@ -60,8 +60,8 @@ const Topbar = ({ activePage, allowedPages = [], user, onLogout, onNavigate, not
     const entityTypeKey = String(notification?.entityType || '').toLowerCase();
     const text = `${String(notification?.tieuDe || '')} ${String(notification?.noiDung || '')}`.toLowerCase();
 
-    // Ưu tiên đưa các thông báo cần phê duyệt sang tab Đơn xin nghỉ và phê duyệt lịch công tác.
-    if (/(cho duyet|chờ duyệt|duyet lich cong tac|duyệt lịch công tác)/.test(text)) {
+    // Ưu tiên đưa các thông báo cần phê duyệt sang tab Đơn xin nghỉ và phê duyệt Lịch sự kiện.
+    if (/(cho duyet|chờ duyệt|duyet lich cong tac|duyệt Lịch sự kiện)/.test(text)) {
       return 'ykien';
     }
 
@@ -91,7 +91,7 @@ const Topbar = ({ activePage, allowedPages = [], user, onLogout, onNavigate, not
     const keywordRules = [
       { pattern: /(xin nghi|xin nghỉ|don xin nghi|đơn xin nghỉ|cho duyet|chờ duyệt)/, page: 'ykien' },
       { pattern: /(lich truc|lịch trực|truc ban|trực ban)/, page: 'lichtrucan' },
-      { pattern: /(lich cong tac|lịch công tác|cho duyet lich|duyet lich)/, page: 'lichcongtac' },
+      { pattern: /(lich cong tac|Lịch sự kiện|cho duyet lich|duyet lich)/, page: 'lichcongtac' },
       { pattern: /(can bo|cán bộ|phan quyen|phân quyền)/, page: 'canbo' },
       { pattern: /(phong ban|phòng ban|don vi|đơn vị)/, page: 'phongban' },
       { pattern: /(ngay le|ngày lễ|ky niem|kỷ niệm)/, page: 'ngayle' },

@@ -89,7 +89,7 @@ export const requireRole = (...allowedRoles) => {
     if (!expandedAllowedRoles.has(effectiveRole)) {
       return res.status(403).json({
         success: false,
-        error: 'Insufficient permissions',
+        error: 'Bạn không có quyền thực hiện',
         code: 'FORBIDDEN',
       });
     }

@@ -244,7 +244,7 @@ const Login = ({ onLogin }) => {
           <div className="lg:col-span-2">
             <div className="bg-white/[0.08] backdrop-blur-xl rounded-2xl border border-white/10 p-6 shadow-2xl">
               <h2 className="text-lg font-bold text-white mb-6">
-                Lịch công tác hôm nay - {formatDDMM(new Date())}
+                Lịch sự kiện hôm nay - {formatDDMM(new Date())}
                 {todayHoliday && <span className="text-red-300 text-sm ml-2">({todayHoliday.ten})</span>}
               </h2>
               
