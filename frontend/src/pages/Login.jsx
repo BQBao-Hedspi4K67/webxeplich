@@ -24,6 +24,13 @@ const formatDisplayTime = (timeValue) => {
   return time === '00:00' ? '12:00' : time;
 };
 
+const toTimeOnly = (value) => {
+  if (!value) return '';
+  const raw = String(value).trim();
+  if (/^\d{2}:\d{2}$/.test(raw)) return raw;
+  return raw.slice(0, 5);
+};
+
 const normalizeDutyItem = (duty) => ({
   id: duty.id,
   kieuTruc: duty.dutyType === 'director_weekly' ? 'giamdoc' : 'canbo',
@@ -35,33 +42,87 @@ const normalizeDutyItem = (duty) => ({
   ngay: duty.date || '',
 });
 
-const getDutyLines = (items = []) => {
-  const sorted = [...items].sort((a, b) => {
+const buildSlotLabel = (item) => {
+  if (item.viTri === 'Nhà hiệu bộ' && item.dutyRole === 'commander') return 'HB - Chỉ huy';
+  if (item.viTri === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 1) return 'HB - Cán bộ 1';
+  if (item.viTri === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 2) return 'HB - Cán bộ 2';
+  return item.viTri || 'Trực ban';
+};
+
+const buildTodayRows = (dutyItems = [], scheduleItems = []) => {
+  const sortedDutyItems = [...dutyItems].sort((a, b) => {
+    const slotA = Number(a.slotNo || 1);
+    const slotB = Number(b.slotNo || 1);
     if (a.kieuTruc !== b.kieuTruc) return a.kieuTruc === 'giamdoc' ? -1 : 1;
     if (a.viTri !== b.viTri) {
       const order = { 'Nhà hiệu bộ': 1, 'Lái xe': 2, 'Bệnh xá': 3, 'Trực ban Giám đốc': 0 };
       return (order[a.viTri] || 99) - (order[b.viTri] || 99);
     }
-    return Number(a.slotNo || 1) - Number(b.slotNo || 1);
+    return slotA - slotB;
   });
 
-  const director = sorted.find((item) => item.kieuTruc === 'giamdoc');
-  const officers = sorted.filter((item) => item.kieuTruc === 'canbo');
+  const directorDuty = sortedDutyItems.find((item) => item.kieuTruc === 'giamdoc');
+  const canboDuties = sortedDutyItems.filter((item) => item.kieuTruc === 'canbo');
 
-  return [
-    `Trực ban Giám đốc: ${director?.tenCanBo || 'Chưa phân công'}`,
-    'Trực ban cán bộ:',
-    ...(
-      officers.length > 0
-        ? officers.map((item) => {
-          if (item.viTri === 'Nhà hiệu bộ' && item.dutyRole === 'commander') return `HB - Chỉ huy: ${item.tenCanBo || 'Chưa phân công'}`;
-          if (item.viTri === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 1) return `HB - Cán bộ 1: ${item.tenCanBo || 'Chưa phân công'}`;
-          if (item.viTri === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 2) return `HB - Cán bộ 2: ${item.tenCanBo || 'Chưa phân công'}`;
-          return `${item.viTri || 'Trực ban'}: ${item.tenCanBo || 'Chưa phân công'}`;
-        })
-        : ['Chưa phân công']
-    ),
+  const morningSchedules = [...scheduleItems]
+    .filter((evt) => {
+      const hour = parseInt(String(evt.gioBatDau || '00:00').split(':')[0]);
+      return hour < 12;
+    })
+    .sort((a, b) => String(a.gioBatDau || '').localeCompare(String(b.gioBatDau || '')));
+
+  const afternoonSchedules = [...scheduleItems]
+    .filter((evt) => {
+      const hour = parseInt(String(evt.gioBatDau || '00:00').split(':')[0]);
+      return hour >= 12;
+    })
+    .sort((a, b) => String(a.gioBatDau || '').localeCompare(String(b.gioBatDau || '')));
+
+  const rows = [
+    {
+      isFirstRow: true,
+      session: 'Sáng',
+      time: '00:00',
+      isDutyRow: true,
+      content: [
+        `Trực ban Giám đốc: ${directorDuty?.tenCanBo || 'Chưa phân công'}`,
+        'Trực ban cán bộ:',
+        ...(canboDuties.length > 0
+          ? canboDuties.map((item) => `${buildSlotLabel(item)}: ${item.tenCanBo || 'Chưa phân công'}`)
+          : ['Chưa phân công']),
+      ],
+    },
   ];
+
+  morningSchedules.forEach((sch) => {
+    rows.push({
+      isFirstRow: false,
+      session: 'Sáng',
+      time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
+      isDutyRow: false,
+      schedules: [sch],
+    });
+  });
+
+  rows.push({
+    isFirstRow: false,
+    session: 'Chiều',
+    time: '',
+    isDutyRow: false,
+    schedules: [],
+  });
+
+  afternoonSchedules.forEach((sch) => {
+    rows.push({
+      isFirstRow: false,
+      session: 'Chiều',
+      time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
+      isDutyRow: false,
+      schedules: [sch],
+    });
+  });
+
+  return rows;
 };
 
 const Login = ({ onLogin }) => {
@@ -87,19 +148,31 @@ const Login = ({ onLogin }) => {
           startDate: today, 
           endDate: today 
         });
-        setTodaySchedules(schedulesRes?.data || []);
+        setTodaySchedules((schedulesRes?.data || []).map((evt) => ({
+          id: evt.id,
+          tieuDe: evt.title || evt.tieuDe || '',
+          ngay: evt.date || evt.ngay || today,
+          gioBatDau: toTimeOnly(evt.startTime || evt.gioBatDau),
+          gioKetThuc: toTimeOnly(evt.endTime || evt.gioKetThuc),
+          diaDiem: evt.location || evt.diaDiem || '',
+          donVi: evt.departmentName || evt.department || evt.donVi || '',
+        })));
         
         // Fetch duty schedules for today
         const dutiesRes = await apiClient.dutySchedules.list(1, 100, { 
           startDate: today, 
           endDate: today 
         });
-        setTodayDuties((dutiesRes?.data || []).map(normalizeDutyItem));
+        setTodayDuties((dutiesRes?.data || []).map((duty) => normalizeDutyItem({
+          ...duty,
+          officerName: duty.officerName || duty.officerId || '',
+          location: duty.location || duty.viTri || '',
+        })));
         
         // Fetch holidays
         try {
-          const holidaysRes = await apiClient.holidays.list({ status: 'active' });
-          const holiday = (holidaysRes?.data || []).find(h => h.ngay === today);
+          const holidaysRes = await apiClient.holidays.list({ year: new Date().getFullYear() });
+          const holiday = (holidaysRes?.data || []).find((h) => (h.holidayDate || h.ngay) === today);
           setTodayHoliday(holiday);
         } catch (err) {
           // Ignore holiday fetch error
@@ -180,110 +253,66 @@ const Login = ({ onLogin }) => {
                   <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                <div className="overflow-x-auto rounded-xl border border-white/10">
+                  <table className="w-full text-sm table-fixed">
                     <thead>
-                      <tr className="border-b-2 border-white/30">
-                        <th className="px-3 py-2 text-left font-bold text-white/80 bg-white/5 w-1/6">Ngày/Tháng/Năm</th>
-                        <th className="px-3 py-2 text-left font-bold text-white/80 bg-white/5 w-1/8">Buổi</th>
-                        <th className="px-3 py-2 text-left font-bold text-white/80 bg-white/5 w-1/8">Giờ</th>
-                        <th className="px-3 py-2 text-left font-bold text-white/80 bg-white/5 flex-1">Chi tiết nội dung</th>
+                      <tr className="border-b-2 border-white/20 bg-white/5">
+                        <th className="px-4 py-3 text-left font-bold text-white/85 w-[24%]">Ngày/Tháng/Năm</th>
+                        <th className="px-4 py-3 text-left font-bold text-white/85 w-[12%]">Buổi</th>
+                        <th className="px-4 py-3 text-left font-bold text-white/85 w-[16%]">Giờ</th>
+                        <th className="px-4 py-3 text-left font-bold text-white/85 w-[48%]">Chi tiết nội dung</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr className="border-b border-white/10 hover:bg-white/5 transition-colors">
-                        <td className="px-3 py-2 bg-white/5 font-bold text-white align-top">
-                          <div>{formatDateWithDay(new Date())}</div>
-                          {todayHoliday && <div className="text-[10px] text-red-300 mt-0.5">{todayHoliday.ten || todayHoliday.holidayName}</div>}
-                        </td>
-                        <td className="px-3 py-2 text-center align-top text-white">Sáng</td>
-                        <td className="px-3 py-2 text-slate-300 text-[10px] align-top">00:00</td>
-                        <td className="px-3 py-2 align-top text-white/90">
-                          {(() => {
-                            const sorted = [...todayDuties].sort((a, b) => {
-                              const slotA = Number(a.slotNo || 1);
-                              const slotB = Number(b.slotNo || 1);
-                              if (a.kieuTruc !== b.kieuTruc) return a.kieuTruc === 'giamdoc' ? -1 : 1;
-                              if (a.viTri !== b.viTri) {
-                                const order = { 'Nhà hiệu bộ': 1, 'Lái xe': 2, 'Bệnh xá': 3, 'Trực ban Giám đốc': 0 };
-                                return (order[a.viTri] || 99) - (order[b.viTri] || 99);
-                              }
-                              return slotA - slotB;
-                            });
+                      {(() => {
+                        const dayRows = buildTodayRows(todayDuties, todaySchedules);
+                        const dateLabel = formatDateWithDay(new Date());
 
-                            const director = sorted.find((d) => d.kieuTruc === 'giamdoc');
-                            const officers = sorted.filter((d) => d.kieuTruc === 'canbo');
+                        return dayRows.map((row, rowIdx) => {
+                          const isDutyRow = row.isDutyRow;
+                          const details = isDutyRow
+                            ? row.content || []
+                            : row.schedules?.length > 0
+                              ? row.schedules.map((sch) => {
+                                const timeLabel = sch.gioBatDau || sch.gioKetThuc ? `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}` : '';
+                                const content = [sch.tieuDe, sch.diaDiem, sch.donVi].filter(Boolean).join(' - ');
+                                return timeLabel ? `${timeLabel} | ${content}` : content;
+                              })
+                              : [];
 
-                            const slotLabel = (item) => {
-                              if (item.viTri === 'Nhà hiệu bộ' && item.dutyRole === 'commander') return 'HB - Chỉ huy';
-                              if (item.viTri === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 1) return 'HB - Cán bộ 1';
-                              if (item.viTri === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 2) return 'HB - Cán bộ 2';
-                              return item.viTri || 'Trực ban';
-                            };
-
-                            return (
-                              <div className="space-y-1">
-                                <div className="font-semibold">Trực ban Giám đốc: {director?.tenCanBo || 'Chưa phân công'}</div>
-                                <div className="font-semibold">Trực ban cán bộ:</div>
-                                {officers.length > 0 ? (
-                                  <div className="pl-4 space-y-1">
-                                    {officers.map((item) => (
-                                      <div key={`${item.viTri}-${item.dutyRole}-${item.slotNo}`} className="leading-5">
-                                        {slotLabel(item)}: {item.tenCanBo || 'Chưa phân công'}
+                          return (
+                            <tr key={`today-${rowIdx}`} className="border-b border-white/10 bg-white/[0.03] hover:bg-white/5 transition-colors">
+                              {rowIdx === 0 && (
+                                <td rowSpan={dayRows.length} className="px-4 py-3 bg-white/5 font-bold text-white align-top border-r border-white/10">
+                                  <div>{dateLabel}</div>
+                                  {todayHoliday && <div className="text-[10px] text-red-300 mt-0.5">{todayHoliday.ten || todayHoliday.holidayName}</div>}
+                                </td>
+                              )}
+                              <td className="px-4 py-3 text-center align-top text-white border-r border-white/10">{row.session}</td>
+                              <td className="px-4 py-3 text-slate-300 text-[10px] align-top border-r border-white/10">{row.time || ''}</td>
+                              <td className="px-4 py-3 align-top text-white/90 leading-6">
+                                {isDutyRow ? (
+                                  <div className="space-y-0.5">
+                                    {details.map((line, lineIdx) => (
+                                      <div key={lineIdx} className={lineIdx === 0 || lineIdx === 1 ? 'font-semibold text-white' : 'text-white/90'}>
+                                        {line}
                                       </div>
                                     ))}
                                   </div>
+                                ) : details.length > 0 ? (
+                                  <div className="space-y-1">
+                                    {details.map((line, lineIdx) => (
+                                      <div key={lineIdx}>{line}</div>
+                                    ))}
+                                  </div>
                                 ) : (
-                                  <div className="pl-4 text-slate-300">Chưa phân công</div>
+                                  <div className="text-slate-400">—</div>
                                 )}
-                              </div>
-                            );
-                          })()}
-                        </td>
-                      </tr>
-
-                      {todaySchedules
-                        .filter((evt) => {
-                          const hour = parseInt(String(evt.gioBatDau || '00:00').split(':')[0]);
-                          return hour < 12;
-                        })
-                        .map((evt, idx) => (
-                          <tr key={`morning-${idx}`} className="border-b border-white/10 hover:bg-white/5 transition-colors">
-                            <td className="px-3 py-2 text-white/70"></td>
-                            <td className="px-3 py-2 text-center align-top text-white">Sáng</td>
-                            <td className="px-3 py-2 text-slate-300 text-[10px] font-semibold align-top">
-                              {formatDisplayTime(evt.gioBatDau)} - {formatDisplayTime(evt.gioKetThuc)}
-                            </td>
-                            <td className="px-3 py-2 align-top text-white/90 leading-6">
-                              {evt.tieuDe}{evt.diaDiem ? ` - ${evt.diaDiem}` : ''}{evt.donVi ? ` - ${evt.donVi}` : ''}
-                            </td>
-                          </tr>
-                        ))}
-
-                      <tr className="border-b border-white/10 hover:bg-white/5 transition-colors">
-                        <td className="px-3 py-2"></td>
-                        <td className="px-3 py-2 text-center align-top text-white">Chiều</td>
-                        <td className="px-3 py-2"></td>
-                        <td className="px-3 py-2"></td>
-                      </tr>
-
-                      {todaySchedules
-                        .filter((evt) => {
-                          const hour = parseInt(String(evt.gioBatDau || '00:00').split(':')[0]);
-                          return hour >= 12;
-                        })
-                        .map((evt, idx) => (
-                          <tr key={`afternoon-${idx}`} className="border-b border-white/10 hover:bg-white/5 transition-colors">
-                            <td className="px-3 py-2"></td>
-                            <td className="px-3 py-2 text-center align-top text-white">Chiều</td>
-                            <td className="px-3 py-2 text-slate-300 text-[10px] font-semibold align-top">
-                              {formatDisplayTime(evt.gioBatDau)} - {formatDisplayTime(evt.gioKetThuc)}
-                            </td>
-                            <td className="px-3 py-2 align-top text-white/90 leading-6">
-                              {evt.tieuDe}{evt.diaDiem ? ` - ${evt.diaDiem}` : ''}{evt.donVi ? ` - ${evt.donVi}` : ''}
-                            </td>
-                          </tr>
-                        ))}
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
                     </tbody>
                   </table>
                 </div>

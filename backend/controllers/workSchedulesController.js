@@ -74,6 +74,10 @@ const resolveDepartmentRef = async (connection, { departmentId, department }) =>
 };
 
 const resolveRequesterOfficer = async (connection, reqUser = {}) => {
+  if (!reqUser?.id && !reqUser?.email && !reqUser?.fullName) {
+    return null;
+  }
+
   const [rowsByUser] = await connection.execute(
     `SELECT id, departmentId, department
      FROM officers

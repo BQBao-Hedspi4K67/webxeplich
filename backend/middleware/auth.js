@@ -57,6 +57,18 @@ export const verifyToken = async (req, res, next) => {
   }
 };
 
+// Middleware: Verify JWT token when present, but allow anonymous read-only access.
+export const optionalVerifyToken = async (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+
+  if (!token) {
+    req.user = undefined;
+    return next();
+  }
+
+  return verifyToken(req, res, next);
+};
+
 // Middleware: Check role permission
 export const requireRole = (...allowedRoles) => {
   return (req, res, next) => {

@@ -323,8 +323,118 @@ const XuatLich = ({ xuatLichHistory = [], reloadData }) => {
     });
   };
 
+  const buildUnifiedRowsByDay = (workRows, dutyRows, bounds) => {
+    const dateList = getDateListByBounds(bounds);
+    const byDate = new Map(dateList.map((date) => [date, []]));
+
+    const ensureDayRows = (date) => {
+      if (!byDate.has(date)) byDate.set(date, []);
+      return byDate.get(date);
+    };
+
+    const formatDutyLabel = (item) => {
+      if (item.location === 'Nhà hiệu bộ' && item.dutyRole === 'commander') return 'HB - Chỉ huy';
+      if (item.location === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 1) return 'HB - Cán bộ 1';
+      if (item.location === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 2) return 'HB - Cán bộ 2';
+      return item.location || 'Trực ban';
+    };
+
+    const dutyByDate = new Map();
+    for (const row of dutyRows || []) {
+      const date = toDateOnly(row.date);
+      if (!dutyByDate.has(date)) {
+        dutyByDate.set(date, []);
+      }
+      dutyByDate.get(date).push(row);
+    }
+
+    for (const row of workRows || []) {
+      const date = toDateOnly(row.date);
+      if (!byDate.has(date)) byDate.set(date, []);
+    }
+
+    for (const date of Array.from(new Set([...byDate.keys(), ...dutyByDate.keys()])).sort()) {
+      const dayRows = ensureDayRows(date);
+      const dayDuties = [...(dutyByDate.get(date) || [])].sort((a, b) => {
+        const slotA = Number(a.slotNo || 1);
+        const slotB = Number(b.slotNo || 1);
+        if (a.dutyType !== b.dutyType) return a.dutyType === 'director_weekly' ? -1 : 1;
+        if (a.location !== b.location) {
+          const order = { 'Nhà hiệu bộ': 1, 'Lái xe': 2, 'Bệnh xá': 3 };
+          return (order[a.location] || 99) - (order[b.location] || 99);
+        }
+        return slotA - slotB;
+      });
+
+      const directorDuty = dayDuties.find((item) => item.dutyType === 'director_weekly');
+      const officerDuties = dayDuties.filter((item) => item.dutyType !== 'director_weekly');
+
+      dayRows.push({
+        session: 'Sáng',
+        time: '00:00',
+        isDutyRow: true,
+        content: [
+          `Trực ban Giám đốc: ${directorDuty?.officerName || directorDuty?.officerId || 'Chưa phân công'}`,
+          'Trực ban cán bộ:',
+          ...(
+            officerDuties.length > 0
+              ? officerDuties.map((item) => `${formatDutyLabel(item)}: ${item.officerName || item.officerId || 'Chưa phân công'}`)
+              : ['Chưa phân công']
+          ),
+        ],
+      });
+
+      const morningSchedules = (workRows || []).filter((row) => toDateOnly(row.date) === date && Number(String(row.startTime || '00:00').slice(0, 2)) < 12)
+        .sort((a, b) => String(a.startTime || '').localeCompare(String(b.startTime || '')));
+      morningSchedules.forEach((row) => {
+        const start = String(row.startTime || '').slice(0, 5);
+        const end = String(row.endTime || '').slice(0, 5);
+        const timeRange = start && end ? `${start} - ${end}` : start || end || '';
+        const location = row.location ? ` - ${row.location}` : '';
+        const unit = row.unit ? ` - ${row.unit}` : '';
+        dayRows.push({
+          session: 'Sáng',
+          time: timeRange,
+          isDutyRow: false,
+          content: [`${row.title || ''}${location}${unit}`],
+        });
+      });
+
+      dayRows.push({
+        session: 'Chiều',
+        time: '',
+        isDutyRow: false,
+        content: [],
+      });
+
+      const afternoonSchedules = (workRows || []).filter((row) => toDateOnly(row.date) === date && Number(String(row.startTime || '00:00').slice(0, 2)) >= 12)
+        .sort((a, b) => String(a.startTime || '').localeCompare(String(b.startTime || '')));
+      afternoonSchedules.forEach((row) => {
+        const start = String(row.startTime || '').slice(0, 5);
+        const end = String(row.endTime || '').slice(0, 5);
+        const timeRange = start && end ? `${start} - ${end}` : start || end || '';
+        const location = row.location ? ` - ${row.location}` : '';
+        const unit = row.unit ? ` - ${row.unit}` : '';
+        dayRows.push({
+          session: 'Chiều',
+          time: timeRange,
+          isDutyRow: false,
+          content: [`${row.title || ''}${location}${unit}`],
+        });
+      });
+    }
+
+    return Array.from(new Set([...byDate.keys(), ...dutyByDate.keys()])).sort().map((date) => ({
+      date,
+      rows: byDate.get(date) || [],
+    }));
+  };
+
   const workPreviewRows = (exportType === 'trucban' ? [] : buildWorkRowsByDay(previewData.workSchedules || [], previewDateList));
   const dutyPreviewRows = (exportType === 'congtac' ? [] : buildDutyRowsByDay(previewData.dutySchedules || [], previewBounds));
+  const unifiedPreviewRows = exportType === 'both'
+    ? buildUnifiedRowsByDay(previewData.workSchedules || [], previewData.dutySchedules || [], previewBounds)
+    : [];
 
   const renderPreviewCell = (value) => (
     <div className="whitespace-pre-line leading-5 text-slate-700">{value}</div>
@@ -450,7 +560,7 @@ const XuatLich = ({ xuatLichHistory = [], reloadData }) => {
                     <div className="text-xs text-blue-200 mt-1">{previewBounds ? `(${formatDateVN(previewBounds.startDate)} - ${formatDateVN(previewBounds.endDate)})` : '(Theo phạm vi được chọn)'}</div>
                   </div>
                   <div className="p-4 space-y-5">
-                    {(exportType === 'congtac' || exportType === 'both') && (
+                    {exportType === 'congtac' && (
                       <div className="border border-slate-200 rounded-xl overflow-hidden">
                         <div className="bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">LỊCH CÔNG TÁC TUẦN</div>
                         <table className="w-full text-xs table-fixed">
@@ -477,7 +587,7 @@ const XuatLich = ({ xuatLichHistory = [], reloadData }) => {
                       </div>
                     )}
 
-                    {(exportType === 'trucban' || exportType === 'both') && (
+                    {exportType === 'trucban' && (
                       <div className="border border-slate-200 rounded-xl overflow-hidden">
                         <div className="bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">LỊCH TRỰC BAN</div>
                         <table className="w-full text-xs table-fixed">
@@ -503,6 +613,46 @@ const XuatLich = ({ xuatLichHistory = [], reloadData }) => {
                                 <td className="py-2 px-2 text-slate-700 border-b border-slate-100 align-top whitespace-pre-line">{renderPreviewCell(row.giamDoc)}</td>
                               </tr>
                             ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {exportType === 'both' && (
+                      <div className="border border-slate-200 rounded-xl overflow-hidden">
+                        <div className="bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">LỊCH CÔNG TÁC & TRỰC BAN TUẦN</div>
+                        <table className="w-full text-xs table-fixed">
+                          <thead>
+                            <tr className="bg-slate-50">
+                              <th className="w-[24%] text-left py-2 px-2 font-semibold text-slate-600 border-b border-slate-200">THỨ/NGÀY</th>
+                              <th className="w-[12%] text-left py-2 px-2 font-semibold text-slate-600 border-b border-slate-200">BUỔI</th>
+                              <th className="w-[16%] text-left py-2 px-2 font-semibold text-slate-600 border-b border-slate-200">GIỜ</th>
+                              <th className="w-[48%] text-left py-2 px-2 font-semibold text-slate-600 border-b border-slate-200">CHI TIẾT</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {unifiedPreviewRows.map((day, dayIndex) => {
+                              const rows = day.rows || [];
+                              return rows.map((row, rowIndex) => {
+                                const isFirstRow = rowIndex === 0;
+                                const baseBorder = 'border-b border-slate-100';
+                                return (
+                                  <tr key={`${day.date}-${rowIndex}`} className={dayIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                                    {isFirstRow && (
+                                      <td rowSpan={rows.length} className="py-2 px-2 text-slate-700 border-b border-slate-100 align-top whitespace-pre-line">
+                                        <div className="font-semibold">{getWeekdayLabel(day.date)}</div>
+                                        <div className="text-slate-400">{formatDateVN(day.date)}</div>
+                                      </td>
+                                    )}
+                                    <td className={`py-2 px-2 text-slate-700 border-b border-slate-100 align-top ${baseBorder}`}>{row.session || ''}</td>
+                                    <td className={`py-2 px-2 text-slate-700 border-b border-slate-100 align-top ${baseBorder}`}>{row.time || ''}</td>
+                                    <td className={`py-2 px-2 text-slate-700 border-b border-slate-100 align-top whitespace-pre-line ${baseBorder}`}>
+                                      {renderPreviewCell((row.content || []).join('\n'))}
+                                    </td>
+                                  </tr>
+                                );
+                              });
+                            })}
                           </tbody>
                         </table>
                       </div>

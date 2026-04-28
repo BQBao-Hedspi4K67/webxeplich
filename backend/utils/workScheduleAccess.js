@@ -29,6 +29,10 @@ export const ensureWorkScheduleAccessSchema = async (connection) => {
 };
 
 export const resolveRequesterOfficer = async (connection, reqUser = {}) => {
+  if (!reqUser?.id && !reqUser?.email && !reqUser?.fullName) {
+    return null;
+  }
+
   const hasUserIdColumn = await hasOfficersUserIdColumn(connection);
   const hasDepartmentIdColumn = await hasOfficersDepartmentIdColumn(connection);
   const selectDepartment = hasDepartmentIdColumn ? 'departmentId, department,' : 'NULL AS departmentId, department,';
