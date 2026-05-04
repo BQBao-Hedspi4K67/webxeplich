@@ -347,22 +347,6 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
       return;
     }
 
-    // Kiểm tra thời gian trong phạm vi 7:00-18:00
-    if (form.gioBatDau) {
-      const startHour = parseInt(form.gioBatDau.split(':')[0]);
-      if (startHour < 7 || startHour >= 18) {
-        alert('Giờ bắt đầu phải trong phạm vi 7:00 - 18:00.');
-        return;
-      }
-    }
-    if (form.gioKetThuc) {
-      const endHour = parseInt(form.gioKetThuc.split(':')[0]);
-      if (endHour < 7 || endHour > 18) {
-        alert('Giờ kết thúc phải trong phạm vi 7:00 - 18:00.');
-        return;
-      }
-    }
-
     const payload = {
       title: form.tieuDe,
       date: form.ngay,
@@ -600,12 +584,12 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                   <input disabled={isReadOnlyModal} type="date" className="input-field" value={form.ngay} onChange={e => setForm({...form, ngay: e.target.value})} />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Từ giờ (7:00-18:00)</label>
-                  <input disabled={isReadOnlyModal} type="time" className="input-field" value={form.gioBatDau} min="07:00" max="18:00" onChange={e => setForm({...form, gioBatDau: e.target.value})} />
+                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Từ giờ</label>
+                  <input disabled={isReadOnlyModal} type="time" className="input-field" value={form.gioBatDau} onChange={e => setForm({...form, gioBatDau: e.target.value})} />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đến giờ (7:00-18:00)</label>
-                  <input disabled={isReadOnlyModal} type="time" className="input-field" value={form.gioKetThuc} min="07:00" max="18:00" onChange={e => setForm({...form, gioKetThuc: e.target.value})} />
+                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đến giờ</label>
+                  <input disabled={isReadOnlyModal} type="time" className="input-field" value={form.gioKetThuc} onChange={e => setForm({...form, gioKetThuc: e.target.value})} />
                 </div>
               </div>
               <div>

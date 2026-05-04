@@ -364,11 +364,11 @@ const Dashboard = ({
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Từ giờ</label>
-                  <input disabled={isReadOnlyModal} type="time" className="input-field" value={form.gioBatDau || ''} min="07:00" max="18:00" onChange={e => setForm({ ...form, gioBatDau: e.target.value })} />
+                  <input disabled={isReadOnlyModal} type="time" className="input-field" value={form.gioBatDau || ''} onChange={e => setForm({ ...form, gioBatDau: e.target.value })} />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đến giờ</label>
-                  <input disabled={isReadOnlyModal} type="time" className="input-field" value={form.gioKetThuc || ''} min="07:00" max="18:00" onChange={e => setForm({ ...form, gioKetThuc: e.target.value })} />
+                  <input disabled={isReadOnlyModal} type="time" className="input-field" value={form.gioKetThuc || ''} onChange={e => setForm({ ...form, gioKetThuc: e.target.value })} />
                 </div>
               </div>
               <div>

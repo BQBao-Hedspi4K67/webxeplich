@@ -121,6 +121,7 @@ const buildRowsForDay = (dutyItems = [], scheduleItems = []) => {
     },
   ];
 
+  // Add night schedules
   groupedSchedules.night.forEach((sch, idx) => {
     rows.push({
       isDutyRow: false,
@@ -130,29 +131,31 @@ const buildRowsForDay = (dutyItems = [], scheduleItems = []) => {
     });
   });
 
-  groupedSchedules.morning.forEach((sch, idx) => {
-    rows.push({
-      isDutyRow: false,
-      session: idx === 0 ? SESSION_LABELS.morning : '',
-      time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
-      schedules: [sch],
+  // Always add morning section (even if empty)
+  if (groupedSchedules.morning.length > 0) {
+    groupedSchedules.morning.forEach((sch, idx) => {
+      rows.push({
+        isDutyRow: false,
+        session: idx === 0 ? SESSION_LABELS.morning : '',
+        time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
+        schedules: [sch],
+      });
     });
-  });
-
-  groupedSchedules.afternoon.forEach((sch, idx) => {
-    rows.push({
-      isDutyRow: false,
-      session: idx === 0 ? SESSION_LABELS.afternoon : '',
-      time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
-      schedules: [sch],
-    });
-  });
-
-  if (!groupedSchedules.morning.length) {
+  } else {
     rows.push({ isDutyRow: false, session: SESSION_LABELS.morning, time: '', schedules: [] });
   }
 
-  if (!groupedSchedules.afternoon.length) {
+  // Always add afternoon section (even if empty)
+  if (groupedSchedules.afternoon.length > 0) {
+    groupedSchedules.afternoon.forEach((sch, idx) => {
+      rows.push({
+        isDutyRow: false,
+        session: idx === 0 ? SESSION_LABELS.afternoon : '',
+        time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
+        schedules: [sch],
+      });
+    });
+  } else {
     rows.push({ isDutyRow: false, session: SESSION_LABELS.afternoon, time: '', schedules: [] });
   }
 
@@ -417,7 +420,7 @@ const LandingLogin = ({ onLogin }) => {
                 
               </div>
 
-              <div className="h-full max-h-[calc(100vh-310px)] overflow-auto">
+              <div className="max-h-[calc(100vh-310px)] overflow-y-auto overflow-x-auto">
                 <table className="w-full text-sm table-fixed">
                   <thead>
                     <tr className="border-b-2 border-white/15 bg-white/5">

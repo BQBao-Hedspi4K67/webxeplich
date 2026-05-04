@@ -109,31 +109,33 @@ const buildTodayRows = (dutyItems = [], scheduleItems = []) => {
     });
   });
 
-  groupedSchedules.morning.forEach((sch, idx) => {
-    rows.push({
-      isFirstRow: false,
-      session: idx === 0 ? SESSION_LABELS.morning : '',
-      time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
-      isDutyRow: false,
-      schedules: [sch],
+  // Always add morning section (even if empty)
+  if (groupedSchedules.morning.length > 0) {
+    groupedSchedules.morning.forEach((sch, idx) => {
+      rows.push({
+        isFirstRow: false,
+        session: idx === 0 ? SESSION_LABELS.morning : '',
+        time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
+        isDutyRow: false,
+        schedules: [sch],
+      });
     });
-  });
-
-  groupedSchedules.afternoon.forEach((sch, idx) => {
-    rows.push({
-      isFirstRow: false,
-      session: idx === 0 ? SESSION_LABELS.afternoon : '',
-      time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
-      isDutyRow: false,
-      schedules: [sch],
-    });
-  });
-
-  if (!groupedSchedules.morning.length) {
+  } else {
     rows.push({ isFirstRow: false, session: SESSION_LABELS.morning, time: '', isDutyRow: false, schedules: [] });
   }
 
-  if (!groupedSchedules.afternoon.length) {
+  // Always add afternoon section (even if empty)
+  if (groupedSchedules.afternoon.length > 0) {
+    groupedSchedules.afternoon.forEach((sch, idx) => {
+      rows.push({
+        isFirstRow: false,
+        session: idx === 0 ? SESSION_LABELS.afternoon : '',
+        time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
+        isDutyRow: false,
+        schedules: [sch],
+      });
+    });
+  } else {
     rows.push({ isFirstRow: false, session: SESSION_LABELS.afternoon, time: '', isDutyRow: false, schedules: [] });
   }
 
@@ -303,7 +305,7 @@ const Login = ({ onLogin }) => {
                   <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 </div>
               ) : (
-                <div className="overflow-x-auto rounded-xl border border-white/10">
+                <div className="max-h-[calc(100vh-360px)] overflow-y-auto overflow-x-auto rounded-xl border border-white/10">
                   <table className="w-full text-sm table-fixed">
                     <thead>
                       <tr className="border-b-2 border-white/20 bg-white/5">
