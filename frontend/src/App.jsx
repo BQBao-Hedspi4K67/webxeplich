@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import Login from './pages/Login';
+import LandingLogin from './pages/LandingLogin';
 import MainLayout from './components/Layout/MainLayout';
 import Dashboard from './components/Dashboard/Dashboard';
 import QuanLyCanBo from './components/CanBo/QuanLyCanBo';
@@ -20,6 +20,32 @@ const BACKEND_TO_UI_ROLE = {
 };
 
 const SUPERADMIN_PAGES = ['canbo', 'ngayle', 'phongban', 'taikhoan'];
+
+const PAGE_TO_PATH = {
+  dashboard: '/dashboard',
+  thongbao: '/thongbao',
+  canbo: '/canbo',
+  lichcongtac: '/lichcongtac',
+  lichcuatoi: '/lichcuatoi',
+  ngayle: '/ngayle',
+  phongban: '/phongban',
+  ykien: '/ykien',
+  taikhoan: '/taikhoan',
+};
+
+const PATH_TO_PAGE = Object.entries(PAGE_TO_PATH).reduce((acc, [page, path]) => {
+  acc[path] = page;
+  return acc;
+}, { '/': 'dashboard' });
+
+const getPageFromPath = (pathname = '/') => PATH_TO_PAGE[pathname] || 'dashboard';
+const pushPagePath = (page) => {
+  if (typeof window === 'undefined') return;
+  const nextPath = PAGE_TO_PATH[page] || '/dashboard';
+  if (window.location.pathname !== nextPath) {
+    window.history.pushState({}, '', nextPath);
+  }
+};
 
 const OFFICER_ROLE_TO_UI = {
   leader: 'Lãnh đạo',
@@ -417,7 +443,7 @@ const resolveAllowedPages = (currentUser) => {
 
 function App() {
   const [user, setUser] = useState(null);
-  const [activePage, setActivePage] = useState(() => sessionStorage.getItem('activePage') || 'dashboard');
+  const [activePage, setActivePage] = useState(() => getPageFromPath(typeof window !== 'undefined' ? window.location.pathname : '/'));
   const [loadingData, setLoadingData] = useState(false);
   const [canBoData, setCanBoData] = useState([]);
   const [lichCongTacData, setLichCongTacData] = useState([]);
@@ -610,6 +636,15 @@ function App() {
   }, [user]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handlePopState = () => {
+      setActivePage(getPageFromPath(window.location.pathname));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
     if (activePage) {
       sessionStorage.setItem('activePage', activePage);
     }
@@ -714,6 +749,7 @@ function App() {
       canGrantWorkSchedulePermissions: Boolean(userData.canGrantWorkSchedulePermissions),
     });
     setActivePage('dashboard');
+    pushPagePath('dashboard');
     const loaded = await loadData();
     const officerId = resolveOfficerId(userData, loaded?.mappedOfficers || []);
     const officerProfile = resolveOfficerProfile(userData, loaded?.mappedOfficers || []);
@@ -740,20 +776,30 @@ function App() {
     apiClient.clearAuthToken();
     setUser(null);
     setActivePage('dashboard');
+    pushPagePath('dashboard');
   };
-
-  if (!user) {
-    return <Login onLogin={handleLogin} />;
-  }
 
   const allowedPages = resolveAllowedPages(user);
   const defaultPage = allowedPages[0] || 'dashboard';
   const safeActivePage = allowedPages.includes(activePage) ? activePage : defaultPage;
   const navigateSafe = (page) => {
-    if (allowedPages.includes(page)) setActivePage(page);
+    if (allowedPages.includes(page)) {
+      setActivePage(page);
+      pushPagePath(page);
+    }
   };
 
   const PageComponent = PAGE_COMPONENTS[safeActivePage] || PAGE_COMPONENTS[defaultPage] || Dashboard;
+
+  useEffect(() => {
+    if (user && safeActivePage) {
+      pushPagePath(safeActivePage);
+    }
+  }, [safeActivePage, user]);
+  if (!user) {
+    return <LandingLogin onLogin={handleLogin} />;
+  }
+
   const canReviewLeaveRequests = Boolean(
     user?.role === 'Quản lý'
     && String(user?.department || '').trim() === 'Phòng hành chính tổng hợp'

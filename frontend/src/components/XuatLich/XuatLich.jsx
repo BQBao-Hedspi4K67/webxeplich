@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FileText, Eye, Download, Check, Shield, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 import apiClient from '../../services/api';
 
-const XuatLich = ({ xuatLichHistory = [], reloadData }) => {
+const XuatLich = ({ xuatLichHistory = [], reloadData, variant = 'page' }) => {
   const currentMonth = new Date().toISOString().slice(0, 7);
   const formatLocalDate = (date) => {
     const y = date.getFullYear();
@@ -440,11 +440,15 @@ const XuatLich = ({ xuatLichHistory = [], reloadData }) => {
     <div className="whitespace-pre-line leading-5 text-slate-700">{value}</div>
   );
 
+  const containerClass = variant === 'modal' ? 'space-y-5' : 'max-w-5xl mx-auto space-y-5';
+
   return (
-    <div className="max-w-5xl mx-auto space-y-5">
-      <div>
-        <h2 className="text-xl font-bold text-slate-800">Xuất / In lịch</h2>
-      </div>
+    <div className={containerClass}>
+      {variant !== 'modal' && (
+        <div>
+          <h2 className="text-xl font-bold text-slate-800">Xuất / In lịch</h2>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Config panel */}

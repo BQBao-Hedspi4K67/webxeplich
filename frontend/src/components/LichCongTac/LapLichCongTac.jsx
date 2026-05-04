@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, ChevronLeft, ChevronRight, MapPin, User, Clock, X, Edit2, Filter, CalendarDays, Trash2 } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, MapPin, User, Clock, X, Edit2, Filter, CalendarDays, Trash2, Printer } from 'lucide-react';
 import { LOAI_LICH_COLORS, WEEK_DAYS } from '../../data/uiConstants';
 import apiClient from '../../services/api';
+import WeekGridSchedule from '../WeekGridSchedule/WeekGridSchedule';
 
 const HOURS = ['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00'];
 
@@ -47,10 +48,46 @@ const getIsoWeekNo = (dateStr) => {
   return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
 };
 
+const getBoardMemberLine = (participants) => {
+  const labels = participants?.boardMemberLabels;
+  if (!Array.isArray(labels) || !labels.length) return '';
+  return `Ban giám đốc: ${labels.join(', ')}`;
+};
+
+const buildScheduleDetails = (schedule) => {
+  const details = [schedule.tieuDe, schedule.diaDiem].filter(Boolean);
+  const boardMemberLine = getBoardMemberLine(schedule.participants);
+  const units = String(schedule.donVi || '')
+    .split(',')
+    .map((unit) => unit.trim())
+    .filter(Boolean);
+  const filteredUnits = boardMemberLine
+    ? units.filter((unit) => unit.toLowerCase() !== 'ban giám đốc')
+    : units;
+  const participantLine = boardMemberLine
+    ? [boardMemberLine, ...filteredUnits].join(', ')
+    : filteredUnits.join(', ');
+  if (participantLine) details.push(participantLine);
+  return details;
+};
+
 const formatDisplayTime = (timeValue) => {
   const time = String(timeValue || '');
   if (!/^\d{2}:\d{2}$/.test(time)) return time;
   return time === '00:00' ? '12:00' : time;
+};
+
+const getSessionBucket = (timeValue) => {
+  const hour = Number.parseInt(String(timeValue || '00:00').split(':')[0], 10);
+  if (Number.isNaN(hour) || hour < 8) return 'night';
+  if (hour < 16) return 'morning';
+  return 'afternoon';
+};
+
+const SESSION_LABELS = {
+  night: 'Đêm\n(00:00-08:00)',
+  morning: 'Sáng\n(08:00-16:00)',
+  afternoon: 'Chiều\n(16:00-24:00)',
 };
 
 const initialForm = {
@@ -59,22 +96,39 @@ const initialForm = {
   thanhPhanThamGia: [], bgdMemberIds: [], loai: 'hop', ghiChu: ''
 };
 
-const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], departmentData = [], holidayData = [], dutyScheduleData = [], reloadData }) => {
+const canUserEditSchedule = (user, item) => {
+  const canApprove = Boolean(
+    user?.canApproveWorkSchedules
+    || user?.backendRole === 'admin'
+    || user?.backendRole === 'superadmin'
+  );
+  const isCreator = String(item?.nguoiTaoOfficerId || '') === String(user?.id || '')
+    || String(item?.nguoiTaoUserId || '') === String(user?.userId || '');
+  return canApprove || isCreator;
+};
+
+const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], departmentData = [], holidayData = [], dutyScheduleData = [], reloadData, onOpenExport }) => {
   const canCreate = Boolean(
     user?.canCreateWorkSchedules
     || user?.backendRole === 'admin'
     || user?.backendRole === 'superadmin'
     || user?.backendRole === 'manager'
   );
+  const canExportPrint = Boolean(
+    onOpenExport
+    && (!user?.backendRole || ['admin', 'manager', 'officer', 'superadmin', 'leader'].includes(user.backendRole))
+  );
   const canEdit = ['Quản trị viên', 'Quản lý'].includes(user?.role);
 
   const [data, setData] = useState(lichCongTacData);
   const [officerOptions, setOfficerOptions] = useState(canBoData || []);
   const [dutyData, setDutyData] = useState(dutyScheduleData || []);
-  const [viewMode, setViewMode] = useState(() => sessionStorage.getItem('lapLichCongTacViewMode') || 'month'); // 'week' | 'month'
+  const [viewMode, setViewMode] = useState(() => sessionStorage.getItem('lapLichCongTacViewMode') || 'week'); // 'week' | 'month'
   const [weekOffset, setWeekOffset] = useState(() => Number(sessionStorage.getItem('lapLichCongTacWeekOffset')) || 0);
   const [monthOffset, setMonthOffset] = useState(() => Number(sessionStorage.getItem('lapLichCongTacMonthOffset')) || 0);
   const [showModal, setShowModal] = useState(false);
+  const [isReadOnlyModal, setIsReadOnlyModal] = useState(false);
+  const [selectedDutyDetail, setSelectedDutyDetail] = useState(null);
 
   useEffect(() => {
     sessionStorage.setItem('lapLichCongTacViewMode', viewMode);
@@ -253,10 +307,12 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
   const openAdd = (day) => {
     setForm({ ...initialForm, ngay: toDateOnly(weekDates[day] || new Date()) });
     setEditId(null);
+    setIsReadOnlyModal(false);
     setShowModal(true);
   };
 
-  const openEdit = (item) => {
+  const openEdit = (item, forceReadOnly = false) => {
+    const canEditThisEvent = canUserEditSchedule(user, item);
     const participants = item.participants || {};
     setForm({
       ...item,
@@ -265,10 +321,22 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
       bgdMemberIds: Array.isArray(participants.boardMembers) ? participants.boardMembers : [],
     });
     setEditId(item.id);
+    setIsReadOnlyModal(forceReadOnly || !canEditThisEvent);
     setShowModal(true);
   };
 
+  const handleGridEventClick = (event) => {
+    if (event.eventType === 'schedule') {
+      openEdit(event, false);
+      return;
+    }
+    if (event.eventType === 'duty') {
+      setSelectedDutyDetail(event);
+    }
+  };
+
   const handleSave = async () => {
+    if (isReadOnlyModal) return;
     if (!form.tieuDe || !form.ngay) return;
     if (!form.nguoiPhuTrachId) {
       alert('Vui lòng chọn người phụ trách.');
@@ -342,10 +410,24 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
             className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'month' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
             <CalendarDays size={14} className="inline mr-1.5" />Lịch tháng
           </button>
-          {canCreate && (
-            <button onClick={() => openAdd(3)} className="btn-primary">
-              <Plus size={16} /> Thêm lịch
-            </button>
+          {(canCreate || canExportPrint) && (
+            <div className="flex items-center gap-2">
+              {canExportPrint && (
+                <button
+                  type="button"
+                  onClick={() => onOpenExport?.()}
+                  className="btn-secondary"
+                  title="Xuất / In lịch"
+                >
+                  <Printer size={16} /> Xuất / In lịch
+                </button>
+              )}
+              {canCreate && (
+                <button onClick={() => openAdd(3)} className="btn-primary">
+                  <Plus size={16} /> Thêm lịch
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -389,185 +471,15 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
         <div className="card-lg p-0 overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
             <h3 className="text-base font-bold text-slate-800">Lịch tuần</h3>
-            {canCreate && (
-              <button onClick={() => openAdd(0)} className="btn-primary !py-1.5 !px-3 text-sm">
-                <Plus size={14} /> Thêm lịch
-              </button>
-            )}
           </div>
-          
-          {/* Weekly table layout - Day | Session | Time | Details */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b-2 border-slate-300">
-                  <th className="px-4 py-3 text-left font-bold text-slate-700 bg-slate-100 w-1/6">Ngày/Tháng/Năm</th>
-                  <th className="px-4 py-3 text-left font-bold text-slate-700 bg-slate-100 w-1/8">Buổi</th>
-                  <th className="px-4 py-3 text-left font-bold text-slate-700 bg-slate-100 w-1/8">Giờ</th>
-                  <th className="px-4 py-3 text-left font-bold text-slate-700 bg-slate-100 flex-1">Chi tiết nội dung</th>
-                </tr>
-              </thead>
-              <tbody>
-                {weekDates.map((dayDate, dayIdx) => {
-                  const dateStr = toDateOnly(dayDate);
-                  const holiday = HOLIDAYS[dateStr];
-                  const isWeekend = dayIdx === 5 || dayIdx === 6;
-                  
-                  // Get schedules for this day
-                  const daySchedules = weekData.filter(l => l.ngay === dateStr);
-                  
-                  // Separate morning and afternoon schedules
-                  const morningSchedules = daySchedules.filter(l => {
-                    const hour = parseInt(String(l.gioBatDau || '00:00').split(':')[0]);
-                    return hour < 12;
-                  });
-                  const afternoonSchedules = daySchedules.filter(l => {
-                    const hour = parseInt(String(l.gioBatDau || '00:00').split(':')[0]);
-                    return hour >= 12;
-                  });
-                  
-                  // Get duty schedules for this day, including weekly director duties across the whole week
-                  const dayDuties = dutyData.filter((duty) => {
-                    const dutyDate = toDateOnly(duty.date || duty.ngay);
-                    if (duty.kieuTruc === 'giamdoc') {
-                      return isDutyInDateRange(duty, dateStr);
-                    }
-                    return dutyDate === dateStr;
-                  });
-
-                  // Build rows for this day
-                  const dayRows = [];
-                  
-                  // Morning session with duties
-                  dayRows.push({
-                    isFirstRow: true,
-                    session: 'Sáng',
-                    time: '00:00',
-                    content: dayDuties,
-                    schedules: [],
-                    isDutyRow: true,
-                  });
-                  
-                  // Morning work schedules
-                  morningSchedules.forEach((sch, idx) => {
-                    dayRows.push({
-                      isFirstRow: false,
-                      session: idx > 0 ? '' : '',
-                      time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
-                      schedules: [sch],
-                      content: [],
-                      isDutyRow: false,
-                    });
-                  });
-                  
-                  // Afternoon session
-                  dayRows.push({
-                    isFirstRow: false,
-                    session: 'Chiều',
-                    time: '',
-                    content: [],
-                    schedules: [],
-                    isDutyRow: false,
-                  });
-                  
-                  // Afternoon work schedules
-                  afternoonSchedules.forEach((sch, idx) => {
-                    dayRows.push({
-                      isFirstRow: false,
-                      session: '',
-                      time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
-                      schedules: [sch],
-                      content: [],
-                      isDutyRow: false,
-                    });
-                  });
-
-                  return dayRows.map((row, rowIdx) => (
-                    <tr key={`${dateStr}-${rowIdx}`} className={`border-b border-slate-200 ${isWeekend ? 'bg-slate-50' : rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'} hover:bg-blue-50/30 transition-colors`}>
-                      {/* Day column - only on first row of the day */}
-                      {rowIdx === 0 && (
-                        <td rowSpan={dayRows.length} className={`px-4 py-3 align-top font-bold text-sm ${isWeekend ? 'bg-slate-100' : 'bg-white'} border-r border-slate-200`}>
-                          <div className="text-slate-800">{formatDateWithDay(dayDate)}</div>
-                          {holiday && <div className="text-xs text-red-600 font-semibold mt-1">{holiday}</div>}
-                        </td>
-                      )}
-                      
-                      {/* Session column */}
-                      <td className="px-4 py-2 align-top text-center font-semibold text-slate-700 border-r border-slate-200">
-                        {row.session || '—'}
-                      </td>
-                      
-                      {/* Time column */}
-                      <td className="px-4 py-2 align-top text-slate-600 text-xs font-semibold border-r border-slate-200 min-w-[80px]">
-                        {row.time || '—'}
-                      </td>
-                      
-                      {/* Content column */}
-                      <td className="px-4 py-2 align-top text-slate-700">
-                        {row.isDutyRow ? (
-                          <div className="space-y-1 text-sm leading-6">
-                            {(() => {
-                              const sortedDutyItems = [...row.content].sort((a, b) => {
-                                const slotA = Number(a.slotNo || 1);
-                                const slotB = Number(b.slotNo || 1);
-                                if (a.kieuTruc !== b.kieuTruc) return a.kieuTruc === 'giamdoc' ? -1 : 1;
-                                if (a.viTri !== b.viTri) {
-                                  const order = { 'Nhà hiệu bộ': 1, 'Lái xe': 2, 'Bệnh xá': 3, 'Trực ban Giám đốc': 0 };
-                                  return (order[a.viTri] || 99) - (order[b.viTri] || 99);
-                                }
-                                return slotA - slotB;
-                              });
-
-                              const directorDuty = sortedDutyItems.find((d) => d.kieuTruc === 'giamdoc');
-                              const canboDuties = sortedDutyItems.filter((d) => d.kieuTruc === 'canbo');
-
-                              const slotLabel = (item) => {
-                                if (item.viTri === 'Nhà hiệu bộ' && item.dutyRole === 'commander') return 'TB - Chỉ huy';
-                                if (item.viTri === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 1) return 'TB - Cán bộ 1';
-                                if (item.viTri === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 2) return 'TB - Cán bộ 2';
-                                return item.viTri || 'Trực ban';
-                              };
-
-                              return (
-                                <div>
-                                  <div className="font-semibold text-slate-900">Trực ban Giám đốc: {directorDuty?.tenCanBo || 'Chưa phân công'}</div>
-                                  <div className="mt-1 font-semibold text-slate-900">Trực ban cán bộ:</div>
-                                  {canboDuties.length > 0 ? (
-                                    <div className="pl-4">
-                                      {canboDuties.map((item) => (
-                                        <div key={`${item.viTri}-${item.dutyRole}-${item.slotNo}`}>
-                                          {slotLabel(item)}: {item.tenCanBo || 'Chưa phân công'}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <div className="pl-4 text-slate-500">Chưa phân công</div>
-                                  )}
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        ) : row.schedules.length > 0 ? (
-                          <div className="space-y-1 text-sm leading-6">
-                            {row.schedules.map((sch) => {
-                              const timeLabel = sch.gioBatDau || sch.gioKetThuc ? `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}` : '';
-                              const details = [sch.tieuDe, sch.diaDiem, sch.donVi].filter(Boolean).join(' - ');
-                              return (
-                                <div key={sch.id} className="text-slate-700">
-                                  {timeLabel ? `${timeLabel} | ${details}` : details}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="text-slate-400">—</div>
-                        )}
-                      </td>
-                    </tr>
-                  ));
-                })}
-              </tbody>
-            </table>
+          <div className="p-4">
+            <WeekGridSchedule
+              weekDates={weekDates}
+              duties={dutyData}
+              schedules={weekData}
+              holidays={HOLIDAYS}
+              onSelectEvent={handleGridEventClick}
+            />
           </div>
         </div>
       ) : viewMode === 'month' ? (
@@ -672,42 +584,44 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-fade-in-up">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-800">{editId ? 'Chỉnh sửa Lịch sự kiện' : 'Thêm Lịch sự kiện'}</h3>
+              <h3 className="text-base font-bold text-slate-800">
+                {isReadOnlyModal ? 'Chi tiết Lịch sự kiện' : (editId ? 'Chỉnh sửa Lịch sự kiện' : 'Thêm Lịch sự kiện')}
+              </h3>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
             </div>
             <div className="p-6 space-y-4">
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Nội dung công tác <span className="text-red-500">*</span></label>
-                <input className="input-field" placeholder="Nhập nội dung công tác..." value={form.tieuDe} onChange={e => setForm({...form, tieuDe: e.target.value})} />
+                <input disabled={isReadOnlyModal} className="input-field" placeholder="Nhập nội dung công tác..." value={form.tieuDe} onChange={e => setForm({...form, tieuDe: e.target.value})} />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Ngày <span className="text-red-500">*</span></label>
-                  <input type="date" className="input-field" value={form.ngay} onChange={e => setForm({...form, ngay: e.target.value})} />
+                  <input disabled={isReadOnlyModal} type="date" className="input-field" value={form.ngay} onChange={e => setForm({...form, ngay: e.target.value})} />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Từ giờ (7:00-18:00)</label>
-                  <input type="time" className="input-field" value={form.gioBatDau} min="07:00" max="18:00" onChange={e => setForm({...form, gioBatDau: e.target.value})} />
+                  <input disabled={isReadOnlyModal} type="time" className="input-field" value={form.gioBatDau} min="07:00" max="18:00" onChange={e => setForm({...form, gioBatDau: e.target.value})} />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đến giờ (7:00-18:00)</label>
-                  <input type="time" className="input-field" value={form.gioKetThuc} min="07:00" max="18:00" onChange={e => setForm({...form, gioKetThuc: e.target.value})} />
+                  <input disabled={isReadOnlyModal} type="time" className="input-field" value={form.gioKetThuc} min="07:00" max="18:00" onChange={e => setForm({...form, gioKetThuc: e.target.value})} />
                 </div>
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Địa điểm</label>
-                <input className="input-field" placeholder="VD: Phòng họp A - Tầng 2" value={form.diaDiem} onChange={e => setForm({...form, diaDiem: e.target.value})} />
+                <input disabled={isReadOnlyModal} className="input-field" placeholder="VD: Phòng họp A - Tầng 2" value={form.diaDiem} onChange={e => setForm({...form, diaDiem: e.target.value})} />
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Loại lịch</label>
-                <select className="input-field" value={form.loai} onChange={e => setForm({...form, loai: e.target.value})}>
+                <select disabled={isReadOnlyModal} className="input-field" value={form.loai} onChange={e => setForm({...form, loai: e.target.value})}>
                   {Object.entries(LOAI_LICH_COLORS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
               </div>
               <div>
                 <div>
                   <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Người phụ trách <span className="text-red-500">*</span></label>
-                  <select className="input-field" value={form.nguoiPhuTrachId || ''} onChange={e => setForm({...form, nguoiPhuTrachId: e.target.value})}>
+                  <select disabled={isReadOnlyModal} className="input-field" value={form.nguoiPhuTrachId || ''} onChange={e => setForm({...form, nguoiPhuTrachId: e.target.value})}>
                     <option value="">-- Chọn --</option>
                     {officerOptions.map(cb => <option key={cb.id} value={cb.id}>{[cb.capBac, cb.hoTen].filter(Boolean).join(' ')}</option>)}
                   </select>
@@ -723,6 +637,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                       <div key={unit} className="space-y-2">
                         <label className="flex items-center gap-2 text-sm text-slate-700">
                           <input
+                            disabled={isReadOnlyModal}
                             type="checkbox"
                             checked={checked}
                             onChange={(e) => {
@@ -741,6 +656,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                         {isBoardUnit && checked && (
                           <div className="ml-6 space-y-2">
                             <button
+                              disabled={isReadOnlyModal}
                               type="button"
                               onClick={() => setShowBgdPicker(true)}
                               className="px-3 py-1.5 text-xs rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200"
@@ -763,12 +679,57 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Ghi chú</label>
-                <textarea rows={2} className="input-field resize-none" placeholder="Ghi chú thêm..." value={form.ghiChu} onChange={e => setForm({...form, ghiChu: e.target.value})} />
+                <textarea disabled={isReadOnlyModal} rows={2} className="input-field resize-none" placeholder="Ghi chú thêm..." value={form.ghiChu} onChange={e => setForm({...form, ghiChu: e.target.value})} />
               </div>
             </div>
             <div className="flex gap-3 px-6 pb-6">
               <button onClick={() => setShowModal(false)} className="btn-secondary flex-1 justify-center">Hủy</button>
-              <button onClick={handleSave} className="btn-primary flex-1 justify-center">{editId ? 'Lưu' : 'Thêm lịch'}</button>
+              {!isReadOnlyModal && (
+                <button onClick={handleSave} className="btn-primary flex-1 justify-center">{editId ? 'Lưu' : 'Thêm lịch'}</button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedDutyDetail && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-fade-in-up">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-800">Chi tiết Lịch trực</h3>
+              <button onClick={() => setSelectedDutyDetail(null)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              {selectedDutyDetail.items?.map((duty, idx) => (
+                <div key={`${duty.id || idx}-${idx}`} className="rounded-xl border border-slate-200 p-4 bg-slate-50/40">
+                  <div className="font-semibold text-slate-900 mb-3 text-sm">
+                    {duty.kieuTruc === 'giamdoc' ? '🎖️ Trực ban Giám đốc' : `📍 ${duty.viTri || 'Trực ban'}`}
+                  </div>
+                  <div className="space-y-2 text-sm text-slate-700">
+                    <div className="flex justify-between items-start">
+                      <span className="font-medium text-slate-600">Cán bộ:</span>
+                      <span className="text-slate-900 text-right">{duty.tenCanBo || 'Chưa phân công'}</span>
+                    </div>
+                    <div className="flex justify-between items-start">
+                      <span className="font-medium text-slate-600">Thời gian:</span>
+                      <span className="text-slate-900 text-right">
+                        {duty.gioBatDau && duty.gioKetThuc ? `${duty.gioBatDau} - ${duty.gioKetThuc}` : '00:00 - 24:00'}
+                      </span>
+                    </div>
+                    {duty.ngay && (
+                      <div className="flex justify-between items-start">
+                        <span className="font-medium text-slate-600">Ngày:</span>
+                        <span className="text-slate-900 text-right">{duty.ngay}</span>
+                      </div>
+                    )}
+                    
+                  </div>
+                </div>
+              ))}
+              {!selectedDutyDetail.items?.length && <div className="text-center text-slate-500 py-4">Không có dữ liệu lịch trực.</div>}
+            </div>
+            <div className="px-6 pb-6">
+              <button onClick={() => setSelectedDutyDetail(null)} className="btn-secondary w-full justify-center">Đóng</button>
             </div>
           </div>
         </div>

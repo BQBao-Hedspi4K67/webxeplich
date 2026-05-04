@@ -523,8 +523,8 @@ export const logout = (req, res) => {
 // Create user account (internal provisioning only)
 export const createUserAccount = async (req, res, next) => {
   try {
-    // Only superadmin (role === 'admin') can create officer accounts
-    if (req.user?.role !== 'admin') {
+    // Only superadmin/admin can create officer accounts
+    if (!['admin', 'superadmin'].includes(req.user?.role)) {
       return res.status(403).json({
         success: false,
         error: 'Chỉ Superadmin có quyền tạo cán bộ mới',
@@ -545,9 +545,6 @@ export const createUserAccount = async (req, res, next) => {
       status = 'active',
       businessTripStartDate = null,
       businessTripEndDate = null,
-      canManageDutySchedulesByPermission = false,
-      canCreateWorkSchedulesByPermission = false,
-      canApproveWorkSchedulesByPermission = false,
     } = req.body;
 
     const splitTitleAndName = (name = '') => {
@@ -716,38 +713,6 @@ export const createUserAccount = async (req, res, next) => {
             normalizedOfficerStatus,
             normalizedOfficerStatus === 'on_business_trip' ? businessTripStartDate : null,
             normalizedOfficerStatus === 'on_business_trip' ? businessTripEndDate : null,
-          ]
-        );
-      }
-
-      if (Boolean(canManageDutySchedulesByPermission)) {
-        await connection.execute(
-          `INSERT INTO duty_schedule_permissions (officerId, canManageDutySchedules, grantedByUserId)
-           VALUES (?, 1, ?)
-           ON DUPLICATE KEY UPDATE
-             canManageDutySchedules = VALUES(canManageDutySchedules),
-             grantedByUserId = VALUES(grantedByUserId),
-             grantedAt = CURRENT_TIMESTAMP,
-             updatedAt = CURRENT_TIMESTAMP`,
-          [newOfficerId, req.user?.id || null]
-        );
-      }
-
-      if (Boolean(canCreateWorkSchedulesByPermission) || Boolean(canApproveWorkSchedulesByPermission)) {
-        await connection.execute(
-          `INSERT INTO work_schedule_permissions (officerId, canCreateWorkSchedules, canApproveWorkSchedules, grantedByUserId)
-           VALUES (?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE
-             canCreateWorkSchedules = VALUES(canCreateWorkSchedules),
-             canApproveWorkSchedules = VALUES(canApproveWorkSchedules),
-             grantedByUserId = VALUES(grantedByUserId),
-             grantedAt = CURRENT_TIMESTAMP,
-             updatedAt = CURRENT_TIMESTAMP`,
-          [
-            newOfficerId,
-            Boolean(canCreateWorkSchedulesByPermission) ? 1 : 0,
-            Boolean(canApproveWorkSchedulesByPermission) ? 1 : 0,
-            req.user?.id || null,
           ]
         );
       }

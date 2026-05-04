@@ -117,6 +117,54 @@ const normalizeParticipantPayload = (participants) => {
   };
 };
 
+const formatOfficerDisplayName = (officer) => {
+  const name = [officer?.officerTitle, officer?.fullName].filter(Boolean).join(' ').trim();
+  return name ? `đ/c ${name}` : '';
+};
+
+const enrichWorkScheduleParticipants = async (connection, rows = []) => {
+  const normalizedRows = rows.map((row) => ({
+    ...row,
+    participants: normalizeParticipantPayload(row.participants),
+  }));
+
+  const boardMemberIds = Array.from(new Set(
+    normalizedRows.flatMap((row) => row.participants.boardMembers || []).map((id) => String(id)).filter(Boolean)
+  ));
+
+  if (!boardMemberIds.length) {
+    return normalizedRows.map((row) => ({
+      ...row,
+      participants: {
+        ...row.participants,
+        boardMemberLabels: [],
+      },
+    }));
+  }
+
+  const placeholders = boardMemberIds.map(() => '?').join(', ');
+  const [officerRows] = await connection.execute(
+    `SELECT id, officerTitle, fullName
+     FROM officers
+     WHERE id IN (${placeholders})`,
+    boardMemberIds
+  );
+
+  const labelMap = new Map(
+    officerRows.map((officer) => [String(officer.id), formatOfficerDisplayName(officer)])
+  );
+
+  return normalizedRows.map((row) => ({
+    ...row,
+    participants: {
+      ...row.participants,
+      boardMemberLabels: (row.participants.boardMembers || [])
+        .map((id) => labelMap.get(String(id)))
+        .filter(Boolean),
+    },
+  }));
+};
+
 const collectParticipantOfficerIds = async (connection, participants) => {
   const normalized = normalizeParticipantPayload(participants);
   const officerIds = new Set();
@@ -291,9 +339,11 @@ export const getWorkSchedules = async (req, res, next) => {
         queryParams
       );
 
+      const enrichedRows = await enrichWorkScheduleParticipants(connection, rows);
+
       res.json({
         success: true,
-        data: rows,
+        data: enrichedRows,
         pagination: {
           total: countRows[0].total,
           page: parseInt(page, 10),
@@ -332,7 +382,9 @@ export const getWorkScheduleById = async (req, res, next) => {
         canViewPending ? [id] : [id, ...ownPendingParams]
       );
 
-      if (!rows.length) {
+      const enrichedRows = await enrichWorkScheduleParticipants(connection, rows);
+
+      if (!enrichedRows.length) {
         return res.status(404).json({
           success: false,
           error: 'Work schedule not found',
@@ -340,7 +392,7 @@ export const getWorkScheduleById = async (req, res, next) => {
         });
       }
 
-      res.json({ success: true, data: rows[0] });
+      res.json({ success: true, data: enrichedRows[0] });
     } finally {
       connection.release();
     }

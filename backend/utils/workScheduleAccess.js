@@ -3,8 +3,6 @@ const hasOfficersUserIdColumn = async (connection) => {
   return rows.length > 0;
 };
 
-const ADMIN_DEPARTMENT = 'Phòng hành chính tổng hợp';
-
 const hasOfficersDepartmentIdColumn = async (connection) => {
   const [rows] = await connection.execute("SHOW COLUMNS FROM officers LIKE 'departmentId'");
   return rows.length > 0;
@@ -90,43 +88,22 @@ const getWorkSchedulePermissionState = async (connection, officerId) => {
 };
 
 export const getWorkScheduleAccessState = async (connection, reqUser = {}) => {
-  await ensureWorkScheduleAccessSchema(connection);
-
   const officer = await resolveRequesterOfficer(connection, reqUser);
   const effectiveRole = reqUser?.effectiveRole || reqUser?.role;
-  const isDirector = effectiveRole === 'admin' || effectiveRole === 'superadmin';
-  const isDepartmentManager = effectiveRole === 'manager';
-  const departmentName = String(officer?.department || '').trim();
-  const canGrantWorkSchedulePermissions = isDirector || (isDepartmentManager && departmentName === ADMIN_DEPARTMENT);
-
-  if (isDirector) {
-    return {
-      officer,
-      canCreateWorkSchedules: true,
-      canApproveWorkSchedules: true,
-      canCreateWorkSchedulesByRole: true,
-      canApproveWorkSchedulesByRole: true,
-      canCreateWorkSchedulesByPermission: false,
-      canApproveWorkSchedulesByPermission: false,
-      canGrantWorkSchedulePermissions,
-    };
-  }
-
-  const permissionState = await getWorkSchedulePermissionState(connection, officer?.id);
-  // Managers can create work schedules by role, but approval of work schedules is reserved
-  // for director/admin roles or explicit permission entries. Managers do not get approve-by-role.
-  const canCreateWorkSchedulesByRole = isDepartmentManager;
-  const canApproveWorkSchedulesByRole = false;
+  const isAdminRole = effectiveRole === 'admin' || effectiveRole === 'superadmin';
+  const isManagerRole = effectiveRole === 'manager';
+  const canCreateWorkSchedulesByRole = isAdminRole || isManagerRole;
+  const canApproveWorkSchedulesByRole = isAdminRole;
 
   return {
     officer,
-    canCreateWorkSchedules: canCreateWorkSchedulesByRole || permissionState.canCreateWorkSchedulesByPermission,
-    canApproveWorkSchedules: canApproveWorkSchedulesByRole || permissionState.canApproveWorkSchedulesByPermission,
+    canCreateWorkSchedules: canCreateWorkSchedulesByRole,
+    canApproveWorkSchedules: canApproveWorkSchedulesByRole,
     canCreateWorkSchedulesByRole,
     canApproveWorkSchedulesByRole,
-    canCreateWorkSchedulesByPermission: permissionState.canCreateWorkSchedulesByPermission,
-    canApproveWorkSchedulesByPermission: permissionState.canApproveWorkSchedulesByPermission,
-    canGrantWorkSchedulePermissions,
+    canCreateWorkSchedulesByPermission: false,
+    canApproveWorkSchedulesByPermission: false,
+    canGrantWorkSchedulePermissions: false,
   };
 };
 

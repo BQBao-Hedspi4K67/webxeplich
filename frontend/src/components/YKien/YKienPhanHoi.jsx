@@ -18,6 +18,8 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], lichCongTacD
   const [phanHoiMap, setPhanHoiMap] = useState({});
 
   const isAdminLike = user?.role === 'Quản trị viên' || user?.isDelegatedAdmin;
+  const isBackendAdmin = user?.backendRole === 'admin' || user?.backendRole === 'superadmin';
+  const isAdminRole = isAdminLike || isBackendAdmin;
   const hasWorkScheduleApprove = Boolean(
     user?.canApproveWorkSchedules ||
     user?.canApproveWorkSchedulesByRole ||
@@ -114,27 +116,23 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], lichCongTacD
 
   return (
     <div className="max-w-7xl mx-auto space-y-5">
-      <div>
-        <h2 className="text-xl font-bold text-slate-800">Phê duyệt</h2>
-      </div>
-
-
-      <div className="flex gap-2 mb-4">
-        {!(isAdminLike && !canReviewLeaveRequests) && (
-          <button
-            className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${approvalTab === 'leave' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-            onClick={() => setApprovalTab('leave')}
-          >
-            Đơn xin nghỉ
-          </button>
-        )}
-        {hasWorkScheduleApprove && (
-          <button
-            className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${approvalTab === 'work' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-            onClick={() => setApprovalTab('work')}
-          >
+      
+      <div className="flex flex-wrap items-center gap-6 mb-4">
+        {isAdminRole ? (
+          <span className="text-xl font-bold text-slate-800 hover:text-slate-900 transition-colors cursor-pointer">
             Phê duyệt lịch công tác
-          </button>
+          </span>
+        ) : (
+          <>
+            <span className="text-xl font-bold text-slate-800 hover:text-slate-900 transition-colors">
+              {canReview ? 'Phê duyệt đơn xin nghỉ' : 'Tạo đơn xin nghỉ'}
+            </span>
+            {hasWorkScheduleApprove && (
+              <span className="text-xl font-bold text-slate-800 hover:text-slate-900 transition-colors cursor-pointer">
+                Phê duyệt lịch công tác
+              </span>
+            )}
+          </>
         )}
       </div>
 
@@ -142,10 +140,7 @@ const YKienPhanHoi = ({ user, lichTrucBanData = [], yKienData = [], lichCongTacD
         <>
           {canCreateLeaveRequest && (
             <div className="card">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-base font-bold text-slate-800">Tạo đơn xin nghỉ</h3>
-                <span className="badge bg-blue-100 text-blue-700">Gửi quản lý duyệt</span>
-              </div>
+              
               <div className="mb-3">
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Chọn ngày trực để xin nghỉ</label>
                 {myDutyItems.length === 0 ? (

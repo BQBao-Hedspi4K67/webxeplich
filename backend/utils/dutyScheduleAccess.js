@@ -1,6 +1,5 @@
 const ADMIN_DEPARTMENT = 'Phòng hành chính tổng hợp';
 const SPECIAL_DUTY_DEPARTMENTS = ['Phòng hành chính tổng hợp', 'Đội lái xe', 'Đội bệnh xá'];
-const MANAGER_DUTY_POSITION_PATTERN = /(Trưởng\s*phòng|Phó\s*trưởng\s*phòng|Trưởng\s*đội|Phó\s*đội)/i;
 
 const hasOfficersUserIdColumn = async (connection) => {
   const [rows] = await connection.execute("SHOW COLUMNS FROM officers LIKE 'userId'");
@@ -64,32 +63,21 @@ export const hasDutySchedulePermission = async (connection, officerId) => {
 };
 
 export const getDutyScheduleAccessState = async (connection, reqUser = {}) => {
-  await ensureDutyScheduleAccessSchema(connection);
-
   const officer = await resolveRequesterOfficer(connection, reqUser);
   const effectiveRole = reqUser?.effectiveRole || reqUser?.role;
-  const isAdminRole = effectiveRole === 'admin' || effectiveRole === 'superadmin';
   const isManagerRole = effectiveRole === 'manager';
   const departmentName = String(officer?.department || reqUser?.department || '').trim();
   const canManageByManagerRole = isManagerRole
-    && SPECIAL_DUTY_DEPARTMENTS.includes(departmentName)
-    && (
-      Boolean(reqUser?.isDelegatedManager)
-      || MANAGER_DUTY_POSITION_PATTERN.test(String(officer?.position || reqUser?.position || ''))
-      || departmentName === ADMIN_DEPARTMENT
-      || departmentName === 'Đội lái xe'
-      || departmentName === 'Đội bệnh xá'
-    );
-  // Only managers of special departments (and leaders by role via officers table or explicit permission)
-  // are allowed to manage duty schedules by department. Admin backend role should NOT implicitly
-  // get duty-schedule management rights (request from product owner).
+    && SPECIAL_DUTY_DEPARTMENTS.includes(departmentName);
+
+  // Rule: duty schedules are managed only by managers in 3 special departments.
   const canManageDutySchedulesByDepartment = canManageByManagerRole;
-  const canManageDutySchedulesByPermission = await hasDutySchedulePermission(connection, officer?.id);
-  const canGrantDutySchedulePermissions = canManageByManagerRole;
+  const canManageDutySchedulesByPermission = false;
+  const canGrantDutySchedulePermissions = false;
 
   return {
     officer,
-    canManageDutySchedules: canManageDutySchedulesByDepartment || canManageDutySchedulesByPermission,
+    canManageDutySchedules: canManageDutySchedulesByDepartment,
     canManageDutySchedulesByDepartment,
     canManageDutySchedulesByPermission,
     canGrantDutySchedulePermissions,

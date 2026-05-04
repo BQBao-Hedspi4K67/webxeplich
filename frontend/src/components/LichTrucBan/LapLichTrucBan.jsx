@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, ChevronLeft, ChevronRight, X, Edit2, Eye, Trash2, Shuffle } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, X, Edit2, Trash2, Shuffle } from 'lucide-react';
 import { WEEK_DAYS } from '../../data/uiConstants';
 import apiClient from '../../services/api';
 import { confirmDialog } from '../../utils/notify';
@@ -359,27 +359,11 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
 
   const renderDutyCell = (slot, emptyText = 'Chưa phân công') => (
     slot ? (
-      <div className="relative group">
-        <button
-          onClick={() => openEditSingle(slot)}
-          className="text-left w-full h-12 p-2 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100 flex items-center gap-2"
-          title="Chi tiết"
-          aria-label="Chi tiết"
-        >
-          <Eye size={14} className="text-slate-500 flex-shrink-0" />
-          <div className="min-w-0">
-            <div className="text-xs font-semibold text-slate-800 line-clamp-1 whitespace-nowrap">{slot.tenCanBo}</div>
-            <div className="text-xs text-slate-400 font-mono">{slot.canBoId}</div>
-          </div>
-        </button>
-        {/* Nút bút chỉnh sửa (hiển thị nhưng sẽ khóa nếu không có quyền) */}
-        <button
-          onClick={() => openEditSingle(slot)}
-          className={`absolute top-1 right-1 p-1 rounded-full bg-white border border-slate-200 shadow ${canEdit ? 'hover:bg-blue-50 hover:text-blue-600 text-slate-400' : 'opacity-50 cursor-not-allowed text-slate-300'} group-hover:visible invisible`}
-          title={canEdit ? 'Đổi người trực' : 'Bạn không có quyền sửa phân công'}
-        >
-          <Edit2 size={13} />
-        </button>
+      <div className="w-full h-12 p-2 rounded-lg bg-slate-50 border border-slate-200 flex items-center">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-slate-800 line-clamp-1 whitespace-nowrap">{slot.tenCanBo}</div>
+          <div className="text-xs text-slate-400 font-mono">{slot.canBoId}</div>
+        </div>
       </div>
     ) : <span className="text-slate-400 text-sm">{emptyText}</span>
   );
@@ -405,12 +389,6 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
     setSingleOfficerId('');
     setDayForm(form);
     setShowDayModal(true);
-  };
-
-  const openEditSingle = (item) => {
-    setEditItem(item);
-    setSingleOfficerId(item.canBoId);
-    setShowDayModal(false);
   };
 
   const getOptionsForSlot = (item) => {
@@ -603,8 +581,12 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
                   <tr key={`${dutyType}-${date}`} className="group hover:bg-slate-50/70">
                     <td className="table-td px-2 py-2">
                       <div className="font-semibold text-slate-700 whitespace-nowrap inline-block">{WEEK_DAYS[idx]}</div>
-                      <div className="text-xs text-slate-400 whitespace-nowrap inline ml-2">{formatDDMM(date)}</div>
-                      {holidayName && <div className="text-[11px] text-red-600 font-semibold mt-1">{holidayName}</div>}
+                      <div
+                        className={`text-xs whitespace-nowrap inline ml-2 ${holidayName ? 'text-red-600 font-semibold' : 'text-slate-400'}`}
+                        title={holidayName || undefined}
+                      >
+                        {formatDDMM(date)}
+                      </div>
                     </td>
                     <td className="table-td px-2 py-2">{renderDutyCell(slot1)}</td>
                     <td className="table-td px-2 py-2">{renderDutyCell(slot2)}</td>

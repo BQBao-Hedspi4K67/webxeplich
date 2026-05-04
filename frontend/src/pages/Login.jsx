@@ -24,6 +24,19 @@ const formatDisplayTime = (timeValue) => {
   return time === '00:00' ? '12:00' : time;
 };
 
+const getSessionBucket = (timeValue) => {
+  const hour = Number.parseInt(String(timeValue || '00:00').split(':')[0], 10);
+  if (Number.isNaN(hour) || hour < 8) return 'night';
+  if (hour < 16) return 'morning';
+  return 'afternoon';
+};
+
+const SESSION_LABELS = {
+  night: 'Đêm\n(00:00-08:00)',
+  morning: 'Sáng\n(08:00-16:00)',
+  afternoon: 'Chiều\n(16:00-24:00)',
+};
+
 const toTimeOnly = (value) => {
   if (!value) return '';
   const raw = String(value).trim();
@@ -43,9 +56,9 @@ const normalizeDutyItem = (duty) => ({
 });
 
 const buildSlotLabel = (item) => {
-  if (item.viTri === 'Nhà hiệu bộ' && item.dutyRole === 'commander') return 'TB - Chỉ huy';
-  if (item.viTri === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 1) return 'TB - Cán bộ 1';
-  if (item.viTri === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 2) return 'TB - Cán bộ 2';
+  if (item.viTri === 'Nhà hiệu bộ' && item.dutyRole === 'commander') return 'HB - Chỉ huy';
+  if (item.viTri === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 1) return 'HB - Cán bộ 1';
+  if (item.viTri === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 2) return 'HB - Cán bộ 2';
   return item.viTri || 'Trực ban';
 };
 
@@ -64,24 +77,16 @@ const buildTodayRows = (dutyItems = [], scheduleItems = []) => {
   const directorDuty = sortedDutyItems.find((item) => item.kieuTruc === 'giamdoc');
   const canboDuties = sortedDutyItems.filter((item) => item.kieuTruc === 'canbo');
 
-  const morningSchedules = [...scheduleItems]
-    .filter((evt) => {
-      const hour = parseInt(String(evt.gioBatDau || '00:00').split(':')[0]);
-      return hour < 12;
-    })
-    .sort((a, b) => String(a.gioBatDau || '').localeCompare(String(b.gioBatDau || '')));
-
-  const afternoonSchedules = [...scheduleItems]
-    .filter((evt) => {
-      const hour = parseInt(String(evt.gioBatDau || '00:00').split(':')[0]);
-      return hour >= 12;
-    })
-    .sort((a, b) => String(a.gioBatDau || '').localeCompare(String(b.gioBatDau || '')));
+  const groupedSchedules = {
+    night: [...scheduleItems].filter((evt) => getSessionBucket(evt.gioBatDau) === 'night').sort((a, b) => String(a.gioBatDau || '').localeCompare(String(b.gioBatDau || ''))),
+    morning: [...scheduleItems].filter((evt) => getSessionBucket(evt.gioBatDau) === 'morning').sort((a, b) => String(a.gioBatDau || '').localeCompare(String(b.gioBatDau || ''))),
+    afternoon: [...scheduleItems].filter((evt) => getSessionBucket(evt.gioBatDau) === 'afternoon').sort((a, b) => String(a.gioBatDau || '').localeCompare(String(b.gioBatDau || ''))),
+  };
 
   const rows = [
     {
       isFirstRow: true,
-      session: 'Sáng',
+      session: SESSION_LABELS.night,
       time: '00:00',
       isDutyRow: true,
       content: [
@@ -94,35 +99,68 @@ const buildTodayRows = (dutyItems = [], scheduleItems = []) => {
     },
   ];
 
-  morningSchedules.forEach((sch) => {
+  groupedSchedules.night.forEach((sch, idx) => {
     rows.push({
       isFirstRow: false,
-      session: 'Sáng',
+      session: idx === 0 ? SESSION_LABELS.night : '',
       time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
       isDutyRow: false,
       schedules: [sch],
     });
   });
 
-  rows.push({
-    isFirstRow: false,
-    session: 'Chiều',
-    time: '',
-    isDutyRow: false,
-    schedules: [],
-  });
-
-  afternoonSchedules.forEach((sch) => {
+  groupedSchedules.morning.forEach((sch, idx) => {
     rows.push({
       isFirstRow: false,
-      session: 'Chiều',
+      session: idx === 0 ? SESSION_LABELS.morning : '',
       time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
       isDutyRow: false,
       schedules: [sch],
     });
   });
+
+  groupedSchedules.afternoon.forEach((sch, idx) => {
+    rows.push({
+      isFirstRow: false,
+      session: idx === 0 ? SESSION_LABELS.afternoon : '',
+      time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
+      isDutyRow: false,
+      schedules: [sch],
+    });
+  });
+
+  if (!groupedSchedules.morning.length) {
+    rows.push({ isFirstRow: false, session: SESSION_LABELS.morning, time: '', isDutyRow: false, schedules: [] });
+  }
+
+  if (!groupedSchedules.afternoon.length) {
+    rows.push({ isFirstRow: false, session: SESSION_LABELS.afternoon, time: '', isDutyRow: false, schedules: [] });
+  }
 
   return rows;
+};
+
+const getBoardMemberLine = (participants) => {
+  const labels = participants?.boardMemberLabels;
+  if (!Array.isArray(labels) || !labels.length) return '';
+  return `Ban giám đốc: ${labels.join(', ')}`;
+};
+
+const buildScheduleDetails = (schedule) => {
+  const details = [schedule.tieuDe, schedule.diaDiem].filter(Boolean);
+  const boardMemberLine = getBoardMemberLine(schedule.participants);
+  const units = String(schedule.donVi || '')
+    .split(',')
+    .map((unit) => unit.trim())
+    .filter(Boolean);
+  const filteredUnits = boardMemberLine
+    ? units.filter((unit) => unit.toLowerCase() !== 'ban giám đốc')
+    : units;
+  const participantLine = boardMemberLine
+    ? [boardMemberLine, ...filteredUnits].join(', ')
+    : filteredUnits.join(', ');
+  if (participantLine) details.push(participantLine);
+  return details;
 };
 
 const Login = ({ onLogin }) => {
@@ -156,6 +194,18 @@ const Login = ({ onLogin }) => {
           gioKetThuc: toTimeOnly(evt.endTime || evt.gioKetThuc),
           diaDiem: evt.location || evt.diaDiem || '',
           donVi: evt.departmentName || evt.department || evt.donVi || '',
+          participants: (() => {
+            const participants = evt.participants;
+            if (!participants) return { units: [], boardMembers: [], boardMemberLabels: [] };
+            if (typeof participants === 'string') {
+              try {
+                return JSON.parse(participants);
+              } catch {
+                return { units: [], boardMembers: [], boardMemberLabels: [] };
+              }
+            }
+            return participants;
+          })(),
         })));
         
         // Fetch duty schedules for today
@@ -244,7 +294,7 @@ const Login = ({ onLogin }) => {
           <div className="lg:col-span-2">
             <div className="bg-white/[0.08] backdrop-blur-xl rounded-2xl border border-white/10 p-6 shadow-2xl">
               <h2 className="text-lg font-bold text-white mb-6">
-                Lịch sự kiện hôm nay - {formatDDMM(new Date())}
+                Lịch công tác hôm nay - {formatDDMM(new Date())}
                 {todayHoliday && <span className="text-red-300 text-sm ml-2">({todayHoliday.ten})</span>}
               </h2>
               
@@ -273,11 +323,7 @@ const Login = ({ onLogin }) => {
                           const details = isDutyRow
                             ? row.content || []
                             : row.schedules?.length > 0
-                              ? row.schedules.map((sch) => {
-                                const timeLabel = sch.gioBatDau || sch.gioKetThuc ? `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}` : '';
-                                const content = [sch.tieuDe, sch.diaDiem, sch.donVi].filter(Boolean).join(' - ');
-                                return timeLabel ? `${timeLabel} | ${content}` : content;
-                              })
+                              ? row.schedules.flatMap((sch) => buildScheduleDetails(sch))
                               : [];
 
                           return (
@@ -288,7 +334,7 @@ const Login = ({ onLogin }) => {
                                   {todayHoliday && <div className="text-[10px] text-red-300 mt-0.5">{todayHoliday.ten || todayHoliday.holidayName}</div>}
                                 </td>
                               )}
-                              <td className="px-4 py-3 text-center align-top text-white border-r border-white/10">{row.session}</td>
+                              <td className="px-4 py-3 text-center align-top text-white border-r border-white/10 whitespace-pre-line">{row.session || ''}</td>
                               <td className="px-4 py-3 text-slate-300 text-[10px] align-top border-r border-white/10">{row.time || ''}</td>
                               <td className="px-4 py-3 align-top text-white/90 leading-6">
                                 {isDutyRow ? (

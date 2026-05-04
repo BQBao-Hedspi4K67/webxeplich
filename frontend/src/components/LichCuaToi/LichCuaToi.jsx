@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { CA_TRUC_COLORS, LOAI_LICH_COLORS } from '../../data/uiConstants';
 
 const simplify = (value) => String(value || '')
@@ -44,13 +45,48 @@ const getAssigneeTokens = (assignedTo) => {
     .filter(Boolean);
 };
 
+  const BAN_GIAM_DOC_NORMALIZED = simplify('Ban Giám đốc');
+
+  const getWeekStart = (offset = 0) => {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = day === 0 ? -6 : 1 - day; // move to Monday
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diff + offset * 7);
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+  };
+
+  const formatDDMM = (d) => {
+    const dt = new Date(d);
+    return `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}`;
+  };
+
+  const formatWeekRange = (weekStart) => {
+    const start = formatDDMM(weekStart);
+    const end = formatDDMM(new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6));
+    return `${start} - ${end}`;
+  };
+
+  const formatISODate = (d) => {
+    const dt = new Date(d);
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const day = String(dt.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
 const LichCuaToi = ({ user, canBoData = [], lichCongTacData = [], lichTrucBanData = [] }) => {
-  const [monthFilter, setMonthFilter] = useState(() => sessionStorage.getItem('lichCuaToiMonth') || new Date().toISOString().slice(0, 7));
   const [typeFilter, setTypeFilter] = useState(() => sessionStorage.getItem('lichCuaToiType') || 'all');
+  const [weekOffset, setWeekOffset] = useState(() => {
+    if (typeof window === 'undefined') return 0;
+    const v = Number(window.localStorage.getItem('lichCuaToiWeekOffset'));
+    return Number.isFinite(v) ? v : 0;
+  });
 
   React.useEffect(() => {
-    sessionStorage.setItem('lichCuaToiMonth', monthFilter);
-  }, [monthFilter]);
+    window.localStorage.setItem('lichCuaToiWeekOffset', String(weekOffset));
+  }, [weekOffset]);
 
   React.useEffect(() => {
     sessionStorage.setItem('lichCuaToiType', typeFilter);
@@ -80,7 +116,7 @@ const LichCuaToi = ({ user, canBoData = [], lichCongTacData = [], lichTrucBanDat
       
       if (myDepartment && item.participants?.units) {
         const units = Array.isArray(item.participants.units) ? item.participants.units : [];
-        if (units.some(u => simplify(u) === myDepartment)) {
+        if (myDepartment !== BAN_GIAM_DOC_NORMALIZED && units.some(u => simplify(u) === myDepartment)) {
           return true;
         }
       }
@@ -125,12 +161,18 @@ const LichCuaToi = ({ user, canBoData = [], lichCongTacData = [], lichTrucBanDat
 
     return [...workRows, ...dutyRows]
       .filter((item) => {
-        const matchMonth = !monthFilter || String(item.date || '').startsWith(monthFilter);
+        // filter by selected week
+        if (!item.date) return false;
+        const itemDate = new Date(item.date);
+        const weekStart = getWeekStart(weekOffset);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        const matchWeek = itemDate >= weekStart && itemDate <= weekEnd;
         const matchType = typeFilter === 'all' || item.type === typeFilter;
-        return matchMonth && matchType;
+        return matchWeek && matchType;
       })
       .sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  }, [myWorkSchedules, myDutySchedules, monthFilter, typeFilter]);
+  }, [myWorkSchedules, myDutySchedules, weekOffset, typeFilter]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-5">
@@ -144,13 +186,23 @@ const LichCuaToi = ({ user, canBoData = [], lichCongTacData = [], lichTrucBanDat
       <div className="card">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
-            <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Tháng</label>
-            <input
-              type="month"
-              value={monthFilter}
-              onChange={(e) => setMonthFilter(e.target.value)}
-              className="input-field"
-            />
+            <label className="text-xs font-bold text-slate-500 mb-1.5 block">Tuần</label>
+            <div className="flex items-center bg-white border border-slate-200 rounded-xl">
+              <button onClick={() => setWeekOffset((w) => w - 1)}
+                className="p-2 rounded-l-xl text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-all">
+                <ChevronLeft size={16} />
+              </button>
+              <div className="flex-1 px-4 py-2 text-sm text-slate-700 font-bold text-center">
+                {weekOffset === 0
+                  ? `Tuần này (${formatWeekRange(getWeekStart(weekOffset))})`
+                  : `Tuần ${formatISODate(getWeekStart(weekOffset))} - ${formatISODate(new Date(getWeekStart(weekOffset).getFullYear(), getWeekStart(weekOffset).getMonth(), getWeekStart(weekOffset).getDate() + 6))}`
+                }
+              </div>
+              <button onClick={() => setWeekOffset((w) => w + 1)}
+                className="p-2 rounded-r-xl text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-all">
+                <ChevronRight size={16} />
+              </button>
+            </div>
           </div>
           <div>
             <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Loại lịch</label>

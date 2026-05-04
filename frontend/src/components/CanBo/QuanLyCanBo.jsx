@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Search, Filter, Edit2, Trash2, Eye, X, UserCheck, Users, Phone, Mail, Building2, ChevronLeft, ChevronRight, ChevronDown, Plus, Shield } from 'lucide-react';
+import { Search, Filter, Edit2, Trash2, Eye, X, UserCheck, Users, Phone, Mail, Building2, ChevronLeft, ChevronRight, ChevronDown, Plus } from 'lucide-react';
 import apiClient from '../../services/api';
 import { DEPARTMENTS, SCHOOLS } from '../../data/uiConstants';
 
@@ -61,9 +61,6 @@ const initialCreateForm = {
   status: 'active',
   businessTripStartDate: '',
   businessTripEndDate: '',
-  canManageDutySchedulesByPermission: false,
-  canCreateWorkSchedulesByPermission: false,
-  canApproveWorkSchedulesByPermission: false,
 };
 
 const DEFAULT_UNIT_OPTIONS = ['Ban Giám đốc', ...DEPARTMENTS, ...SCHOOLS];
@@ -76,8 +73,6 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
   const canProvisionUser = false;
   const canManageDelegation = !isSuperadmin && (isAdmin || isManager);
   const canCreateOfficer = isSuperadmin;
-  const canGrantDutyPermission = Boolean(user?.canGrantDutySchedulePermissions);
-  const canGrantWorkPermission = Boolean(user?.canGrantWorkSchedulePermissions);
   
   // Admin can delegate to manager and officer; Manager can only delegate to officers in their department
   const canDelegateToRole = (targetRole) => {
@@ -189,11 +184,6 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
     setForm({
       ...cb,
       donViId: cb.donViId || unit?.id || '',
-      // Use the explicit permission flags returned from the API so checkbox reflects
-      // who currently has the granted permission (not combined role-based flag).
-      canManageDutySchedulesByPermission: Boolean(cb.canManageDutySchedulesByPermission),
-      canCreateWorkSchedulesByPermission: Boolean(cb.canCreateWorkSchedulesByPermission),
-      canApproveWorkSchedulesByPermission: Boolean(cb.canApproveWorkSchedulesByPermission),
       tuNgayCongTac: cb.tuNgayCongTac || '',
       denNgayCongTac: cb.denNgayCongTac || '',
     });
@@ -247,9 +237,6 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
         status: createForm.status,
         businessTripStartDate: createForm.status === 'on_business_trip' ? createForm.businessTripStartDate : null,
         businessTripEndDate: createForm.status === 'on_business_trip' ? createForm.businessTripEndDate : null,
-        canManageDutySchedulesByPermission: Boolean(createForm.canManageDutySchedulesByPermission),
-        canCreateWorkSchedulesByPermission: Boolean(createForm.canCreateWorkSchedulesByPermission),
-        canApproveWorkSchedulesByPermission: Boolean(createForm.canApproveWorkSchedulesByPermission),
       });
 
       if (reloadData) await reloadData();
@@ -297,20 +284,6 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
 
     try {
       await apiClient.officers.update(editItem, payload);
-
-      if (canGrantDutyPermission) {
-        await apiClient.officers.updateDutySchedulePermission(
-          editItem,
-          Boolean(form.canManageDutySchedulesByPermission)
-        );
-      }
-
-      if (canGrantWorkPermission) {
-        await apiClient.officers.updateWorkSchedulePermission(editItem, {
-          canCreateWorkSchedules: Boolean(form.canCreateWorkSchedulesByPermission),
-          canApproveWorkSchedules: Boolean(form.canApproveWorkSchedulesByPermission),
-        });
-      }
 
       if (reloadData) await reloadData();
       setShowModal(false);
@@ -608,7 +581,7 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div>
                 <h3 className="text-base font-bold text-slate-800">Tạo tài khoản nội bộ</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Nhập thông tin cán bộ để tạo tài khoản (mật khẩu mặc định: 123456).</p>
+                
               </div>
               <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600 p-1">
                 <X size={18} />
@@ -744,40 +717,6 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
                 </div>
               )}
 
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-                <div>
-                  <h4 className="text-sm font-bold text-slate-700">Phân quyền lịch</h4>
-                  <p className="text-xs text-slate-500 mt-0.5">Chọn quyền cần cấp ngay khi tạo cán bộ.</p>
-                </div>
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(createForm.canManageDutySchedulesByPermission)}
-                    onChange={(e) => setCreateForm((prev) => ({ ...prev, canManageDutySchedulesByPermission: e.target.checked }))}
-                    className="w-4 h-4 rounded border-slate-300 text-blue-600"
-                  />
-                  Cấp quyền lập/sửa lịch trực ban
-                </label>
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(createForm.canCreateWorkSchedulesByPermission)}
-                    onChange={(e) => setCreateForm((prev) => ({ ...prev, canCreateWorkSchedulesByPermission: e.target.checked }))}
-                    className="w-4 h-4 rounded border-slate-300 text-blue-600"
-                  />
-                  Cấp quyền tạo Lịch sự kiện
-                </label>
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(createForm.canApproveWorkSchedulesByPermission)}
-                    onChange={(e) => setCreateForm((prev) => ({ ...prev, canApproveWorkSchedulesByPermission: e.target.checked }))}
-                    className="w-4 h-4 rounded border-slate-300 text-blue-600"
-                  />
-                  Cấp quyền duyệt Lịch sự kiện
-                </label>
-              </div>
-
               {createResult.message && (
                 <div className={`text-sm rounded-xl px-3 py-2 ${createResult.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
                   {createResult.message}
@@ -873,44 +812,6 @@ const QuanLyCanBo = ({ user, canBoData = [], departmentData = [], reloadData }) 
                     </select>
                   </div>
                 </div>
-                {(canGrantDutyPermission || canGrantWorkPermission || user?.backendRole === 'superadmin') && (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
-                    <h4 className="text-xs font-bold text-slate-700">Phân quyền lịch</h4>
-                    {(canGrantDutyPermission || user?.backendRole === 'superadmin') && (
-                      <label className="flex items-center gap-2 text-sm text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(form.canManageDutySchedulesByPermission)}
-                          onChange={(e) => setForm({ ...form, canManageDutySchedulesByPermission: e.target.checked })}
-                          className="w-4 h-4 rounded border-slate-300 text-blue-600"
-                        />
-                        Cấp quyền lập/sửa lịch trực ban
-                      </label>
-                    )}
-                    {canGrantWorkPermission && (
-                      <>
-                        <label className="flex items-center gap-2 text-sm text-slate-700">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(form.canCreateWorkSchedulesByPermission)}
-                            onChange={(e) => setForm({ ...form, canCreateWorkSchedulesByPermission: e.target.checked })}
-                            className="w-4 h-4 rounded border-slate-300 text-blue-600"
-                          />
-                          Cấp quyền tạo Lịch sự kiện
-                        </label>
-                        <label className="flex items-center gap-2 text-sm text-slate-700">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(form.canApproveWorkSchedulesByPermission)}
-                            onChange={(e) => setForm({ ...form, canApproveWorkSchedulesByPermission: e.target.checked })}
-                            className="w-4 h-4 rounded border-slate-300 text-blue-600"
-                          />
-                          Cấp quyền duyệt Lịch sự kiện
-                        </label>
-                      </>
-                    )}
-                  </div>
-                )}
                 {form.trangThai === 'studying' && (
                   <div>
                     <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đang học đến ngày</label>

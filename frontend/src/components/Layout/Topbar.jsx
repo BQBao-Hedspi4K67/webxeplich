@@ -128,13 +128,7 @@ const Topbar = ({ activePage, allowedPages = [], user, onLogout, onNavigate, not
         <p className="text-[11px] text-slate-400 truncate hidden sm:block">{today}</p>
       </div>
 
-      {/* Search bar */}
-      <div className="hidden md:flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 w-52 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-300 transition-all group">
-        <Search size={14} className="text-slate-400 flex-shrink-0" />
-        <input type="text" placeholder="Tìm kiếm nhanh..."
-          className="bg-transparent text-sm text-slate-700 placeholder-slate-400 flex-1 min-w-0 outline-none" />
-        <kbd className="text-[10px] text-slate-300 border border-slate-200 px-1.5 py-0.5 rounded font-mono hidden group-focus-within:hidden">⌘K</kbd>
-      </div>
+      
 
       {/* Notification */}
       <div className="relative" ref={notifRef}>
