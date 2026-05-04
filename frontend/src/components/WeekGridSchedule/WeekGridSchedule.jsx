@@ -48,9 +48,9 @@ const getSessionBucket = (timeValue) => {
 };
 
 const buildDutyLabel = (duty) => {
-  if (duty.viTri === 'Nhà hiệu bộ' && duty.vaiTroTruc === 'commander') return 'HB - Chỉ huy';
-  if (duty.viTri === 'Nhà hiệu bộ' && Number(duty.slotNo || 1) === 1) return 'HB - Cán bộ 1';
-  if (duty.viTri === 'Nhà hiệu bộ' && Number(duty.slotNo || 1) === 2) return 'HB - Cán bộ 2';
+  if (duty.viTri === 'Nhà hiệu bộ' && duty.vaiTroTruc === 'commander') return 'TB - Chỉ huy';
+  if (duty.viTri === 'Nhà hiệu bộ' && Number(duty.slotNo || 1) === 1) return 'TB - Cán bộ 1';
+  if (duty.viTri === 'Nhà hiệu bộ' && Number(duty.slotNo || 1) === 2) return 'TB - Cán bộ 2';
   return duty.viTri || 'Trực ban';
 };
 

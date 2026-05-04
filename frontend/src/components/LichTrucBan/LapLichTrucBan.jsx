@@ -547,9 +547,9 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
             <thead>
               <tr>
                 <th className="table-th px-2 py-2.5">Ngày</th>
-                <th className="table-th px-2 py-2.5">HB - Cán bộ 1</th>
-                <th className="table-th px-2 py-2.5">HB - Cán bộ 2</th>
-                <th className="table-th px-2 py-2.5">HB - Chỉ huy</th>
+                <th className="table-th px-2 py-2.5">TB - Cán bộ 1</th>
+                <th className="table-th px-2 py-2.5">TB - Cán bộ 2</th>
+                <th className="table-th px-2 py-2.5">TB - Chỉ huy</th>
                 <th className="table-th px-2 py-2.5">Lái xe</th>
                 <th className="table-th px-2 py-2.5">Bệnh xá</th>
                 
@@ -680,15 +680,15 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
 
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
                 <div>
-                  <div className="text-xs font-semibold text-slate-500 mb-2">HB - Cán bộ 1</div>
+                  <div className="text-xs font-semibold text-slate-500 mb-2">TB - Cán bộ 1</div>
                   {renderDutyCell(slot1)}
                 </div>
                 <div>
-                  <div className="text-xs font-semibold text-slate-500 mb-2">HB - Cán bộ 2</div>
+                  <div className="text-xs font-semibold text-slate-500 mb-2">TB - Cán bộ 2</div>
                   {renderDutyCell(slot2)}
                 </div>
                 <div>
-                  <div className="text-xs font-semibold text-slate-500 mb-2">HB - Chỉ huy</div>
+                  <div className="text-xs font-semibold text-slate-500 mb-2">TB - Chỉ huy</div>
                   {renderDutyCell(slotCommander)}
                 </div>
                 <div>

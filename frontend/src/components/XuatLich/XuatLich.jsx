@@ -333,9 +333,9 @@ const XuatLich = ({ xuatLichHistory = [], reloadData, variant = 'page' }) => {
     };
 
     const formatDutyLabel = (item) => {
-      if (item.location === 'Nhà hiệu bộ' && item.dutyRole === 'commander') return 'HB - Chỉ huy';
-      if (item.location === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 1) return 'HB - Cán bộ 1';
-      if (item.location === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 2) return 'HB - Cán bộ 2';
+      if (item.location === 'Nhà hiệu bộ' && item.dutyRole === 'commander') return 'TB - Chỉ huy';
+      if (item.location === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 1) return 'TB - Cán bộ 1';
+      if (item.location === 'Nhà hiệu bộ' && Number(item.slotNo || 1) === 2) return 'TB - Cán bộ 2';
       return item.location || 'Trực ban';
     };
 
