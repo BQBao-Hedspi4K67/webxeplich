@@ -247,18 +247,18 @@ export const getOfficers = async (req, res, next) => {
       }
 
       if (search) {
-        whereConditions.push("(fullName LIKE ? OR id LIKE ? OR department LIKE ?)");
+        whereConditions.push("(o.fullName LIKE ? OR o.id LIKE ? OR o.department LIKE ?)");
         const searchPattern = `%${search}%`;
         params.push(searchPattern, searchPattern, searchPattern);
       }
 
       if (role) {
-        whereConditions.push("role = ?");
+        whereConditions.push("o.role = ?");
         params.push(role);
       }
 
       if (status) {
-        whereConditions.push("status = ?");
+        whereConditions.push("o.status = ?");
         params.push(status);
       }
 
@@ -266,7 +266,7 @@ export const getOfficers = async (req, res, next) => {
 
       // Get total count
       const [countRows] = await connection.execute(
-        `SELECT COUNT(*) as total FROM officers ${whereClause}`,
+        `SELECT COUNT(*) as total FROM officers o ${whereClause}`,
         params
       );
       const total = countRows[0].total;
