@@ -207,7 +207,13 @@ const WeekGridSchedule = ({
     <div className="w-full">
       {/* Week Grid */}
       <div className="overflow-x-auto rounded-xl border border-slate-200">
-        <table className="w-full">
+        <table className="w-full table-fixed">
+          <colgroup>
+            <col style={{ width: '12%' }} />
+            {normalizedWeekDates.map(({ key }) => (
+              <col key={`col-${key}`} style={{ width: `${88 / 7}%` }} />
+            ))}
+          </colgroup>
           <thead>
             <tr className="bg-slate-50 border-b-2 border-slate-200">
               <th className="px-4 py-3 text-left font-bold text-slate-700 w-[12%]"></th>
@@ -218,12 +224,12 @@ const WeekGridSchedule = ({
                 return (
                   <th
                     key={key}
-                    className={`px-3 py-3 text-center font-bold text-slate-700 border-l border-slate-200 ${isWeekend ? 'bg-slate-100' : ''}`}
+                    className={`px-3 py-3 text-center font-bold text-slate-700 border-l border-slate-200 max-w-0 ${isWeekend ? 'bg-slate-100' : ''}`}
                   >
                     <div className="text-xs">{dayLabel}</div>
                     <div className="text-sm font-semibold">{day}/{month}</div>
                     {holidays[dateStr] && (
-                      <div className="text-[10px] text-red-600 mt-1 font-semibold">{holidays[dateStr]}</div>
+                      <div className="text-[10px] text-red-600 mt-1 font-semibold break-words">{holidays[dateStr]}</div>
                     )}
                   </th>
                 );
@@ -245,19 +251,19 @@ const WeekGridSchedule = ({
                   return (
                     <td
                       key={`${key}-${session}`}
-                      className={`px-3 py-2 align-top border-l border-slate-200 min-h-[120px] ${isWeekend ? 'bg-slate-50' : 'bg-white'} hover:bg-blue-50 transition-colors`}
+                      className={`px-3 py-2 align-top border-l border-slate-200 min-h-[120px] max-w-0 ${isWeekend ? 'bg-slate-50' : 'bg-white'} hover:bg-blue-50 transition-colors`}
                     >
-                      <div className="space-y-2">
+                      <div className="space-y-2 min-w-0">
                         {dayDuties.length > 0 && (
                           <div
-                            className="text-[11px] px-2 py-1 rounded-md transition-all duration-150 cursor-pointer hover:shadow-sm border border-current border-opacity-30 group/evt bg-blue-50 text-blue-700"
+                            className="w-full min-w-0 overflow-hidden text-[11px] px-2 py-1 rounded-md transition-all duration-150 cursor-pointer hover:shadow-sm border border-current border-opacity-30 group/evt bg-blue-50 text-blue-700"
                             onMouseEnter={(e) => handleEventHover({ items: dayDuties }, e, 'duty')}
                             onMouseLeave={() => setHoveredEvent(null)}
                             onClick={() => handleEventClick({ items: dayDuties, session }, 'duty')}
                           >
                             <div className="font-bold whitespace-nowrap flex-shrink-0">00:00</div>
                             {dutyLines.map((line, lineIdx) => (
-                              <div key={`${line}-${lineIdx}`} className={`mt-0.5 ${lineIdx < 2 ? 'font-semibold' : ''}`}>
+                              <div key={`${line}-${lineIdx}`} className={`mt-0.5 break-words ${lineIdx < 2 ? 'font-semibold' : ''}`}>
                                 {line}
                               </div>
                             ))}
@@ -268,7 +274,7 @@ const WeekGridSchedule = ({
                         {daySchedules.map((schedule, idx) => (
                           <div
                             key={`schedule-${schedule.id}-${idx}`}
-                            className="text-[11px] px-2 py-1 rounded-md transition-all duration-150 cursor-pointer hover:shadow-sm border border-current border-opacity-30 group/evt bg-emerald-100 text-emerald-700"
+                            className="w-full min-w-0 overflow-hidden text-[11px] px-2 py-1 rounded-md transition-all duration-150 cursor-pointer hover:shadow-sm border border-current border-opacity-30 group/evt bg-emerald-100 text-emerald-700"
                             onMouseEnter={(e) => handleEventHover(schedule, e, 'schedule')}
                             onMouseLeave={() => setHoveredEvent(null)}
                             onClick={() => handleEventClick(schedule, 'schedule')}
@@ -276,7 +282,7 @@ const WeekGridSchedule = ({
                             <div className="font-bold whitespace-nowrap flex-shrink-0">
                               {toTimeOnly(schedule.gioBatDau) || '—'}
                             </div>
-                            <div className="font-medium mt-0.5 line-clamp-2 group-hover/evt:underline">
+                            <div className="font-medium mt-0.5 line-clamp-2 break-words group-hover/evt:underline">
                               {schedule.tieuDe || 'Sự kiện'}
                             </div>
                           </div>

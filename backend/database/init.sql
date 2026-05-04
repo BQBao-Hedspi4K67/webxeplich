@@ -844,6 +844,84 @@ INSERT INTO notifications (title, content, type, module, entityType, entityId, t
 ('Lịch sự kiện đã được duyệt', 'a (2026-04-02)', 'success', 'lichcongtac', 'work_schedule', 'LCT007', 5, NULL, 1),
 ('Lịch sự kiện đã được duyệt', 'a (2026-04-02)', 'success', 'lichcongtac', 'work_schedule', 'LCT007', 19, NULL, 1);
 
+-- ========== ADDITIONAL USERS FOR NEW OFFICERS ==========
+INSERT INTO users (username, passwordHash, fullName, email, role, avatar, status) VALUES
+('huynm', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Nguyễn Minh Huy', 'huynm@hvktcnan.edu.vn', 'officer', 'NH', 'active'),
+('tiendt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Đỗ Thành Tiến', 'tiendt@hvktcnan.edu.vn', 'officer', 'DT', 'active'),
+('anhtt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Trần Thanh Anh', 'anhtt@hvktcnan.edu.vn', 'officer', 'TA', 'active'),
+('trongnv', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Nguyễn Văn Trọng', 'trongnv@hvktcnan.edu.vn', 'officer', 'NV', 'active'),
+('minhlh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Lê Hữu Minh', 'minhlh@hvktcnan.edu.vn', 'officer', 'LM', 'active'),
+('dung0', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng úy Dương Văn Dũng', 'dung0@hvktcnan.edu.vn', 'officer', 'DV', 'active'),
+('hoanh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng úy Hoàng Quốc Hoan', 'hoanh@hvktcnan.edu.vn', 'officer', 'HH', 'active'),
+('hangtt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng úy Tạ Thị Hằng', 'hangtt@hvktcnan.edu.vn', 'officer', 'TH', 'active'),
+('thuannv', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung úy Nguyễn Văn Thuận', 'thuannv@hvktcnan.edu.vn', 'officer', 'NV', 'active'),
+('linkn', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung úy Kiều Nữ Linh', 'linkn@hvktcnan.edu.vn', 'officer', 'KN', 'active'),
+('phongpv', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Phạm Văn Phong', 'phongpv@hvktcnan.edu.vn', 'officer', 'PV', 'active'),
+('tuongnm', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Nguyễn Minh Tường', 'tuongnm@hvktcnan.edu.vn', 'officer', 'NM', 'active'),
+('vanhq', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Hà Quốc Vân', 'vanhq@hvktcnan.edu.vn', 'officer', 'HQ', 'active'),
+('huonglm', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Lê Minh Hương', 'huonglm@hvktcnan.edu.vn', 'officer', 'LH', 'active'),
+('phanmn', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Phạm Minh Nhật', 'phanmn@hvktcnan.edu.vn', 'officer', 'PM', 'active'),
+('duonglh', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Đại úy Lê Hồng Dương', 'duonglh@hvktcnan.edu.vn', 'officer', 'LH', 'active'),
+('vaongb', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng úy Ngô Bá Vân', 'vaongb@hvktcnan.edu.vn', 'officer', 'NV', 'active'),
+('thiepv', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Thượng úy Phạm Văn Thiệp', 'thiepv@hvktcnan.edu.vn', 'officer', 'PV', 'active'),
+('tunglv', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung úy Lê Văn Tùng', 'tunglv@hvktcnan.edu.vn', 'officer', 'LV', 'active'),
+('thanhnt', '$2a$10$L5HCYjV52HxB2ZYQe4UR3O.IAxNqis9rcghnE1wazFvRFjI0FUdHm', 'Trung úy Nguyễn Thạch Thanh', 'thanhnt@hvktcnan.edu.vn', 'officer', 'NT', 'active');
+
+-- ========== ADDITIONAL OFFICERS ==========
+INSERT INTO officers (id, userId, fullName, officerTitle, officerName, position, department, departmentGroup, phone, email, role, status, studyUntil) VALUES
+('CB087', 89, 'Đại úy Nguyễn Minh Huy', 'Đại úy', 'Nguyễn Minh Huy', 'Cán bộ', 'Phòng hành chính tổng hợp', 'phong', '0911110087', 'huynm@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB088', 90, 'Đại úy Đỗ Thành Tiến', 'Đại úy', 'Đỗ Thành Tiến', 'Cán bộ', 'Phòng hành chính tổng hợp', 'phong', '0911110088', 'tiendt@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB089', 91, 'Đại úy Trần Thanh Anh', 'Đại úy', 'Trần Thanh Anh', 'Cán bộ', 'Phòng chính trị', 'phong', '0911110089', 'anhtt@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB090', 92, 'Đại úy Nguyễn Văn Trọng', 'Đại úy', 'Nguyễn Văn Trọng', 'Cán bộ', 'Phòng chính trị', 'phong', '0911110090', 'trongnv@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB091', 93, 'Đại úy Lê Hữu Minh', 'Đại úy', 'Lê Hữu Minh', 'Cán bộ', 'Phòng quản lý đào tạo và BDNC', 'phong', '0911110091', 'minhlh@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB092', 94, 'Thượng úy Dương Văn Dũng', 'Thượng úy', 'Dương Văn Dũng', 'Cán bộ', 'Phòng ĐBCL đào tạo', 'phong', '0911110092', 'dung0@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB093', 95, 'Thượng úy Hoàng Quốc Hoan', 'Thượng úy', 'Hoàng Quốc Hoan', 'Cán bộ', 'Phòng ĐBCL đào tạo', 'phong', '0911110093', 'hoanh@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB094', 96, 'Thượng úy Tạ Thị Hằng', 'Thượng úy', 'Tạ Thị Hằng', 'Cán bộ', 'Phòng quản lý nghiên cứu khoa học', 'phong', '0911110094', 'hangtt@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB095', 97, 'Trung úy Nguyễn Văn Thuận', 'Trung úy', 'Nguyễn Văn Thuận', 'Cán bộ', 'Phòng quản lý học viên', 'phong', '0911110095', 'thuannv@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB096', 98, 'Trung úy Kiều Nữ Linh', 'Trung úy', 'Kiều Nữ Linh', 'Cán bộ', 'Phòng hậu cần', 'phong', '0911110096', 'linkn@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB097', 99, 'Đại úy Phạm Văn Phong', 'Đại úy', 'Phạm Văn Phong', 'Cán bộ khoa', 'Khoa Công nghệ và ATTT', 'khoa', '0911110097', 'phongpv@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB098', 100, 'Đại úy Nguyễn Minh Tường', 'Đại úy', 'Nguyễn Minh Tường', 'Cán bộ khoa', 'Khoa Công nghệ và ATTT', 'khoa', '0911110098', 'tuongnm@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB099', 101, 'Đại úy Hà Quốc Vân', 'Đại úy', 'Hà Quốc Vân', 'Cán bộ khoa', 'Khoa Luật', 'khoa', '0911110099', 'vanhq@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB100', 102, 'Đại úy Lê Minh Hương', 'Đại úy', 'Lê Minh Hương', 'Cán bộ khoa', 'Khoa Luật', 'khoa', '0911110100', 'huonglm@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB101', 103, 'Đại úy Phạm Minh Nhật', 'Đại úy', 'Phạm Minh Nhật', 'Cán bộ khoa', 'Khoa Hậu cần', 'khoa', '0911110101', 'phanmn@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB102', 104, 'Đại úy Lê Hồng Dương', 'Đại úy', 'Lê Hồng Dương', 'Cán bộ khoa', 'Khoa Y Dược', 'khoa', '0911110102', 'duonglh@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB103', 105, 'Thượng úy Ngô Bá Vân', 'Thượng úy', 'Ngô Bá Vân', 'Cán bộ', 'Đội lái xe', 'doi', '0911110103', 'vaongb@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB104', 106, 'Thượng úy Phạm Văn Thiệp', 'Thượng úy', 'Phạm Văn Thiệp', 'Cán bộ', 'Đội lái xe', 'doi', '0911110104', 'thiepv@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB105', 107, 'Trung úy Lê Văn Tùng', 'Trung úy', 'Lê Văn Tùng', 'Cán bộ', 'Đội bệnh xá', 'doi', '0911110105', 'tunglv@hvktcnan.edu.vn', 'officer', 'active', NULL),
+('CB106', 108, 'Trung úy Nguyễn Thạch Thanh', 'Trung úy', 'Nguyễn Thạch Thanh', 'Cán bộ', 'Đội bệnh xá', 'doi', '0911110106', 'thanhnt@hvktcnan.edu.vn', 'officer', 'active', NULL);
+
+-- ========== EXTENDED WORK SCHEDULES (May-June 2026) ==========
+INSERT INTO work_schedules (
+  id, title, date, startTime, endTime, location, department, type, weekNo, notes,
+  responsibleOfficerId,
+  createdByUserId,
+  createdByOfficerId
+) VALUES
+('LCT008', 'Giao ban Ban Giám đốc tuần 2', '2026-04-20', '08:00', '09:30', 'Phòng họp A', 'Ban Giám đốc', 'hop', 16, 'Họp giao ban định kỳ', 'CB001', 1, 'CB001'),
+('LCT009', 'Họp triển khai công tác đào tạo tuần 2', '2026-04-21', '14:00', '16:00', 'Phòng họp B', 'Phòng quản lý đào tạo và BDNC', 'hop', 16, 'Triển khai kế hoạch tháng 4 tuần 2', 'CB007', 7, 'CB007'),
+('LCT010', 'Khảo sát chất lượng đào tạo', '2026-04-27', '09:00', '11:00', 'Khoa Công nghệ và ATTT', 'Phòng ĐBCL đào tạo', 'khaoSat', 17, 'Đánh giá nội bộ tuần thứ 3', 'CB008', 8, 'CB008'),
+('LCT011', 'Hội thảo nghiên cứu khoa học', '2026-05-04', '08:30', '11:30', 'Hội trường lớn', 'Phòng quản lý nghiên cứu khoa học', 'hoiThao', 18, 'Báo cáo đề tài cấp học viện', 'CB009', 9, 'CB009'),
+('LCT012', 'Lớp bồi dưỡng chuyên môn tháng 5', '2026-05-11', '13:30', '16:30', 'Phòng học C3', 'Khoa Luật', 'baoCao', 19, 'Cập nhật luật pháp mới', 'CB013', 13, 'CB013'),
+('LCT013', 'Thăm viếng cơ sở đào tạo', '2026-05-18', '10:00', '12:00', 'Khoa Hậu cần', 'Ban Giám đốc', 'khaoSat', 20, 'Kiểm tra cơ sở vật chất', 'CB002', 2, 'CB002'),
+('LCT014', 'Họp quy hoạch kế hoạch 2027', '2026-05-25', '08:00', '11:00', 'Phòng họp A', 'Ban Giám đốc', 'hop', 21, 'Lập kế hoạch năm tới', 'CB001', 1, 'CB001'),
+('LCT015', 'Kiểm tra công tác hành chính', '2026-06-01', '09:00', '11:00', 'Phòng hành chính tổng hợp', 'Phòng hành chính tổng hợp', 'khaoSat', 22, 'Kiểm tra công tác hành chính', 'CB005', 5, 'CB005'),
+('LCT016', 'Hội thảo kế hoạch đào tạo 2027', '2026-06-08', '14:00', '16:00', 'Hội trường lớn', 'Phòng quản lý đào tạo và BDNC', 'hoiThao', 23, 'Lập kế hoạch đào tạo năm 2027', 'CB007', 7, 'CB007'),
+('LCT017', 'Họp đánh giá hoạt động tháng 6', '2026-06-15', '10:00', '12:00', 'Phòng họp A', 'Ban Giám đốc', 'hop', 24, 'Đánh giá hoạt động tháng 6', 'CB001', 1, 'CB001'),
+('LCT018', 'Tổng kết công tác nửa năm', '2026-06-22', '08:00', '11:00', 'Hội trường lớn', 'Ban Giám đốc', 'baoCao', 25, 'Tổng kết hoạt động nửa năm', 'CB001', 1, 'CB001'),
+('LCT019', 'Hội nghị lập kế hoạch Q3', '2026-06-29', '14:00', '16:00', 'Phòng họp A', 'Ban Giám đốc', 'hop', 26, 'Lập kế hoạch quý III', 'CB002', 2, 'CB002');
+
+-- ========== EXTENDED DUTY SCHEDULES (May-June 2026) ==========
+INSERT INTO duty_schedules (id, officerId, dutyType, date, endDate, weekStartDate, shift, startTime, endTime, location, dutyRole, slotNo, assignmentGroup, notes) VALUES
+('TBGD020', 'CB001', 'director_weekly', '2026-05-04', '2026-05-10', '2026-05-04', 'tuan', '00:00', '23:59', 'Trực ban Giám đốc', 'commander', 1, NULL, 'Tuần 18'),
+('TBGD021', 'CB001', 'director_weekly', '2026-05-11', '2026-05-17', '2026-05-11', 'tuan', '00:00', '23:59', 'Trực ban Giám đốc', 'commander', 1, NULL, 'Tuần 19'),
+('TBGD022', 'CB001', 'director_weekly', '2026-05-18', '2026-05-24', '2026-05-18', 'tuan', '00:00', '23:59', 'Trực ban Giám đốc', 'commander', 1, NULL, 'Tuần 20'),
+('TBGD023', 'CB001', 'director_weekly', '2026-05-25', '2026-05-31', '2026-05-25', 'tuan', '00:00', '23:59', 'Trực ban Giám đốc', 'commander', 1, NULL, 'Tuần 21'),
+('TBGD024', 'CB001', 'director_weekly', '2026-06-01', '2026-06-07', '2026-06-01', 'tuan', '00:00', '23:59', 'Trực ban Giám đốc', 'commander', 1, NULL, 'Tuần 22'),
+('TBGD025', 'CB001', 'director_weekly', '2026-06-08', '2026-06-14', '2026-06-08', 'tuan', '00:00', '23:59', 'Trực ban Giám đốc', 'commander', 1, NULL, 'Tuần 23'),
+('TBGD026', 'CB001', 'director_weekly', '2026-06-15', '2026-06-21', '2026-06-15', 'tuan', '00:00', '23:59', 'Trực ban Giám đốc', 'commander', 1, NULL, 'Tuần 24'),
+('TBGD027', 'CB001', 'director_weekly', '2026-06-22', '2026-06-28', '2026-06-22', 'tuan', '00:00', '23:59', 'Trực ban Giám đốc', 'commander', 1, NULL, 'Tuần 25'),
+('TBGD028', 'CB001', 'director_weekly', '2026-06-29', '2026-06-30', '2026-06-29', 'tuan', '00:00', '23:59', 'Trực ban Giám đốc', 'commander', 1, NULL, 'Tuần 26');
+
 -- ========== EXPORT LOGS ==========
 INSERT INTO export_logs (userId, username, role, exportType, exportScope, exportFormat, itemCount) VALUES
 (1, 'thaolm', 'admin', 'congtac', 'week', 'pdf', 5),
