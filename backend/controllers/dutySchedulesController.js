@@ -39,6 +39,16 @@ const SHIFT_LABELS = {
   tuan: 'Trực tuần giám đốc',
 };
 
+const buildOfficerDisplaySql = (alias) => `
+CASE
+  WHEN ${alias}.officerTitle IS NULL OR TRIM(${alias}.officerTitle) = '' THEN TRIM(COALESCE(${alias}.fullName, ''))
+  WHEN ${alias}.fullName IS NULL OR TRIM(${alias}.fullName) = '' THEN TRIM(${alias}.officerTitle)
+  WHEN LOWER(TRIM(${alias}.fullName)) = LOWER(TRIM(${alias}.officerTitle))
+       OR LOWER(TRIM(${alias}.fullName)) LIKE CONCAT(LOWER(TRIM(${alias}.officerTitle)), ' %')
+    THEN TRIM(${alias}.fullName)
+  ELSE CONCAT(TRIM(${alias}.officerTitle), ' ', TRIM(${alias}.fullName))
+END`;
+
 const getShiftLabel = (shift = '') => {
   const normalizedShift = String(shift || '').trim().toLowerCase();
   return SHIFT_LABELS[normalizedShift] || String(shift || '').trim();
@@ -245,7 +255,7 @@ const getAssignmentGroupForDate = async (connection, dateValue) => {
 const getOfficerInfo = async (connection, officerId) => {
   const [rows] = await connection.execute(
     `SELECT o.id,
-            CONCAT_WS(' ', NULLIF(o.officerTitle, ''), o.fullName) AS fullName,
+            ${buildOfficerDisplaySql('o')} AS fullName,
             o.role,
             o.status,
             o.position,
@@ -541,7 +551,7 @@ export const getDutySchedules = async (req, res, next) => {
 
       const [schedules] = await connection.execute(
         `SELECT ds.*,
-                CONCAT_WS(' ', NULLIF(o.officerTitle, ''), o.fullName) as officerName,
+                ${buildOfficerDisplaySql('o')} as officerName,
                 COALESCE(d.name, o.department, '') AS department
          FROM duty_schedules ds
          LEFT JOIN officers o ON ds.officerId = o.id
@@ -586,7 +596,7 @@ export const getDutyScheduleById = async (req, res, next) => {
 
       const [rows] = await connection.execute(
         `SELECT ds.*,
-                CONCAT_WS(' ', NULLIF(o.officerTitle, ''), o.fullName) as officerName,
+                ${buildOfficerDisplaySql('o')} as officerName,
                 COALESCE(d.name, o.department, '') AS department
          FROM duty_schedules ds
          LEFT JOIN officers o ON ds.officerId = o.id

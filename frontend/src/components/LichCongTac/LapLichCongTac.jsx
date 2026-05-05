@@ -77,6 +77,19 @@ const formatDisplayTime = (timeValue) => {
   return time === '00:00' ? '12:00' : time;
 };
 
+const buildDisplayName = (militaryRank = '', fullName = '') => {
+  const rank = String(militaryRank || '').trim();
+  const name = String(fullName || '').trim();
+  if (!rank) return name;
+  if (!name) return rank;
+  const lowerRank = rank.toLowerCase();
+  const lowerName = name.toLowerCase();
+  if (lowerName === lowerRank || lowerName.startsWith(`${lowerRank} `)) {
+    return name;
+  }
+  return `${rank} ${name}`;
+};
+
 const getSessionBucket = (timeValue) => {
   const hour = Number.parseInt(String(timeValue || '00:00').split(':')[0], 10);
   if (Number.isNaN(hour) || hour < 8) return 'night';
@@ -209,7 +222,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
         const res = await apiClient.officers.list(1, 500, { status: 'active', accessScope: 'system' });
         const mapped = (res?.data || []).map((o) => ({
           id: o.id,
-          hoTen: o.officerName || o.fullName || o.id,
+          hoTen: buildDisplayName(o.officerTitle, o.officerName || o.fullName || o.id),
           capBac: o.officerTitle || '',
           donVi: o.department || '',
           vaiTro: o.role === 'leader' ? 'Lãnh đạo' : o.role === 'manager' ? 'Quản lý' : 'Cán bộ',
@@ -292,7 +305,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
     if (!Array.isArray(memberIds) || !memberIds.length) return [];
     return banGiamDocMembers
       .filter((cb) => memberIds.includes(cb.id))
-      .map((cb) => [cb.capBac, cb.hoTen].filter(Boolean).join(' '));
+      .map((cb) => buildDisplayName(cb.capBac, cb.hoTen));
   };
 
   const handleConfirmBgdSelection = () => {
@@ -609,7 +622,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                   <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Người phụ trách <span className="text-red-500">*</span></label>
                   <select disabled={isReadOnlyModal} className="input-field" value={form.nguoiPhuTrachId || ''} onChange={e => setForm({...form, nguoiPhuTrachId: e.target.value})}>
                     <option value="">-- Chọn --</option>
-                    {officerOptions.map(cb => <option key={cb.id} value={cb.id}>{[cb.capBac, cb.hoTen].filter(Boolean).join(' ')}</option>)}
+                    {officerOptions.map(cb => <option key={cb.id} value={cb.id}>{buildDisplayName(cb.capBac, cb.hoTen)}</option>)}
                   </select>
                 </div>
               </div>
@@ -745,7 +758,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                         setForm({ ...form, bgdMemberIds: next });
                       }}
                     />
-                    <span>{[cb.capBac, cb.hoTen].filter(Boolean).join(' ')}</span>
+                    <span>{buildDisplayName(cb.capBac, cb.hoTen)}</span>
                   </label>
                 );
               })}

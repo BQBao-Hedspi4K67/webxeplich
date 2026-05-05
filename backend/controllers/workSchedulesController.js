@@ -117,8 +117,31 @@ const normalizeParticipantPayload = (participants) => {
   };
 };
 
+const buildDisplayName = (militaryRank = '', fullName = '') => {
+  const rank = String(militaryRank || '').trim();
+  const name = String(fullName || '').trim();
+  if (!rank) return name;
+  if (!name) return rank;
+  const lowerRank = rank.toLowerCase();
+  const lowerName = name.toLowerCase();
+  if (lowerName === lowerRank || lowerName.startsWith(`${lowerRank} `)) {
+    return name;
+  }
+  return `${rank} ${name}`;
+};
+
+const buildOfficerDisplaySql = (alias) => `
+CASE
+  WHEN ${alias}.officerTitle IS NULL OR TRIM(${alias}.officerTitle) = '' THEN TRIM(COALESCE(${alias}.fullName, ''))
+  WHEN ${alias}.fullName IS NULL OR TRIM(${alias}.fullName) = '' THEN TRIM(${alias}.officerTitle)
+  WHEN LOWER(TRIM(${alias}.fullName)) = LOWER(TRIM(${alias}.officerTitle))
+       OR LOWER(TRIM(${alias}.fullName)) LIKE CONCAT(LOWER(TRIM(${alias}.officerTitle)), ' %')
+    THEN TRIM(${alias}.fullName)
+  ELSE CONCAT(TRIM(${alias}.officerTitle), ' ', TRIM(${alias}.fullName))
+END`;
+
 const formatOfficerDisplayName = (officer) => {
-  const name = [officer?.officerTitle, officer?.fullName].filter(Boolean).join(' ').trim();
+  const name = buildDisplayName(officer?.officerTitle, officer?.fullName);
   return name ? `đ/c ${name}` : '';
 };
 
@@ -256,13 +279,13 @@ const scheduleSelect = `
     CONCAT_WS(' ', NULLIF(approverOfficer.officerTitle, ''), approver.fullName) AS approvedByName,
     creatorUser.fullName AS createdByUserName,
     creatorOfficer.id AS createdByOfficerId,
-    CONCAT_WS(' ', NULLIF(creatorOfficer.officerTitle, ''), creatorOfficer.fullName) AS createdByOfficerName,
+    ${buildOfficerDisplaySql('creatorOfficer')} AS createdByOfficerName,
     creatorOfficer.departmentId AS createdByDepartmentId,
     creatorOfficer.department AS createdByDepartmentName,
-    CONCAT_WS(' ', NULLIF(ro.officerTitle, ''), ro.fullName) AS responsibleOfficerName,
-    CONCAT_WS(' ', NULLIF(o1.officerTitle, ''), o1.fullName) AS officer1Name,
-    CONCAT_WS(' ', NULLIF(o2.officerTitle, ''), o2.fullName) AS officer2Name,
-    CONCAT_WS(' ', NULLIF(cmd.officerTitle, ''), cmd.fullName) AS commanderOfficerName
+    ${buildOfficerDisplaySql('ro')} AS responsibleOfficerName,
+    ${buildOfficerDisplaySql('o1')} AS officer1Name,
+    ${buildOfficerDisplaySql('o2')} AS officer2Name,
+    ${buildOfficerDisplaySql('cmd')} AS commanderOfficerName
   FROM work_schedules ws
   LEFT JOIN departments d ON d.id = ws.departmentId
   LEFT JOIN users approver ON approver.id = ws.approvedByUserId
