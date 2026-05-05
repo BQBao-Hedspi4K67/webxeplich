@@ -581,11 +581,18 @@ const LapLichTrucBan = ({ user, lichTrucBanData = [], canBoData = [], holidayDat
                   <tr key={`${dutyType}-${date}`} className="group hover:bg-slate-50/70">
                     <td className="table-td px-2 py-2">
                       <div className="font-semibold text-slate-700 whitespace-nowrap inline-block">{WEEK_DAYS[idx]}</div>
-                      <div
-                        className={`text-xs whitespace-nowrap inline ml-2 ${holidayName ? 'text-red-600 font-semibold' : 'text-slate-400'}`}
-                        title={holidayName || undefined}
-                      >
-                        {formatDDMM(date)}
+                      <div className="relative inline-block ml-2 align-middle">
+                        <div
+                          className={`text-xs whitespace-nowrap inline ${holidayName ? 'text-red-600 font-semibold cursor-pointer border-b border-dotted border-red-400' : 'text-slate-400'}`}
+                          title={holidayName || undefined}
+                        >
+                          {formatDDMM(date)}
+                        </div>
+                        {holidayName && (
+                          <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[10px] font-medium text-white shadow-md group-hover:block">
+                            {holidayName}
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="table-td px-2 py-2">{renderDutyCell(slot1)}</td>
