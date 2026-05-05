@@ -522,7 +522,9 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                     <div className="space-y-1.5 relative z-10 max-h-20 overflow-y-auto scrollbar-hide">
                       {dayEvents.slice(0, 3).map((evt, eIdx) => {
                         const colorInfo = LOAI_LICH_COLORS[evt.loai] || LOAI_LICH_COLORS.hop;
-                        const timeDisplay = evt.gioBatDau ? `${evt.gioBatDau.slice(0, 5)}` : '';
+                        const start = evt.gioBatDau ? String(evt.gioBatDau).slice(0, 5) : '';
+                        const end = evt.gioKetThuc ? String(evt.gioKetThuc).slice(0, 5) : '';
+                        const timeDisplay = start && end ? `${start}-${end}` : (start || end || '');
                         const isPending = evt.trangThaiDuyet === 'pending';
                         return (
                           <div 

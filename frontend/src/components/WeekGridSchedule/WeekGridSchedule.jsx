@@ -40,6 +40,13 @@ const toTimeOnly = (value) => {
   return raw.slice(0, 5);
 };
 
+const toTimeRange = (startValue, endValue) => {
+  const start = toTimeOnly(startValue);
+  const end = toTimeOnly(endValue);
+  if (start && end) return `${start}-${end}`;
+  return start || end || '—';
+};
+
 const getSessionBucket = (timeValue) => {
   const hour = Number.parseInt(String(timeValue || '00:00').split(':')[0], 10);
   if (Number.isNaN(hour) || hour < 8) return 'night';
@@ -280,7 +287,7 @@ const WeekGridSchedule = ({
                             onClick={() => handleEventClick(schedule, 'schedule')}
                           >
                             <div className="font-bold whitespace-nowrap flex-shrink-0">
-                              {toTimeOnly(schedule.gioBatDau) || '—'}
+                              {toTimeRange(schedule.gioBatDau, schedule.gioKetThuc)}
                             </div>
                             <div className="font-medium mt-0.5 line-clamp-2 break-words group-hover/evt:underline">
                               {schedule.tieuDe || 'Sự kiện'}
