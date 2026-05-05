@@ -3,6 +3,7 @@ import { ArrowUpRight, X } from 'lucide-react';
 import WeekGridSchedule from '../WeekGridSchedule/WeekGridSchedule';
 import { LOAI_LICH_COLORS } from '../../data/uiConstants';
 import apiClient from '../../services/api';
+import { confirmDialog } from '../../utils/notify';
 
 const formatLocalDate = (date) => {
   const y = date.getFullYear();
@@ -327,8 +328,14 @@ const Dashboard = ({
 
   const handleDeleteSchedule = async () => {
     if (!editId || !canUserDeleteSchedule(user, form)) return;
-    const ok = window.confirm(`Bạn có chắc muốn xóa lịch "${form.tieuDe || ''}"?`);
-    if (!ok) return;
+
+    const confirmed = await confirmDialog({
+      title: 'Xác nhận xóa lịch',
+      text: `Bạn có chắc muốn xóa lịch "${form.tieuDe || ''}"?`,
+      confirmText: 'Xóa',
+      cancelText: 'Hủy',
+    });
+    if (!confirmed) return;
 
     try {
       await apiClient.workSchedules.delete(editId);
@@ -456,12 +463,12 @@ const Dashboard = ({
               </div>
             </div>
             <div className="flex gap-3 px-6 pb-6">
-              {editId && canUserDeleteSchedule(user, form) && !isReadOnlyModal && (
-                <button onClick={handleDeleteSchedule} className="btn-danger justify-center">Xóa</button>
-              )}
               <button onClick={() => setShowScheduleModal(false)} className="btn-secondary flex-1 justify-center">Hủy</button>
               {!isReadOnlyModal && (
                 <button onClick={handleSaveSchedule} className="btn-primary flex-1 justify-center">Lưu</button>
+              )}
+              {editId && canUserDeleteSchedule(user, form) && !isReadOnlyModal && (
+                <button onClick={handleDeleteSchedule} className="btn-danger flex-1 justify-center">Xóa</button>
               )}
             </div>
           </div>
@@ -509,6 +516,7 @@ const Dashboard = ({
           </div>
         </div>
       )}
+
     </div>
   );
 };

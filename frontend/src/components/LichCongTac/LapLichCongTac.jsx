@@ -693,20 +693,20 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
               </div>
             </div>
             <div className="flex gap-3 px-6 pb-6">
+              <button onClick={() => setShowModal(false)} className="btn-secondary flex-1 justify-center">Hủy</button>
+              {!isReadOnlyModal && (
+                <button onClick={handleSave} className="btn-primary flex-1 justify-center">{editId ? 'Lưu' : 'Thêm lịch'}</button>
+              )}
               {editId && canUserDeleteSchedule(user, form) && (
                 <button
                   onClick={() => {
                     setShowModal(false);
                     setDeleteConfirm({ id: editId, tieuDe: form.tieuDe || '' });
                   }}
-                  className="btn-danger justify-center"
+                  className="btn-danger flex-1 justify-center"
                 >
                   Xóa
                 </button>
-              )}
-              <button onClick={() => setShowModal(false)} className="btn-secondary flex-1 justify-center">Hủy</button>
-              {!isReadOnlyModal && (
-                <button onClick={handleSave} className="btn-primary flex-1 justify-center">{editId ? 'Lưu' : 'Thêm lịch'}</button>
               )}
             </div>
           </div>
