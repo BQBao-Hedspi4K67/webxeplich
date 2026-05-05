@@ -328,7 +328,7 @@ const Login = ({ onLogin }) => {
                   <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 </div>
               ) : (
-                <div className="max-h-[calc(100vh-360px)] overflow-y-auto overflow-x-auto rounded-xl border border-white/10">
+                <div className="max-h-[calc(100vh-360px)] overflow-y-auto overflow-x-auto rounded-xl border border-white/10 pb-16">
                   <table className="w-full text-sm table-fixed">
                     <thead>
                       <tr className="border-b-2 border-white/20 bg-white/5">

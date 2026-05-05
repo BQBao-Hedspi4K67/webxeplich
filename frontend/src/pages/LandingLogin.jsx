@@ -427,7 +427,7 @@ const LandingLogin = ({ onLogin }) => {
                 
               </div>
 
-              <div className="max-h-[calc(100vh-310px)] overflow-y-auto overflow-x-auto">
+              <div className="max-h-[calc(100vh-310px)] overflow-y-auto overflow-x-auto pb-16">
                 <table className="w-full text-sm table-fixed">
                   <thead>
                     <tr className="border-b-2 border-white/15 bg-white/5">
