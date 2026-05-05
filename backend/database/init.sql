@@ -933,7 +933,7 @@ INSERT INTO export_logs (userId, username, role, exportType, exportScope, export
 (5, 'sontv', 'manager', 'trucban', 'week', 'pdf', 36);
 
 
-USE{hvktcnan_schedule}
+
 INSERT INTO work_schedules (
   id, title, date, startTime, endTime, location, department, type, weekNo, notes,
   responsibleOfficerId, createdByUserId, createdByOfficerId
