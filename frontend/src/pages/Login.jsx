@@ -183,6 +183,18 @@ const Login = ({ onLogin }) => {
       try {
         const today = formatLocalDate(new Date());
         
+        // Calculate week start and end for director_weekly duties
+        const todayObj = new Date(today);
+        const dayOfWeek = todayObj.getDay();
+        const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Monday is day 1
+        const weekStart = new Date(todayObj);
+        weekStart.setDate(todayObj.getDate() + diff);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        
+        const weekStartStr = formatLocalDate(weekStart);
+        const weekEndStr = formatLocalDate(weekEnd);
+        
         // Fetch work schedules for today
         const schedulesRes = await apiClient.workSchedules.list(1, 100, { 
           startDate: today, 
@@ -210,12 +222,23 @@ const Login = ({ onLogin }) => {
           })(),
         })));
         
-        // Fetch duty schedules for today
+        // Fetch duty schedules for the whole week (to get director_weekly)
         const dutiesRes = await apiClient.dutySchedules.list(1, 100, { 
-          startDate: today, 
-          endDate: today 
+          startDate: weekStartStr, 
+          endDate: weekEndStr 
         });
-        setTodayDuties((dutiesRes?.data || []).map((duty) => normalizeDutyItem({
+        
+        // Filter duties: for director_weekly, check if today falls within date-endDate range
+        const filteredDuties = (dutiesRes?.data || []).filter((duty) => {
+          if (duty.dutyType === 'director_weekly' && duty.endDate) {
+            // Director weekly: include if today is between date and endDate
+            return duty.date <= today && today <= duty.endDate;
+          }
+          // Officer daily: must be today
+          return duty.date === today;
+        });
+        
+        setTodayDuties(filteredDuties.map((duty) => normalizeDutyItem({
           ...duty,
           officerName: duty.officerName || duty.officerId || '',
           location: duty.location || duty.viTri || '',

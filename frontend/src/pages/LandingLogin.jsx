@@ -289,7 +289,14 @@ const LandingLogin = ({ onLogin }) => {
   }, [weekDates]);
 
   const selectedSchedules = weekSchedules.filter((item) => item.ngay === selectedDate);
-  const selectedDuties = weekDuties.filter((item) => item.ngay === selectedDate);
+  const selectedDuties = weekDuties.filter((item) => {
+    // Director weekly: check if selectedDate is within duty date range
+    if (item.kieuTruc === 'giamdoc' && item.denNgay) {
+      return item.ngay <= selectedDate && selectedDate <= item.denNgay;
+    }
+    // Officer daily: exact match
+    return item.ngay === selectedDate;
+  });
   const selectedDateObj = new Date(`${selectedDate}T00:00:00`);
   const dayLabel = selectedDateObj.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit' });
   const selectedHoliday = holidayMap[selectedDate];
