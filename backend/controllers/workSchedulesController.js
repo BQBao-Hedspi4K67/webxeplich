@@ -885,8 +885,13 @@ export const deleteWorkSchedule = async (req, res, next) => {
     const connection = await pool.getConnection();
 
     try {
+      await ensureWorkScheduleApprovalSchema(connection);
+      await ensureWorkScheduleAccessSchema(connection);
+      const accessState = await getWorkScheduleAccessState(connection, req.user || {});
+      const requesterOfficer = accessState.officer || await resolveRequesterOfficer(connection, req.user || {});
+
       const [rows] = await connection.execute(
-        'SELECT id FROM work_schedules WHERE id = ? LIMIT 1',
+        'SELECT id, title, createdByUserId, createdByOfficerId FROM work_schedules WHERE id = ? LIMIT 1',
         [id]
       );
 
@@ -898,7 +903,34 @@ export const deleteWorkSchedule = async (req, res, next) => {
         });
       }
 
+      const schedule = rows[0];
+      const canApprove = Boolean(accessState.canApproveWorkSchedules);
+      const isCreatorByUser = Number(schedule.createdByUserId || 0) === Number(req.user?.id || 0);
+      const isCreatorByOfficer = Boolean(
+        requesterOfficer?.id
+        && String(schedule.createdByOfficerId || '') === String(requesterOfficer.id)
+      );
+
+      if (!canApprove && !isCreatorByUser && !isCreatorByOfficer) {
+        return res.status(403).json({
+          success: false,
+          error: 'Bạn không có quyền xóa lịch công tác này',
+          code: 'FORBIDDEN',
+        });
+      }
+
       await connection.execute('DELETE FROM work_schedules WHERE id = ?', [id]);
+
+      await ensureNotificationTargetingSchema(connection);
+      await createRoleNotification(connection, {
+        title: 'Lịch sự kiện đã bị xóa',
+        content: `Lịch "${schedule.title || id}" đã được xóa khỏi hệ thống.`,
+        type: 'warning',
+        module: 'lichcongtac',
+        entityType: 'work_schedule',
+        entityId: id,
+        roles: ['admin', 'manager', 'officer', 'leader'],
+      });
 
       await logActivity({
         actorUserId: req.user?.id,

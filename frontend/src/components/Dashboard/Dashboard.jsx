@@ -64,7 +64,7 @@ const getSessionBucket = (timeValue) => {
 };
 
 const SESSION_LABELS = {
-  night: 'Đêm\n(00:00-08:00)',
+  night: 'Danh sách trực',
   morning: 'Sáng\n(08:00-16:00)',
   afternoon: 'Chiều\n(16:00-24:00)',
 };
@@ -97,55 +97,55 @@ const buildTodayRows = (dutyItems = [], scheduleItems = []) => {
     afternoon: [...scheduleItems].filter((evt) => getSessionBucket(evt.gioBatDau) === 'afternoon').sort((a, b) => String(a.gioBatDau || '').localeCompare(String(b.gioBatDau || ''))),
   };
 
-  const rows = [
-    {
-      isDutyRow: true,
-      session: SESSION_LABELS.night,
-      time: '00:00',
-      content: [
-        `Trực ban Giám đốc: ${directorDuty?.tenCanBo || 'Chưa phân công'}`,
-        'Trực ban cán bộ:',
-        ...(canboDuties.length > 0
-          ? canboDuties.map((item) => `${buildSlotLabel(item)}: ${item.tenCanBo || 'Chưa phân công'}`)
-          : ['Chưa phân công']),
-      ],
-    },
-  ];
+  const rows = [];
 
-  groupedSchedules.night.forEach((sch, idx) => {
-    rows.push({
-      isDutyRow: false,
-      session: idx === 0 ? SESSION_LABELS.night : '',
-      time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
-      schedules: [sch],
+  if (groupedSchedules.morning.length > 0) {
+    groupedSchedules.morning.forEach((sch, idx) => {
+      rows.push({
+        isDutyRow: false,
+        session: idx === 0 ? SESSION_LABELS.morning : '',
+        time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
+        schedules: [sch],
+      });
     });
-  });
-
-  groupedSchedules.morning.forEach((sch, idx) => {
-    rows.push({
-      isDutyRow: false,
-      session: idx === 0 ? SESSION_LABELS.morning : '',
-      time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
-      schedules: [sch],
-    });
-  });
-
-  groupedSchedules.afternoon.forEach((sch, idx) => {
-    rows.push({
-      isDutyRow: false,
-      session: idx === 0 ? SESSION_LABELS.afternoon : '',
-      time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
-      schedules: [sch],
-    });
-  });
-
-  if (!groupedSchedules.morning.length) {
+  } else {
     rows.push({ isDutyRow: false, session: SESSION_LABELS.morning, time: '', schedules: [] });
   }
 
-  if (!groupedSchedules.afternoon.length) {
+  if (groupedSchedules.afternoon.length > 0) {
+    groupedSchedules.afternoon.forEach((sch, idx) => {
+      rows.push({
+        isDutyRow: false,
+        session: idx === 0 ? SESSION_LABELS.afternoon : '',
+        time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
+        schedules: [sch],
+      });
+    });
+  } else {
     rows.push({ isDutyRow: false, session: SESSION_LABELS.afternoon, time: '', schedules: [] });
   }
+
+  rows.push({
+    isDutyRow: true,
+    session: SESSION_LABELS.night,
+    time: '',
+    content: [
+      `Trực ban Giám đốc: ${directorDuty?.tenCanBo || 'Chưa phân công'}`,
+      'Trực ban cán bộ:',
+      ...(canboDuties.length > 0
+        ? canboDuties.map((item) => `${buildSlotLabel(item)}: ${item.tenCanBo || 'Chưa phân công'}`)
+        : ['Chưa phân công']),
+    ],
+  });
+
+  groupedSchedules.night.forEach((sch) => {
+    rows.push({
+      isDutyRow: false,
+      session: '',
+      time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
+      schedules: [sch],
+    });
+  });
 
   return rows;
 };
@@ -187,6 +187,17 @@ const initialForm = {
 };
 
 const canUserEditSchedule = (user, item) => {
+  const canApprove = Boolean(
+    user?.canApproveWorkSchedules
+    || user?.backendRole === 'admin'
+    || user?.backendRole === 'superadmin'
+  );
+  const isCreator = String(item?.nguoiTaoOfficerId || '') === String(user?.id || '')
+    || String(item?.nguoiTaoUserId || '') === String(user?.userId || '');
+  return canApprove || isCreator;
+};
+
+const canUserDeleteSchedule = (user, item) => {
   const canApprove = Boolean(
     user?.canApproveWorkSchedules
     || user?.backendRole === 'admin'
@@ -314,6 +325,20 @@ const Dashboard = ({
     }
   };
 
+  const handleDeleteSchedule = async () => {
+    if (!editId || !canUserDeleteSchedule(user, form)) return;
+    const ok = window.confirm(`Bạn có chắc muốn xóa lịch "${form.tieuDe || ''}"?`);
+    if (!ok) return;
+
+    try {
+      await apiClient.workSchedules.delete(editId);
+      if (reloadData) await reloadData();
+      setShowScheduleModal(false);
+    } catch (err) {
+      alert(err?.message || 'Không thể xóa Lịch sự kiện.');
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-5">
       <div className="card-lg p-0 overflow-hidden">
@@ -431,6 +456,9 @@ const Dashboard = ({
               </div>
             </div>
             <div className="flex gap-3 px-6 pb-6">
+              {editId && canUserDeleteSchedule(user, form) && !isReadOnlyModal && (
+                <button onClick={handleDeleteSchedule} className="btn-danger justify-center">Xóa</button>
+              )}
               <button onClick={() => setShowScheduleModal(false)} className="btn-secondary flex-1 justify-center">Hủy</button>
               {!isReadOnlyModal && (
                 <button onClick={handleSaveSchedule} className="btn-primary flex-1 justify-center">Lưu</button>

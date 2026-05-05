@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { X, Clock, MapPin, Users } from 'lucide-react';
 
-const SESSIONS = ['night', 'morning', 'afternoon'];
+const SESSIONS = ['morning', 'afternoon', 'night'];
 const SESSION_INFO = {
-  night: { label: 'Đêm', range: '(00:00-08:00)' },
+  night: { label: 'Danh sách trực', range: '' },
   morning: { label: 'Sáng', range: '(08:00-16:00)' },
   afternoon: { label: 'Chiều', range: '(16:00-24:00)' },
 };
@@ -248,7 +248,9 @@ const WeekGridSchedule = ({
               <tr key={session} className="border-b border-slate-200">
                 <td className="px-4 py-3 font-bold text-slate-700 bg-slate-50 border-r border-slate-200 align-top">
                   <div className="text-sm">{SESSION_INFO[session].label}</div>
-                  <div className="text-[10px] text-slate-500">{SESSION_INFO[session].range}</div>
+                  {SESSION_INFO[session].range ? (
+                    <div className="text-[10px] text-slate-500">{SESSION_INFO[session].range}</div>
+                  ) : null}
                 </td>
                 {normalizedWeekDates.map(({ key }, idx) => {
                   const { duties: dayDuties, schedules: daySchedules } = eventsByDateSession[key][session];
@@ -268,7 +270,6 @@ const WeekGridSchedule = ({
                             onMouseLeave={() => setHoveredEvent(null)}
                             onClick={() => handleEventClick({ items: dayDuties, session }, 'duty')}
                           >
-                            <div className="font-bold whitespace-nowrap flex-shrink-0">00:00</div>
                             {dutyLines.map((line, lineIdx) => (
                               <div key={`${line}-${lineIdx}`} className={`mt-0.5 break-words ${lineIdx < 2 ? 'font-semibold' : ''}`}>
                                 {line}

@@ -36,7 +36,7 @@ const getSessionBucket = (timeValue) => {
 };
 
 const SESSION_LABELS = {
-  night: 'Đêm\n(00:00-08:00)',
+  night: 'Danh sách trực',
   morning: 'Sáng\n(08:00-16:00)',
   afternoon: 'Chiều\n(16:00-24:00)',
 };
@@ -106,30 +106,7 @@ const buildRowsForDay = (dutyItems = [], scheduleItems = []) => {
     afternoon: [...scheduleItems].filter((evt) => getSessionBucket(evt.gioBatDau) === 'afternoon').sort((a, b) => String(a.gioBatDau || '').localeCompare(String(b.gioBatDau || ''))),
   };
 
-  const rows = [
-    {
-      isDutyRow: true,
-      session: SESSION_LABELS.night,
-      time: '00:00',
-      content: [
-        `Trực ban Giám đốc: ${directorDuty?.tenCanBo || 'Chưa phân công'}`,
-        'Trực ban cán bộ:',
-        ...(canboDuties.length > 0
-          ? canboDuties.map((item) => `${buildSlotLabel(item)}: ${item.tenCanBo || 'Chưa phân công'}`)
-          : ['Chưa phân công']),
-      ],
-    },
-  ];
-
-  // Add night schedules
-  groupedSchedules.night.forEach((sch, idx) => {
-    rows.push({
-      isDutyRow: false,
-      session: idx === 0 ? SESSION_LABELS.night : '',
-      time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
-      schedules: [sch],
-    });
-  });
+  const rows = [];
 
   // Always add morning section (even if empty)
   if (groupedSchedules.morning.length > 0) {
@@ -158,6 +135,29 @@ const buildRowsForDay = (dutyItems = [], scheduleItems = []) => {
   } else {
     rows.push({ isDutyRow: false, session: SESSION_LABELS.afternoon, time: '', schedules: [] });
   }
+
+  rows.push({
+    isDutyRow: true,
+    session: SESSION_LABELS.night,
+    time: '',
+    content: [
+      `Trực ban Giám đốc: ${directorDuty?.tenCanBo || 'Chưa phân công'}`,
+      'Trực ban cán bộ:',
+      ...(canboDuties.length > 0
+        ? canboDuties.map((item) => `${buildSlotLabel(item)}: ${item.tenCanBo || 'Chưa phân công'}`)
+        : ['Chưa phân công']),
+    ],
+  });
+
+  // Add night schedules
+  groupedSchedules.night.forEach((sch) => {
+    rows.push({
+      isDutyRow: false,
+      session: '',
+      time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
+      schedules: [sch],
+    });
+  });
 
   return rows;
 };

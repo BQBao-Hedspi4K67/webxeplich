@@ -32,7 +32,7 @@ const getSessionBucket = (timeValue) => {
 };
 
 const SESSION_LABELS = {
-  night: 'Đêm\n(00:00-08:00)',
+  night: 'Danh sách trực',
   morning: 'Sáng\n(08:00-16:00)',
   afternoon: 'Chiều\n(16:00-24:00)',
 };
@@ -83,37 +83,13 @@ const buildTodayRows = (dutyItems = [], scheduleItems = []) => {
     afternoon: [...scheduleItems].filter((evt) => getSessionBucket(evt.gioBatDau) === 'afternoon').sort((a, b) => String(a.gioBatDau || '').localeCompare(String(b.gioBatDau || ''))),
   };
 
-  const rows = [
-    {
-      isFirstRow: true,
-      session: SESSION_LABELS.night,
-      time: '00:00',
-      isDutyRow: true,
-      content: [
-        `Trực ban Giám đốc: ${directorDuty?.tenCanBo || 'Chưa phân công'}`,
-        'Trực ban cán bộ:',
-        ...(canboDuties.length > 0
-          ? canboDuties.map((item) => `${buildSlotLabel(item)}: ${item.tenCanBo || 'Chưa phân công'}`)
-          : ['Chưa phân công']),
-      ],
-    },
-  ];
-
-  groupedSchedules.night.forEach((sch, idx) => {
-    rows.push({
-      isFirstRow: false,
-      session: idx === 0 ? SESSION_LABELS.night : '',
-      time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
-      isDutyRow: false,
-      schedules: [sch],
-    });
-  });
+  const rows = [];
 
   // Always add morning section (even if empty)
   if (groupedSchedules.morning.length > 0) {
     groupedSchedules.morning.forEach((sch, idx) => {
       rows.push({
-        isFirstRow: false,
+        isFirstRow: rows.length === 0,
         session: idx === 0 ? SESSION_LABELS.morning : '',
         time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
         isDutyRow: false,
@@ -121,7 +97,7 @@ const buildTodayRows = (dutyItems = [], scheduleItems = []) => {
       });
     });
   } else {
-    rows.push({ isFirstRow: false, session: SESSION_LABELS.morning, time: '', isDutyRow: false, schedules: [] });
+    rows.push({ isFirstRow: true, session: SESSION_LABELS.morning, time: '', isDutyRow: false, schedules: [] });
   }
 
   // Always add afternoon section (even if empty)
@@ -138,6 +114,30 @@ const buildTodayRows = (dutyItems = [], scheduleItems = []) => {
   } else {
     rows.push({ isFirstRow: false, session: SESSION_LABELS.afternoon, time: '', isDutyRow: false, schedules: [] });
   }
+
+  rows.push({
+    isFirstRow: false,
+    session: SESSION_LABELS.night,
+    time: '',
+    isDutyRow: true,
+    content: [
+      `Trực ban Giám đốc: ${directorDuty?.tenCanBo || 'Chưa phân công'}`,
+      'Trực ban cán bộ:',
+      ...(canboDuties.length > 0
+        ? canboDuties.map((item) => `${buildSlotLabel(item)}: ${item.tenCanBo || 'Chưa phân công'}`)
+        : ['Chưa phân công']),
+    ],
+  });
+
+  groupedSchedules.night.forEach((sch) => {
+    rows.push({
+      isFirstRow: false,
+      session: '',
+      time: `${formatDisplayTime(sch.gioBatDau)} - ${formatDisplayTime(sch.gioKetThuc)}`,
+      isDutyRow: false,
+      schedules: [sch],
+    });
+  });
 
   return rows;
 };

@@ -120,6 +120,17 @@ const canUserEditSchedule = (user, item) => {
   return canApprove || isCreator;
 };
 
+const canUserDeleteSchedule = (user, item) => {
+  const canApprove = Boolean(
+    user?.canApproveWorkSchedules
+    || user?.backendRole === 'admin'
+    || user?.backendRole === 'superadmin'
+  );
+  const isCreator = String(item?.nguoiTaoOfficerId || '') === String(user?.id || '')
+    || String(item?.nguoiTaoUserId || '') === String(user?.userId || '');
+  return canApprove || isCreator;
+};
+
 const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], departmentData = [], holidayData = [], dutyScheduleData = [], reloadData, onOpenExport }) => {
   const canCreate = Boolean(
     user?.canCreateWorkSchedules
@@ -682,6 +693,17 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
               </div>
             </div>
             <div className="flex gap-3 px-6 pb-6">
+              {editId && canUserDeleteSchedule(user, form) && (
+                <button
+                  onClick={() => {
+                    setShowModal(false);
+                    setDeleteConfirm({ id: editId, tieuDe: form.tieuDe || '' });
+                  }}
+                  className="btn-danger justify-center"
+                >
+                  Xóa
+                </button>
+              )}
               <button onClick={() => setShowModal(false)} className="btn-secondary flex-1 justify-center">Hủy</button>
               {!isReadOnlyModal && (
                 <button onClick={handleSave} className="btn-primary flex-1 justify-center">{editId ? 'Lưu' : 'Thêm lịch'}</button>
