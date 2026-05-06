@@ -1,0 +1,358 @@
+@startuml usecase_overview
+title Biểu đồ Use Case Tổng Quan - Hệ thống Quản lý Lịch Công tác và Trực Ban
+
+skinparam backgroundColor white
+skinparam usecaseBorderColor black
+skinparam actorBorderColor black
+skinparam ArrowColor black
+skinparam defaultTextAlignment center
+skinparam fontSize 11
+
+left to right direction
+
+actor "Superadmin" as superadmin
+actor "Admin" as admin
+actor "Manager" as manager
+actor "Officer" as officer
+
+rectangle "Hệ thống Quản lý Lịch Công tác và Trực Ban" {
+    usecase "UC01: Đăng nhập" as UC01
+    usecase "UC02: Quản lý Cán bộ" as UC02
+    usecase "UC03: Quản lý Lịch Công tác" as UC03
+    usecase "UC04: Quản lý Lịch Trực ban" as UC04
+    usecase "UC05: Lịch của Tôi" as UC05
+    usecase "UC06: Ý kiến Trực ban" as UC06
+    usecase "UC07: Thông báo" as UC07
+    usecase "UC08: Xuất Dữ liệu" as UC08
+    usecase "UC09: Quản lý Ngày lễ" as UC09
+    usecase "UC10: Quản lý Phòng ban" as UC10
+    usecase "UC11: Quản lý Xin Nghỉ" as UC11
+    usecase "UC12: Phân quyền Lịch" as UC12
+}
+
+superadmin --> UC01
+superadmin --> UC02
+superadmin --> UC03
+superadmin --> UC04
+superadmin --> UC05
+superadmin --> UC07
+superadmin --> UC08
+superadmin --> UC09
+superadmin --> UC10
+superadmin --> UC12
+
+admin --> UC01
+admin --> UC02
+admin --> UC03
+admin --> UC04
+admin --> UC05
+admin --> UC07
+admin --> UC08
+admin --> UC09
+admin --> UC10
+admin --> UC12
+
+manager --> UC01
+manager --> UC03
+manager --> UC04
+manager --> UC05
+manager --> UC06
+manager --> UC07
+manager --> UC08
+manager --> UC11
+manager --> UC12
+
+officer --> UC01
+officer --> UC05
+officer --> UC06
+officer --> UC07
+officer --> UC08
+officer --> UC11
+
+UC01 ..> UC02 : include
+UC01 ..> UC03 : include
+UC01 ..> UC04 : include
+UC01 ..> UC05 : include
+UC01 ..> UC06 : include
+UC01 ..> UC07 : include
+UC01 ..> UC08 : include
+UC01 ..> UC09 : include
+UC01 ..> UC10 : include
+UC01 ..> UC11 : include
+UC01 ..> UC12 : include
+@enduml
+
+@startuml usecase_auth
+title Nhóm Use Case Xác thực và Quản lý Phiên Đăng nhập
+
+skinparam backgroundColor white
+skinparam usecaseBorderColor black
+skinparam actorBorderColor black
+skinparam ArrowColor black
+skinparam defaultTextAlignment center
+skinparam fontSize 11
+
+left to right direction
+
+actor "Superadmin" as superadmin
+actor "Admin" as admin
+actor "Manager" as manager
+actor "Officer" as officer
+
+rectangle "Xác thực và Quản lý Phiên" {
+    usecase "UC01: Đăng nhập" as UC01
+    usecase "Khôi phục Phiên" as UC01_restore
+    usecase "Đăng xuất" as UC01_logout
+}
+
+superadmin --> UC01
+admin --> UC01
+manager --> UC01
+officer --> UC01
+
+UC01 <|-- UC01_restore : extend
+UC01 <|-- UC01_logout : extend
+@enduml
+
+@startuml usecase_officers
+title Nhóm Use Case Quản lý Hồ sơ Cán bộ
+
+skinparam backgroundColor white
+skinparam usecaseBorderColor black
+skinparam actorBorderColor black
+skinparam ArrowColor black
+skinparam defaultTextAlignment center
+skinparam fontSize 11
+
+left to right direction
+
+actor "Superadmin" as superadmin
+actor "Admin" as admin
+actor "Manager" as manager
+
+rectangle "Quản lý Hồ sơ Cán bộ" {
+    usecase "UC02: Quản lý Cán bộ" as UC02
+    usecase "Xem Danh sách Cán bộ" as UC02_view
+    usecase "Thêm/Sửa/Xóa Cán bộ\n(Superadmin)" as UC02_crud
+    usecase "Cấp/Thu hồi Quyền Quản lý\n(Admin)" as UC02_permission
+    usecase "Tìm kiếm & Lọc" as UC02_search
+}
+
+superadmin --> UC02
+admin --> UC02
+manager --> UC02
+
+UC02 *-- UC02_view : include
+UC02 *-- UC02_crud : include
+UC02 *-- UC02_permission : include
+UC02_view <|-- UC02_search : extend
+@enduml
+
+@startuml usecase_workschedule
+title Nhóm Use Case Quản lý Lịch Công tác
+
+skinparam backgroundColor white
+skinparam usecaseBorderColor black
+skinparam actorBorderColor black
+skinparam ArrowColor black
+skinparam defaultTextAlignment center
+skinparam fontSize 11
+
+left to right direction
+
+actor "Superadmin" as superadmin
+actor "Admin" as admin
+actor "Manager" as manager
+actor "Officer" as officer
+
+rectangle "Quản lý Lịch Công tác" {
+    usecase "UC03: Quản lý Lịch Công tác" as UC03
+    usecase "Tạo/Cập nhật Lịch" as UC03_create
+    usecase "Duyệt Lịch Chờ duyệt" as UC03_approve
+    usecase "Kiểm tra Xung đột Lịch" as UC03_conflict
+    usecase "Gửi Thông báo" as UC03_notify
+}
+
+superadmin --> UC03
+admin --> UC03
+manager --> UC03
+officer --> UC03
+
+UC03 *-- UC03_create : include
+UC03 *-- UC03_approve : include
+UC03 *-- UC03_conflict : include
+UC03 *-- UC03_notify : include
+@enduml
+
+@startuml usecase_dutyschedule
+title Nhóm Use Case Quản lý Lịch Trực ban
+
+skinparam backgroundColor white
+skinparam usecaseBorderColor black
+skinparam actorBorderColor black
+skinparam ArrowColor black
+skinparam defaultTextAlignment center
+skinparam fontSize 11
+
+left to right direction
+
+actor "Superadmin" as superadmin
+actor "Admin" as admin
+actor "Manager" as manager
+actor "Officer" as officer
+
+rectangle "Quản lý Lịch Trực ban" {
+    usecase "UC04: Quản lý Lịch Trực ban" as UC04
+    usecase "Thiết lập Lịch Trực" as UC04_setup
+    usecase "Cập nhật Trạng thái Trực" as UC04_status
+    usecase "Kiểm tra Xung đột Thời gian" as UC04_conflict
+}
+
+superadmin --> UC04
+admin --> UC04
+manager --> UC04
+officer --> UC04
+
+UC04 *-- UC04_setup : include
+UC04 *-- UC04_status : include
+UC04 *-- UC04_conflict : include
+@enduml
+
+@startuml usecase_myschedule
+title Nhóm Use Case Lịch của Tôi - Cá nhân hóa
+
+skinparam backgroundColor white
+skinparam usecaseBorderColor black
+skinparam actorBorderColor black
+skinparam ArrowColor black
+skinparam defaultTextAlignment center
+skinparam fontSize 11
+
+left to right direction
+
+actor "Superadmin" as superadmin
+actor "Admin" as admin
+actor "Manager" as manager
+actor "Officer" as officer
+
+rectangle "Lịch của Tôi" {
+    usecase "UC05: Lịch của Tôi" as UC05
+    usecase "Xem Lịch Tổng hợp" as UC05_view
+    usecase "Lọc theo Loại Lịch" as UC05_filter
+    usecase "Chuyển đổi Chế độ Xem" as UC05_switch
+}
+
+superadmin --> UC05
+admin --> UC05
+manager --> UC05
+officer --> UC05
+
+UC05 *-- UC05_view : include
+UC05 *-- UC05_filter : include
+UC05_view <|-- UC05_switch : extend
+@enduml
+
+@startuml usecase_opinions
+title Nhóm Use Case Ý kiến Trực ban
+
+skinparam backgroundColor white
+skinparam usecaseBorderColor black
+skinparam actorBorderColor black
+skinparam ArrowColor black
+skinparam defaultTextAlignment center
+skinparam fontSize 11
+
+left to right direction
+
+actor "Superadmin" as superadmin
+actor "Admin" as admin
+actor "Manager" as manager
+actor "Officer" as officer
+
+rectangle "Ý kiến Trực ban" {
+    usecase "UC06: Ý kiến Trực ban" as UC06
+    usecase "UC11: Quản lý Xin Nghỉ" as UC11
+    usecase "Gửi Yêu cầu Nghỉ" as UC06_submit
+    usecase "Duyệt/Từ chối Yêu cầu" as UC06_approve
+    usecase "Ghi chú Phản hồi" as UC06_feedback
+}
+
+superadmin --> UC06
+admin --> UC06
+manager --> UC06
+officer --> UC06
+
+officer --> UC11
+manager --> UC11
+admin --> UC11
+
+UC06 *-- UC06_submit : include
+UC06 *-- UC06_approve : include
+UC06 *-- UC06_feedback : include
+
+UC11 *-- UC06_submit : include
+UC11 *-- UC06_approve : include
+@enduml
+
+@startuml usecase_notificationsexports
+title Nhóm Use Case Thông báo và Kết xuất Dữ liệu
+
+skinparam backgroundColor white
+skinparam usecaseBorderColor black
+skinparam actorBorderColor black
+skinparam ArrowColor black
+skinparam defaultTextAlignment center
+skinparam fontSize 11
+
+left to right direction
+
+actor "Superadmin" as superadmin
+actor "Admin" as admin
+actor "Manager" as manager
+actor "Officer" as officer
+
+rectangle "Thông báo và Kết xuất Dữ liệu" {
+    usecase "UC07: Thông báo" as UC07
+    usecase "UC08: Xuất Dữ liệu" as UC08
+    usecase "UC09: Quản lý Ngày lễ" as UC09
+    usecase "UC10: Quản lý Phòng ban" as UC10
+    
+    usecase "Xem Danh sách Thông báo" as UC07_view
+    usecase "Đánh dấu Đã đọc" as UC07_mark
+    
+    usecase "Chọn Bộ lọc Xuất" as UC08_filter
+    usecase "Xem Trước" as UC08_preview
+    usecase "Tải File PDF" as UC08_download
+    
+    usecase "Thêm/Sửa/Xóa Ngày lễ" as UC09_crud
+    usecase "Tạo/Sửa Phòng ban" as UC10_crud
+}
+
+superadmin --> UC07
+superadmin --> UC08
+superadmin --> UC09
+superadmin --> UC10
+
+admin --> UC07
+admin --> UC08
+admin --> UC09
+admin --> UC10
+
+manager --> UC07
+manager --> UC08
+manager --> UC10
+
+officer --> UC07
+officer --> UC08
+
+UC07 *-- UC07_view : include
+UC07 *-- UC07_mark : include
+
+UC08 *-- UC08_filter : include
+UC08 *-- UC08_preview : include
+UC08 *-- UC08_download : include
+
+UC09 *-- UC09_crud : include
+
+UC10 *-- UC10_crud : include
+@enduml

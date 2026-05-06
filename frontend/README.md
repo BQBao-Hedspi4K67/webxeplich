@@ -1,36 +1,21 @@
-# Frontend - He thong quan ly lich cong tac va lich truc ban
+# Frontend - Ứng dụng giao diện quản lý lịch công tác và lịch trực ban
 
-## 1. Muc tieu frontend
-Frontend la ung dung giao dien cho he thong quan tri noi bo, phuc vu 3 vai tro:
-- Admin
-- Manager
-- Officer
+## 1. Mục tiêu
+Frontend là lớp giao diện cho hệ thống nội bộ, phục vụ:
+- Đăng nhập và xem trước lịch công khai.
+- Hiển thị dashboard và các màn nghiệp vụ theo vai trò.
+- Cung cấp thao tác CRUD, tra cứu, xuất dữ liệu và xem thông báo.
+- Đồng bộ với backend qua API có JWT.
 
-Frontend tap trung vao 3 nhiem vu:
-- Hien thi du lieu nghiep vu theo role.
-- Cung cap thao tac CRUD than thien cho cac module chinh.
-- Dong bo voi backend thong qua API co xac thuc JWT.
-
-## 2. Cong nghe va thu vien
-- React 18
-- Vite 5
-- Tailwind CSS 3
-- Lucide React (icon)
-- Recharts (bieu do)
-- dayjs (xu ly ngay gio)
-
-## 3. Cach chay frontend
-Yeu cau:
-- Node.js >= 18
-
-Lenh chay:
+## 2. Chạy frontend
+Yêu cầu: Node.js 18+.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Frontend mac dinh chay tren `http://localhost:5173` (hoac cong fallback do Vite cap).
+Mặc định frontend chạy tại `http://localhost:5173`.
 
 Build production:
 
@@ -39,19 +24,22 @@ npm run build
 npm run preview
 ```
 
-## 4. Cau truc thu muc quan trong
-```
+## 3. Biến môi trường
+Nếu cần ghi đè backend API mặc định, tạo file `.env` trong thư mục `frontend`:
+- `VITE_API_URL`
+
+Nếu không cấu hình, frontend dùng `http://localhost:3000/api`.
+
+## 4. Cấu trúc chính
+```text
 frontend/
   src/
     App.jsx
     main.jsx
     index.css
     pages/
+      LandingLogin.jsx
       Login.jsx
-    services/
-      api.js
-    data/
-      uiConstants.js
     components/
       Layout/
       Dashboard/
@@ -59,104 +47,112 @@ frontend/
       LichCongTac/
       LichTrucBan/
       LichCuaToi/
+      LichTongHop/
+      NgayLe/
+      PhongBan/
+      ThongBao/
       TraCuu/
+      QuyTrinh/
       XuatLich/
       YKien/
-      QuyTrinh/
+    services/
+      api.js
+    data/
+      uiConstants.js
+    utils/
+      notify.js
 ```
 
-## 5. Luong du lieu tong quat
-1. Dang nhap:
-- Goi `POST /api/auth/login`.
-- Nhan JWT va thong tin user.
+## 5. Các màn hình chính
+- Màn đăng nhập / xem trước lịch tuần.
+- Dashboard.
+- Quản lý cán bộ.
+- Lịch công tác.
+- Lịch trực ban.
+- Lịch của tôi.
+- Lịch tổng hợp / tra cứu lịch.
+- Ngày lễ.
+- Phòng ban.
+- Thông báo.
+- Quy trình.
+- Xuất lịch.
+- Ý kiến / xin nghỉ.
+- Quản trị tài khoản.
 
-2. Luu phien:
-- Token duoc luu tai localStorage voi key `hvktcnan_token`.
+## 6. Luồng dữ liệu
+1. Người dùng đăng nhập qua `POST /api/auth/login`.
+2. JWT được lưu trong `localStorage` với khóa `hvktcnan_token`.
+3. Khi reload, app gọi `GET /api/auth/profile` để khôi phục phiên.
+4. Sau khi có user hợp lệ, app tải đồng thời danh sách cán bộ, lịch công tác, lịch trực ban, xin nghỉ/ý kiến, thông báo, dashboard overview, lịch sử xuất, ngày lễ và phòng ban.
+5. Dữ liệu backend được normalize trong `App.jsx` và các component liên quan trước khi render.
 
-3. Khoi phuc phien:
-- Goi `GET /api/auth/profile` khi reload app.
+## 7. App shell và phân quyền
+File trung tâm: `src/App.jsx`
 
-4. Nap du lieu dashboard va nghiep vu:
-- officers
-- work-schedules
-- duty-schedules
-- opinions
-- notifications
-- dashboard/overview
-- exports/history
+Frontend điều hướng theo vai trò backend và quyền hiệu lực:
+- `superadmin`
+- `admin`
+- `manager`
+- `officer`
 
-5. Render theo phan quyen:
-- Dieu huong trang dua tren role map trong `App.jsx`.
+Ứng dụng cũng xử lý các trường hợp ủy quyền, ví dụ quản trị được ủy quyền hoặc quản lý được ủy quyền.
 
-## 6. Danh sach man hinh hien co
-- Dang nhap
-- Dashboard
-- Quan ly can bo
-- Lap lich cong tac
-- Lap lich truc ban
-- Lich cua toi
-- Tra cuu lich
-- Xuat/In lich
-- Y kien truc ban
-- Quy trinh chuc nang
-- Quan tri tai khoan (chi admin/manager)
+## 8. Landing login
+File: `src/pages/LandingLogin.jsx`
 
-## 7. Phan quyen tren frontend
-- Admin: co tat ca trang, bao gom `Lich cua toi`.
-- Manager: co tat ca trang nghiep vu, bao gom `Lich cua toi`.
-- Officer: khong co trang `Quan tri tai khoan`, cac trang con lai theo luong hien tai.
+Màn đăng nhập không chỉ có form login mà còn hiển thị trước:
+- bảng lịch công tác theo tuần,
+- bảng lịch trực ban,
+- ngày lễ của tuần đang chọn.
 
-## 8. Module Lich cua toi
-File: `src/components/LichCuaToi/LichCuaToi.jsx`
+Đây là phần giao diện công khai trước khi người dùng đăng nhập.
 
-Chuc nang:
-- Tong hop lich cong tac va lich truc ban cua user dang dang nhap.
-- Loc theo thang, loai lich, trang thai.
-- Hien thong ke nhanh so luong lich.
-
-Co che doi chieu du lieu:
-- Lich cong tac: so theo truong nguoi phu trach (ten).
-- Lich truc ban: uu tien khop officerId, fallback theo ten can bo.
-
-## 9. Lop API client
+## 9. API client
 File: `src/services/api.js`
 
-Client da dong goi cac nhom API:
+Client đã gom sẵn các nhóm API:
 - auth
 - officers
 - workSchedules
 - dutySchedules
-- opinions
+- leaveRequests
+- opinions (legacy alias)
 - notifications
 - dashboard
+- holidays
+- departments
 - exports
 
-Client xu ly san:
-- Header Authorization Bearer token.
-- Bat loi va map thong diep loi.
-- Download file export (csv/json).
+Client xử lý sẵn:
+- Tự gắn header `Authorization`.
+- Mapping lỗi API ra `Error` chuẩn.
+- Download file export với tên file lấy từ response header nếu có.
 
-## 10. Quy uoc du lieu UI
-Trong frontend co cac ham normalize giup map du lieu backend thanh du lieu hien thi:
-- Chuan hoa ngay gio.
-- Chuan hoa trang thai (`done` -> `completed`).
-- Chuan hoa ten role backend -> role giao dien.
+## 10. Quy ước dữ liệu UI
+Trong frontend có các hàm normalize để ổn định cách render:
+- Chuẩn hóa ngày và giờ.
+- Chuẩn hóa trạng thái lịch.
+- Chuyển role backend sang nhãn giao diện.
+- Ghép tên/military rank để hiển thị tên cán bộ đồng nhất.
 
-Muc dich la giu giao dien on dinh ngay ca khi backend thay doi dinh dang nho.
+## 11. Xử lý dữ liệu lịch
+Các component lịch dùng chung logic nhóm theo ngày/tuần và theo buổi:
+- Sáng.
+- Chiều.
+- Danh sách trực.
 
-## 11. Van hanh va debug
-1. Khong thay menu/chuc nang moi:
-- Dang xuat dang nhap lai.
-- Hard refresh (Ctrl+F5).
+Hiện giao diện đã hỗ trợ xem bảng lịch trực theo nhiều dòng nội dung, nên khi thêm padding/scroll container cần giữ đủ khoảng trống ở đáy bảng để không cắt mất dòng cuối.
 
-2. Loi 401/403:
-- Kiem tra token het han.
-- Kiem tra role trong token co dung voi route backend.
+## 12. Vận hành và debug
+- Không thấy menu hay chức năng mới: đăng xuất rồi đăng nhập lại, sau đó hard refresh.
+- Lỗi 401/403: kiểm tra token, quyền và thời hạn phiên.
+- Không thấy thông báo: kiểm tra thông báo có `targetUserId` hoặc `targetRole` đúng với người dùng hiện tại.
 
-3. Khong thay thong bao:
-- Kiem tra du lieu notifications co targetUserId/targetRole dung user hien tai.
+## 13. Ghi chú phát triển
+- Khi thêm module mới, nên mở rộng `src/services/api.js` trước để giữ một điểm gọi API tập trung.
+- Khi backend đổi role/quyền, cập nhật lại map role và page access trong `App.jsx`.
+- Khi schema dữ liệu lịch thay đổi, cập nhật hàm normalize trước khi sửa UI chi tiết.
 
-## 12. Luu y cho dev tiep theo
-- Neu them module moi, uu tien bo sung vao `api.js` truoc de giu mot diem goi API tap trung.
-- Neu thay doi role/quyen o backend, cap nhat dong bo map role va page access trong `App.jsx`.
-- Neu thay doi schema schedule/opinion, cap nhat normalize function truoc khi sua UI.
+## 14. Liên kết
+- README gốc: [README.md](../README.md)
+- Backend: [backend/README.md](../backend/README.md)

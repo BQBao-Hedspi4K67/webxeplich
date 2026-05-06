@@ -1,197 +1,181 @@
-# Backend - He thong API quan ly lich cong tac va lich truc ban
+# Backend - API quản lý lịch công tác và lịch trực ban
 
-## 1. Muc tieu backend
-Backend la lop nghiep vu trung tam, dam nhan:
-- Xac thuc, phan quyen va kiem soat truy cap.
-- Xu ly CRUD cho can bo, lich cong tac, lich truc ban.
-- Xu ly y kien truc ban va phe duyet.
-- Cap phat thong bao theo doi tuong nhan.
-- Tong hop so lieu dashboard.
-- Cung cap du lieu export va lich su export.
+## 1. Vai trò của backend
+Backend là lớp nghiệp vụ trung tâm của hệ thống, đảm nhiệm:
+- Xác thực JWT và phân quyền theo vai trò/quyền hiệu lực.
+- Quản lý cán bộ, tài khoản nội bộ và dữ liệu phòng ban.
+- Quản lý lịch công tác và lịch trực ban.
+- Quản lý xin nghỉ / ý kiến / phản hồi liên quan đến trực ban.
+- Phát thông báo theo đúng đối tượng nhận.
+- Tổng hợp dashboard và lịch sử xuất dữ liệu.
 
-## 2. Cong nghe va thu vien
-- Node.js + Express
-- mysql2/promise
-- jsonwebtoken
-- bcryptjs
-- joi
-- cors
-- dotenv
-
-## 3. Khoi dong backend
+## 2. Chạy backend
 ```bash
 npm install
 npm run dev
 ```
 
-Server mac dinh: `http://localhost:3000`
+Server mặc định: `http://localhost:3000`
 
-Health endpoint:
+Health check:
 - `GET /health`
 
-## 4. Bien moi truong can co
-Tao file `.env` dua tren `.env.example`.
+Production:
+```bash
+npm start
+```
 
-Danh sach bien quan trong:
+## 3. Biến môi trường
+Tạo file `.env` trong thư mục `backend` với các biến sau:
 - `PORT`
 - `DB_HOST`
 - `DB_PORT`
 - `DB_USER`
 - `DB_PASSWORD`
 - `DB_NAME`
+- `DATABASE_URL`
 - `JWT_SECRET`
 - `JWT_EXPIRES_IN`
 - `CORS_ORIGIN`
 
-Luu y:
-- `CORS_ORIGIN` cho phep nhieu origin, tach boi dau phay.
+Ghi chú:
+- Có thể dùng `DATABASE_URL` hoặc bộ biến DB tách rời.
+- `CORS_ORIGIN` hỗ trợ nhiều origin, phân tách bằng dấu phẩy.
 
-## 5. Cau truc code
-```
+## 4. Kiến trúc code
+```text
 backend/
-	app.js
-	server.js
-	config/
-		constants.js
-		database.js
-	controllers/
-	routes/
-	middleware/
-	utils/
-	database/
-		init.sql
+  app.js
+  server.js
+  config/
+  controllers/
+  database/
+  middleware/
+  routes/
+  utils/
 ```
 
-## 6. Chuan middleware va bao mat
-1. `verifyToken`
-- Doc JWT tu header Authorization.
-- Gan thong tin user vao request.
+## 5. Cấu hình và middleware
+- `verifyToken`: đọc JWT từ header `Authorization` và gắn thông tin user vào request.
+- `optionalVerifyToken`: cho phép route vừa đọc công khai vừa tận dụng token nếu có.
+- `requireRole`: chặn truy cập theo role.
+- `errorHandler`: trả lỗi thống nhất cho API.
 
-2. `requireRole`
-- Kiem tra role duoc phep theo route.
-
-3. Error handling
-- Su dung middleware tong de tra loi loi co cau truc.
-
-## 7. Route map va quyen truy cap
-Tat ca route `/api/*` deu qua xac thuc, tru login/logout theo route auth.
-
-### 7.1. Auth
+## 6. Route map
+### Auth
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
-- `GET /api/auth/profile` (can token)
-- `POST /api/auth/users` (admin/manager)
+- `GET /api/auth/profile`
+- `PUT /api/auth/profile/contact`
+- `PUT /api/auth/profile/password`
+- `POST /api/auth/users` (superadmin)
 
-### 7.2. Officers
+### Officers
 - `GET /api/officers`
 - `GET /api/officers/:id`
-- `POST /api/officers` (admin)
-- `PUT /api/officers/:id` (admin)
-- `DELETE /api/officers/:id` (admin)
+- `POST /api/officers`
+- `PUT /api/officers/:id`
+- `DELETE /api/officers/:id`
+- `PUT /api/officers/:id/duty-schedule-permission`
+- `PUT /api/officers/:id/work-schedule-permission`
+- `GET /api/officers/admin-delegations`
+- `PUT /api/officers/:id/admin-delegation`
 
-### 7.3. Work schedules
+### Work schedules
 - `GET /api/work-schedules`
 - `GET /api/work-schedules/:id`
-- `POST /api/work-schedules` (admin/manager)
-- `PUT /api/work-schedules/:id` (admin/manager)
-- `DELETE /api/work-schedules/:id` (admin/manager)
+- `POST /api/work-schedules`
+- `PUT /api/work-schedules/:id`
+- `DELETE /api/work-schedules/:id`
+- `PUT /api/work-schedules/:id/approve`
 
-### 7.4. Duty schedules
+### Duty schedules
 - `GET /api/duty-schedules`
 - `GET /api/duty-schedules/:id`
-- `POST /api/duty-schedules` (admin/manager)
-- `PUT /api/duty-schedules/:id` (admin/manager)
-- `DELETE /api/duty-schedules/:id` (admin/manager)
+- `POST /api/duty-schedules`
+- `PUT /api/duty-schedules/:id`
+- `DELETE /api/duty-schedules/:id`
+- `POST /api/duty-schedules/auto-assign-week`
+- `POST /api/duty-schedules/auto-assign-holiday`
+- `GET /api/duty-schedules/check-auto-scheduled`
 
-### 7.5. Opinions
-- `GET /api/opinions`
-- `GET /api/opinions/:id`
-- `POST /api/opinions`
-- `PUT /api/opinions/:id` (admin/manager)
-- `DELETE /api/opinions/:id` (admin)
+### Leave requests / opinions
+- `GET /api/leave-requests`
+- `GET /api/leave-requests/:id`
+- `POST /api/leave-requests`
+- `PUT /api/leave-requests/:id`
+- `DELETE /api/leave-requests/:id`
+- `GET /api/opinions`  
+  Legacy alias tương thích với frontend cũ.
 
-### 7.6. Notifications
+### Holidays and departments
+- `GET /api/holidays`
+- `POST /api/holidays`
+- `PUT /api/holidays/:id`
+- `DELETE /api/holidays/:id`
+- `GET /api/departments`
+- `POST /api/departments`
+- `PUT /api/departments/:id`
+- `DELETE /api/departments/:id`
+
+### Notifications, dashboard, exports
 - `GET /api/notifications`
 - `PATCH /api/notifications/:id/read`
 - `POST /api/notifications/mark-all-read`
-
-### 7.7. Dashboard
 - `GET /api/dashboard/overview`
-
-### 7.8. Exports
 - `GET /api/exports/preview`
 - `GET /api/exports/download`
 - `GET /api/exports/history`
 
-## 8. Notification targeting (trong backend)
-File trung tam: `utils/notificationTargeting.js`
+## 7. Cơ chế thông báo theo mục tiêu
+Hệ thống thông báo hỗ trợ:
+- `targetUserId`: gửi cho một người dùng cụ thể.
+- `targetRole`: gửi cho một nhóm vai trò.
 
-He thong thong bao ho tro:
-- `targetUserId`: thong bao cho mot user cu the.
-- `targetRole`: thong bao cho nhom role.
+Các controller liên quan đã tích hợp cơ chế này, nên thông báo không bị phát đại trà.
 
-Cac controller da tich hop co che nay:
-- `workSchedulesController.js`
-- `dutySchedulesController.js`
-- `opinionsController.js`
-- `notificationsController.js`
+## 8. Đồng bộ tài khoản và hồ sơ cán bộ
+Endpoint `POST /api/auth/users` tạo đồng thời:
+- user đăng nhập trong bảng `users`.
+- hồ sơ nghiệp vụ tương ứng trong bảng `officers`.
 
-## 9. Dong bo users va officers
-Route `POST /api/auth/users` khong chi tao user dang nhap, ma con:
-- Tao them ban ghi trong bang officers.
-- Sinh ma can bo dang `CBxxx` tang dan.
+Mục tiêu là giữ dữ liệu tài khoản và dữ liệu nghiệp vụ luôn khớp nhau.
 
-Dieu nay giup du lieu nghiep vu va du lieu tai khoan khop nhau ngay tu dau.
-
-## 10. Database
-Script khoi tao va seed du lieu:
+## 9. Database
+Script khởi tạo và seed:
 - `database/init.sql`
 
-Bang du lieu chinh:
+Các bảng chính:
 - `users`
 - `officers`
 - `work_schedules`
 - `duty_schedules`
+- `leave_requests`
 - `opinions`
 - `notifications`
 - `notification_reads`
 - `activity_logs`
 - `export_logs`
+- `departments`
+- `holidays`
 
-Lenh khoi tao nhanh:
+Khởi tạo nhanh:
 ```bash
 mysql -u root < database/init.sql
 ```
 
-## 11. Quy tac nghiep vu quan trong
-1. Officer gui y kien theo luong truc ban.
-2. Admin/manager co the duyet hoac tu choi y kien.
-3. Lich cong tac va lich truc ban khi tao/cap nhat co the sinh thong bao target.
-4. API notifications chi tra thong bao dung nguoi dung dang nhap.
-
-## 12. Van hanh va debug
-1. Loi 401:
-- Kiem tra token co gui len header khong.
-- Kiem tra token con han khong.
-
-2. Loi 403:
-- Kiem tra role trong token.
-- Kiem tra route co `requireRole` dung role khong.
-
-3. Khong thay thong bao:
-- Kiem tra du lieu notifications co targetUserId/targetRole dung user hien tai.
-
-4. DB cu thieu cot target thong bao:
-- Utility se tu ensure schema notifications khi xu ly.
-
-## 13. Tai khoan seed de test
-Mat khau mac dinh: `123456`
+## 10. Tài khoản seed
+Mật khẩu mặc định: `123456`
 
 - Admin: `admin`, `admin2`
-- Manager: `quanly1` den `quanly4`
-- Officer: `canbo1` den `canbo10`
+- Manager: `quanly1` đến `quanly4`
+- Officer: `canbo1` đến `canbo10`
 
-## 14. Khuyen nghi cho phat trien tiep
-- Bo sung test tu dong cho controller va route quan trong.
-- Tach service layer neu can mo rong nghiep vu lon hon.
-- Bo sung rate limit va audit bao mat cho login route.
+## 11. Lưu ý vận hành
+- Nếu đổi quyền ở backend, nên đăng nhập lại để frontend nhận JWT mới.
+- `CORS_ORIGIN` có thể dùng nhiều origin, rất hữu ích khi dev với nhiều môi trường.
+- Backend có log request cơ bản để hỗ trợ debug khi phát triển.
+
+## 12. Liên kết
+- README gốc: [README.md](../README.md)
+- Frontend: [frontend/README.md](../frontend/README.md)
