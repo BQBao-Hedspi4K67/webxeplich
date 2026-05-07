@@ -2,65 +2,69 @@
 title Biểu đồ Use Case Tổng Quan - Hệ thống Quản lý Lịch Công tác và Trực Ban
 
 skinparam backgroundColor white
-skinparam usecaseBorderColor black
+skinparam shadowing false
+skinparam roundcorner 12
+
+skinparam actorStyle awesome
 skinparam actorBorderColor black
-skinparam ArrowColor black
+skinparam actorBackgroundColor white
+
+skinparam usecaseBorderColor black
+skinparam usecaseBackgroundColor white
+skinparam ArrowColor #333333
+
+skinparam packageBorderColor black
+skinparam packageBackgroundColor white
+
 skinparam defaultTextAlignment center
-skinparam fontSize 11
+skinparam fontSize 13
 
-left to right direction
+top to bottom direction
 
-actor "Superadmin" as superadmin
-actor "Admin" as admin
-actor "Manager" as manager
-actor "Officer" as officer
+' ================= Actors =================
+actor "Cán bộ" as officer
+actor "Phó / Trưởng phòng" as manager
+actor "Giám đốc /\nPhó giám đốc" as admin
+actor "Quản trị viên\nhệ thống" as superadmin
+actor "Phó / Trưởng phòng HC,\nĐội xe, Đội bệnh xá" as dutyMgr
+
+' ===== Hierarchy =====
+manager --|> officer
+admin --|> manager
+superadmin --|> admin
+dutyMgr --|> manager
 
 rectangle "Hệ thống Quản lý Lịch Công tác và Trực Ban" {
-    usecase "UC01: Đăng nhập" as UC01
-    usecase "UC02: Quản lý Cán bộ" as UC02
-    usecase "UC03: Quản lý Lịch Công tác" as UC03
-    usecase "UC04: Quản lý Lịch Trực ban" as UC04
-    usecase "UC05: Lịch của Tôi" as UC05
-    usecase "UC06: Ý kiến Trực ban" as UC06
-    usecase "UC07: Thông báo" as UC07
-    usecase "UC08: Xuất Dữ liệu" as UC08
-    usecase "UC09: Quản lý Ngày lễ" as UC09
-    usecase "UC10: Quản lý Phòng ban" as UC10
-    usecase "UC11: Quản lý Xin Nghỉ" as UC11
-    usecase "UC12: Phân quyền Lịch" as UC12
+
+    together {
+
+        package "Xác thực" {
+            usecase "UC01\nĐăng nhập" as UC01
+        }
+
+        package "Lịch & Công việc" {
+            usecase "UC03\nQL Lịch Công tác" as UC03
+            usecase "UC04\nQL Lịch Trực ban" as UC04
+            usecase "UC05\nLịch của Tôi" as UC05
+            usecase "UC06\nÝ kiến Trực ban" as UC06
+            usecase "UC11\nQL Xin Nghỉ" as UC11
+        }
+
+        package "Quản trị hệ thống" {
+            usecase "UC02\nQL Cán bộ" as UC02
+            usecase "UC09\nQL Ngày lễ" as UC09
+            usecase "UC10\nQL Phòng ban" as UC10
+            usecase "UC12\nPhân quyền Lịch" as UC12
+        }
+
+        package "Tiện ích" {
+            usecase "UC07\nThông báo" as UC07
+            usecase "UC08\nXuất dữ liệu" as UC08
+        }
+    }
 }
 
-superadmin --> UC01
-superadmin --> UC02
-superadmin --> UC03
-superadmin --> UC04
-superadmin --> UC05
-superadmin --> UC07
-superadmin --> UC08
-superadmin --> UC09
-superadmin --> UC10
-superadmin --> UC12
-
-admin --> UC01
-admin --> UC02
-admin --> UC03
-admin --> UC04
-admin --> UC05
-admin --> UC07
-admin --> UC08
-admin --> UC09
-admin --> UC10
-admin --> UC12
-
-manager --> UC01
-manager --> UC03
-manager --> UC04
-manager --> UC05
-manager --> UC06
-manager --> UC07
-manager --> UC08
-manager --> UC11
-manager --> UC12
+' ================= Connections =================
 
 officer --> UC01
 officer --> UC05
@@ -69,17 +73,17 @@ officer --> UC07
 officer --> UC08
 officer --> UC11
 
-UC01 ..> UC02 : include
-UC01 ..> UC03 : include
-UC01 ..> UC04 : include
-UC01 ..> UC05 : include
-UC01 ..> UC06 : include
-UC01 ..> UC07 : include
-UC01 ..> UC08 : include
-UC01 ..> UC09 : include
-UC01 ..> UC10 : include
-UC01 ..> UC11 : include
-UC01 ..> UC12 : include
+manager --> UC03
+manager --> UC04
+
+admin --> UC02
+admin --> UC09
+admin --> UC10
+
+superadmin --> UC12
+
+dutyMgr --> UC04
+
 @enduml
 
 @startuml usecase_auth
@@ -94,16 +98,17 @@ skinparam fontSize 11
 
 left to right direction
 
-actor "Superadmin" as superadmin
-actor "Admin" as admin
-actor "Manager" as manager
-actor "Officer" as officer
+actor "Quản trị viên hệ thống" as superadmin
+actor "Giám đốc/ Phó giám đốc" as admin
+actor "Phó/ Trưởng phòng" as manager
+actor "cán bộ" as officer
 
 rectangle "Xác thực và Quản lý Phiên" {
     usecase "UC01: Đăng nhập" as UC01
     usecase "Khôi phục Phiên" as UC01_restore
     usecase "Đăng xuất" as UC01_logout
 }
+
 
 superadmin --> UC01
 admin --> UC01
@@ -126,9 +131,10 @@ skinparam fontSize 11
 
 left to right direction
 
-actor "Superadmin" as superadmin
-actor "Admin" as admin
-actor "Manager" as manager
+actor "Quản trị viên hệ thống" as superadmin
+actor "Giám đốc/ Phó giám đốc" as admin
+actor "Phó/ Trưởng phòng" as manager
+
 
 rectangle "Quản lý Hồ sơ Cán bộ" {
     usecase "UC02: Quản lý Cán bộ" as UC02
@@ -160,10 +166,11 @@ skinparam fontSize 11
 
 left to right direction
 
-actor "Superadmin" as superadmin
-actor "Admin" as admin
-actor "Manager" as manager
-actor "Officer" as officer
+
+actor "Giám đốc/ Phó giám đốc" as admin
+actor "Phó/ Trưởng phòng" as manager
+actor "cán bộ" as officer
+
 
 rectangle "Quản lý Lịch Công tác" {
     usecase "UC03: Quản lý Lịch Công tác" as UC03
@@ -173,9 +180,13 @@ rectangle "Quản lý Lịch Công tác" {
     usecase "Gửi Thông báo" as UC03_notify
 }
 
-superadmin --> UC03
-admin --> UC03
-manager --> UC03
+
+
+admin --> UC03_create
+admin --> UC03_approve
+
+manager --> UC03_create
+
 officer --> UC03
 
 UC03 *-- UC03_create : include
@@ -196,10 +207,11 @@ skinparam fontSize 11
 
 left to right direction
 
-actor "Superadmin" as superadmin
-actor "Admin" as admin
-actor "Manager" as manager
-actor "Officer" as officer
+
+actor "Giám đốc/ Phó giám đốc" as admin
+actor "Phó/ Trưởng phòng" as manager
+actor "cán bộ" as officer
+actor "Phó/ Trưởng Phòng Hành chính, Đội xe, Đội bệnh xá" as dutyMgr
 
 rectangle "Quản lý Lịch Trực ban" {
     usecase "UC04: Quản lý Lịch Trực ban" as UC04
@@ -208,10 +220,14 @@ rectangle "Quản lý Lịch Trực ban" {
     usecase "Kiểm tra Xung đột Thời gian" as UC04_conflict
 }
 
-superadmin --> UC04
+
+
 admin --> UC04
 manager --> UC04
 officer --> UC04
+
+dutyMgr --> UC04_setup
+dutyMgr --> UC04_status
 
 UC04 *-- UC04_setup : include
 UC04 *-- UC04_status : include
@@ -230,10 +246,11 @@ skinparam fontSize 11
 
 left to right direction
 
-actor "Superadmin" as superadmin
-actor "Admin" as admin
-actor "Manager" as manager
-actor "Officer" as officer
+
+actor "Giám đốc/ Phó giám đốc" as admin
+actor "Phó/ Trưởng phòng" as manager
+actor "cán bộ" as officer
+
 
 rectangle "Lịch của Tôi" {
     usecase "UC05: Lịch của Tôi" as UC05
@@ -242,10 +259,12 @@ rectangle "Lịch của Tôi" {
     usecase "Chuyển đổi Chế độ Xem" as UC05_switch
 }
 
-superadmin --> UC05
+
+
 admin --> UC05
 manager --> UC05
 officer --> UC05
+
 
 UC05 *-- UC05_view : include
 UC05 *-- UC05_filter : include
@@ -264,10 +283,11 @@ skinparam fontSize 11
 
 left to right direction
 
-actor "Superadmin" as superadmin
-actor "Admin" as admin
-actor "Manager" as manager
-actor "Officer" as officer
+
+actor "Giám đốc/ Phó giám đốc" as admin
+actor "Phó/ Trưởng phòng" as manager
+actor "cán bộ" as officer
+actor "Phó/ Trưởng Phòng Hành chính" as dutyMgr
 
 rectangle "Ý kiến Trực ban" {
     usecase "UC06: Ý kiến Trực ban" as UC06
@@ -277,14 +297,16 @@ rectangle "Ý kiến Trực ban" {
     usecase "Ghi chú Phản hồi" as UC06_feedback
 }
 
-superadmin --> UC06
+
+
 admin --> UC06
 manager --> UC06
 officer --> UC06
 
 officer --> UC11
-manager --> UC11
-admin --> UC11
+dutyMgr --> UC11
+
+dutyMgr --> UC06_approve
 
 UC06 *-- UC06_submit : include
 UC06 *-- UC06_approve : include
@@ -306,10 +328,11 @@ skinparam fontSize 11
 
 left to right direction
 
-actor "Superadmin" as superadmin
-actor "Admin" as admin
-actor "Manager" as manager
-actor "Officer" as officer
+
+actor "Giám đốc/ Phó giám đốc" as admin
+actor "Phó/ Trưởng phòng" as manager
+actor "cán bộ" as officer
+actor "Quản trị viên hệ thống" as superadmin
 
 rectangle "Thông báo và Kết xuất Dữ liệu" {
     usecase "UC07: Thông báo" as UC07
@@ -328,22 +351,25 @@ rectangle "Thông báo và Kết xuất Dữ liệu" {
     usecase "Tạo/Sửa Phòng ban" as UC10_crud
 }
 
+officer --> UC07
+
 superadmin --> UC07
-superadmin --> UC08
+
 superadmin --> UC09
 superadmin --> UC10
 
 admin --> UC07
 admin --> UC08
-admin --> UC09
-admin --> UC10
+
 
 manager --> UC07
 manager --> UC08
-manager --> UC10
+
 
 officer --> UC07
 officer --> UC08
+
+
 
 UC07 *-- UC07_view : include
 UC07 *-- UC07_mark : include
