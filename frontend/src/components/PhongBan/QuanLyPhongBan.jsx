@@ -11,6 +11,7 @@ const TYPE_LABEL = {
 
 const initialForm = {
   name: '',
+  abbreviation: '',
   departmentType: 'phong',
 };
 
@@ -32,6 +33,7 @@ const QuanLyPhongBan = ({ user, departmentData = [], reloadData }) => {
     if (!q) return items;
     return items.filter((x) =>
       String(x.name || '').toLowerCase().includes(q)
+      || String(x.abbreviation || '').toLowerCase().includes(q)
       || String(TYPE_LABEL[x.departmentType] || '').toLowerCase().includes(q)
     );
   }, [items, search]);
@@ -46,6 +48,7 @@ const QuanLyPhongBan = ({ user, departmentData = [], reloadData }) => {
     setEditItem(item);
     setForm({
       name: item.name,
+      abbreviation: item.abbreviation || '',
       departmentType: item.departmentType,
     });
     setShowModal(true);
@@ -57,11 +60,13 @@ const QuanLyPhongBan = ({ user, departmentData = [], reloadData }) => {
     if (editItem) {
       await apiClient.departments.update(editItem.id, {
         name: form.name.trim(),
+        abbreviation: form.abbreviation.trim(),
         departmentType: form.departmentType,
       });
     } else {
       await apiClient.departments.create({
         name: form.name.trim(),
+        abbreviation: form.abbreviation.trim(),
         departmentType: form.departmentType,
       });
     }
@@ -104,9 +109,10 @@ const QuanLyPhongBan = ({ user, departmentData = [], reloadData }) => {
             <thead>
               <tr>
                 <th className="table-th w-[30%]">Tên đơn vị</th>
+                <th className="table-th w-[12%]">Viết tắt</th>
                 <th className="table-th w-[15%]">Loại</th>
-                <th className="table-th w-[25%]">Trưởng phòng</th>
-                <th className="table-th w-[20%]">Nhân sự</th>
+                <th className="table-th w-[23%]">Trưởng phòng</th>
+                <th className="table-th w-[16%]">Nhân sự</th>
                 <th className="table-th w-[10%]"></th>
               </tr>
             </thead>
@@ -114,6 +120,9 @@ const QuanLyPhongBan = ({ user, departmentData = [], reloadData }) => {
               {filtered.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50/70">
                   <td className="table-td font-semibold text-slate-800">{item.name}</td>
+                  <td className="table-td">
+                    <span className="badge bg-slate-100 text-slate-700">{item.abbreviation || '—'}</span>
+                  </td>
                   <td className="table-td">
                     <span className="badge bg-blue-100 text-blue-700">{TYPE_LABEL[item.departmentType] || item.departmentType}</span>
                   </td>
@@ -142,7 +151,7 @@ const QuanLyPhongBan = ({ user, departmentData = [], reloadData }) => {
               ))}
               {!filtered.length && (
                 <tr>
-                  <td colSpan={5} className="text-center py-10 text-slate-400">
+                  <td colSpan={6} className="text-center py-10 text-slate-400">
                     <Building2 size={26} className="mx-auto mb-2 opacity-40" />
                     Chưa có phòng ban nào.
                   </td>
@@ -164,6 +173,15 @@ const QuanLyPhongBan = ({ user, departmentData = [], reloadData }) => {
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Tên đơn vị</label>
                 <input className="input-field" value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Viết tắt</label>
+                <input
+                  className="input-field"
+                  value={form.abbreviation}
+                  onChange={(e) => setForm((prev) => ({ ...prev, abbreviation: e.target.value }))}
+                  placeholder="P1, K1..."
+                />
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Loại</label>

@@ -606,6 +606,7 @@ function App() {
       const mappedDepartments = (departmentsRes?.data || []).map((d) => ({
         id: d.id,
         name: d.name,
+        abbreviation: d.abbreviation || '',
         departmentType: d.departmentType,
         headOfficerId: d.headOfficerId || null,
         headOfficerName: d.headOfficerName || '',

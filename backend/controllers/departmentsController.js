@@ -5,6 +5,7 @@ const ensureDepartmentsTable = async (connection) => {
     CREATE TABLE IF NOT EXISTS departments (
       id INT PRIMARY KEY AUTO_INCREMENT,
       name VARCHAR(150) NOT NULL UNIQUE,
+      abbreviation VARCHAR(20) NULL,
       departmentType ENUM('ban_giam_doc', 'phong', 'khoa', 'doi') NOT NULL,
       headOfficerId VARCHAR(10) NULL,
       isActive TINYINT(1) DEFAULT 1,
@@ -13,7 +14,8 @@ const ensureDepartmentsTable = async (connection) => {
       FOREIGN KEY (headOfficerId) REFERENCES officers(id) ON DELETE SET NULL,
       INDEX idx_department_type (departmentType),
       INDEX idx_head_officer (headOfficerId),
-      INDEX idx_is_active (isActive)
+      INDEX idx_is_active (isActive),
+      UNIQUE KEY uq_department_abbreviation (abbreviation)
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `);
 
@@ -21,9 +23,17 @@ const ensureDepartmentsTable = async (connection) => {
 
   const [columns] = await connection.execute('SHOW COLUMNS FROM departments');
   const colNames = new Set(columns.map((c) => c.Field));
+  if (!colNames.has('abbreviation')) {
+    await connection.execute('ALTER TABLE departments ADD COLUMN abbreviation VARCHAR(20) NULL AFTER name');
+  }
   if (!colNames.has('headOfficerId')) {
     await connection.execute('ALTER TABLE departments ADD COLUMN headOfficerId VARCHAR(10) NULL AFTER departmentType');
     await connection.execute('ALTER TABLE departments ADD INDEX idx_head_officer (headOfficerId)');
+  }
+
+  const [abbrevIndexes] = await connection.execute("SHOW INDEX FROM departments WHERE Key_name = 'uq_department_abbreviation'");
+  if (!abbrevIndexes.length) {
+    await connection.execute('ALTER TABLE departments ADD UNIQUE KEY uq_department_abbreviation (abbreviation)');
   }
 };
 
@@ -56,6 +66,7 @@ export const getDepartments = async (req, res, next) => {
         `SELECT
            d.id,
            d.name,
+           d.abbreviation,
            d.departmentType,
            d.headOfficerId,
            NULLIF(TRIM(o.officerTitle), '') AS headOfficerTitle,
@@ -69,7 +80,7 @@ export const getDepartments = async (req, res, next) => {
          LEFT JOIN officers o ON o.id = d.headOfficerId
          ${officerJoin}
          ${includeAll ? '' : 'WHERE isActive = 1'}
-         GROUP BY d.id, d.name, d.departmentType, d.headOfficerId, o.officerTitle, o.fullName, d.isActive, d.createdAt, d.updatedAt
+         GROUP BY d.id, d.name, d.abbreviation, d.departmentType, d.headOfficerId, o.officerTitle, o.fullName, d.isActive, d.createdAt, d.updatedAt
          ORDER BY
            CASE departmentType
              WHEN 'ban_giam_doc' THEN 1
@@ -111,6 +122,7 @@ export const getDepartments = async (req, res, next) => {
         return {
           id: r.id,
           name: r.name,
+          abbreviation: r.abbreviation,
           departmentType: r.departmentType,
           headOfficerId: r.headOfficerId,
           headOfficerName,
@@ -137,7 +149,7 @@ export const getDepartments = async (req, res, next) => {
 
 export const createDepartment = async (req, res, next) => {
   try {
-    const { name, departmentType = '', headOfficerId = null } = req.body;
+    const { name, abbreviation = '', departmentType = '', headOfficerId = null } = req.body;
 
     if (!name || !String(name).trim()) {
       return res.status(400).json({
@@ -164,8 +176,8 @@ export const createDepartment = async (req, res, next) => {
       const hasDepartmentId = await hasOfficersDepartmentIdColumn(connection);
 
       const [result] = await connection.execute(
-        'INSERT INTO departments (name, departmentType, headOfficerId, isActive) VALUES (?, ?, ?, 1)',
-        [departmentName, type, headOfficerId || null]
+        'INSERT INTO departments (name, abbreviation, departmentType, headOfficerId, isActive) VALUES (?, ?, ?, ?, 1)',
+        [departmentName, String(abbreviation || '').trim() || null, type, headOfficerId || null]
       );
 
       res.status(201).json({
@@ -191,7 +203,7 @@ export const createDepartment = async (req, res, next) => {
 export const updateDepartment = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, departmentType, headOfficerId, isActive } = req.body;
+    const { name, abbreviation, departmentType, headOfficerId, isActive } = req.body;
 
     const fields = [];
     const params = [];
@@ -199,6 +211,11 @@ export const updateDepartment = async (req, res, next) => {
     if (name !== undefined) {
       fields.push('name = ?');
       params.push(String(name).trim());
+    }
+
+    if (abbreviation !== undefined) {
+      fields.push('abbreviation = ?');
+      params.push(String(abbreviation).trim() || null);
     }
 
     if (departmentType !== undefined) {

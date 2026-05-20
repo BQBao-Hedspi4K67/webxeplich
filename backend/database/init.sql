@@ -931,9 +931,6 @@ INSERT INTO export_logs (userId, username, role, exportType, exportScope, export
 (1, 'thaolm', 'admin', 'both', 'week', 'pdf', 41),
 (5, 'sontv', 'manager', 'trucban', 'week', 'pdf', 36),
 (5, 'sontv', 'manager', 'trucban', 'week', 'pdf', 36);
-
-
-
 INSERT INTO work_schedules (
   id, title, date, startTime, endTime, location, department, type, weekNo, notes,
   responsibleOfficerId, createdByUserId, createdByOfficerId
@@ -1122,3 +1119,34 @@ INSERT INTO work_schedules (
 ('LCT201', 'Hội thảo nghiên cứu', '2026-06-30', '16:00:00', '23:59:00', 'Phòng học C3', 'Khoa nghiệp vụ cơ bản', 'hoiThao', 27, '', 'CB047', 47, 'CB047');
 -- Verify tables were created
 SELECT 'Database initialized successfully (seeded, except leave_requests/notification_reads)!' AS status;
+
+-- ========== DEPARTMENT ABBREVIATIONS ==========
+-- Thêm cột viết tắt cho bảng departments và gán dữ liệu theo danh mục yêu cầu.
+ALTER TABLE departments
+ADD COLUMN abbreviation VARCHAR(20) NULL AFTER name;
+
+UPDATE departments
+SET abbreviation = CASE name
+  WHEN 'Phòng hành chính tổng hợp' THEN 'P1'
+  WHEN 'Phòng chính trị' THEN 'P2'
+  WHEN 'Phòng quản lý đào tạo và BDNC' THEN 'P3'
+  WHEN 'Phòng ĐBCL đào tạo' THEN 'P4'
+  WHEN 'Phòng quản lý nghiên cứu khoa học' THEN 'P5'
+  WHEN 'Phòng quản lý học viên' THEN 'P6'
+  WHEN 'Phòng hậu cần' THEN 'P7'
+  WHEN 'Khoa Lý luận chính trị và KHXHNV' THEN 'K1'
+  WHEN 'Khoa Luật' THEN 'K2'
+  WHEN 'Khoa nghiệp vụ cơ bản' THEN 'K3'
+  WHEN 'Khoa khoa học cơ bản và ngoại ngữ' THEN 'K4'
+  WHEN 'Khoa quân sự, võ thuật, TDTT' THEN 'K5'
+  WHEN 'Khoa mật mã' THEN 'K6'
+  WHEN 'Khoa Công nghệ và ATTT' THEN 'K7'
+  WHEN 'Khoa Điện tử viễn thông và kỹ thuật nghiệp vụ' THEN 'K8'
+  WHEN 'Khoa Hồ sơ - Lưu trữ' THEN 'K9'
+  WHEN 'Khoa Hậu cần' THEN 'K10'
+  WHEN 'Khoa Y Dược' THEN 'K11'
+  ELSE abbreviation
+END;
+
+ALTER TABLE departments
+ADD UNIQUE KEY uq_department_abbreviation (abbreviation);
