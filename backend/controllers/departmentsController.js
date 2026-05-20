@@ -84,19 +84,20 @@ export const getDepartments = async (req, res, next) => {
       const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const cleaned = rows.map((r) => {
         const title = (r.headOfficerTitle || '').trim();
-        const full = (r.headOfficerFullName || '').trim();
+        let full = (r.headOfficerFullName || '').trim();
         let headOfficerName = '';
 
         if (full) {
           if (title) {
-            // collapse repeated title prefixes in full name
             try {
-              const re = new RegExp(`^(${escapeRegex(title)}\s+)+`, 'i');
-              if (re.test(full)) {
-                headOfficerName = full.replace(re, `${title} `).trim();
-              } else {
-                headOfficerName = `${title} ${full}`.trim();
-              }
+              // Remove any occurrence of the title inside the full name (case-insensitive),
+              // then ensure a single leading title followed by the cleaned name.
+              const anyTitleRe = new RegExp(escapeRegex(title), 'ig');
+              // remove all occurrences
+              full = full.replace(anyTitleRe, '').trim();
+              // collapse multiple internal spaces
+              full = full.replace(/\s{2,}/g, ' ').trim();
+              headOfficerName = full ? `${title} ${full}` : title;
             } catch (e) {
               headOfficerName = `${title} ${full}`.trim();
             }
