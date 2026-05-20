@@ -43,6 +43,9 @@ const buildOfficerDisplaySql = (alias) => `
 CASE
   WHEN ${alias}.officerTitle IS NULL OR TRIM(${alias}.officerTitle) = '' THEN TRIM(COALESCE(${alias}.fullName, ''))
   WHEN ${alias}.fullName IS NULL OR TRIM(${alias}.fullName) = '' THEN TRIM(${alias}.officerTitle)
+  -- If fullName accidentally contains the title twice (e.g. 'Thiếu tướng Thiếu tướng ...'), collapse the duplicate
+  WHEN LOWER(TRIM(${alias}.fullName)) LIKE CONCAT(LOWER(TRIM(${alias}.officerTitle)), ' ', LOWER(TRIM(${alias}.officerTitle)), ' %')
+    THEN TRIM(REPLACE(TRIM(${alias}.fullName), CONCAT(TRIM(${alias}.officerTitle), ' ', TRIM(${alias}.officerTitle)), TRIM(${alias}.officerTitle)))
   WHEN LOWER(TRIM(${alias}.fullName)) = LOWER(TRIM(${alias}.officerTitle))
        OR LOWER(TRIM(${alias}.fullName)) LIKE CONCAT(LOWER(TRIM(${alias}.officerTitle)), ' %')
     THEN TRIM(${alias}.fullName)
