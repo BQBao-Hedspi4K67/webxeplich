@@ -336,16 +336,16 @@ const LandingLogin = ({ onLogin }) => {
   };
 
   return (
-    <div className="h-screen overflow-hidden bg-white relative">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl" />
-        <div className="absolute top-1/3 -right-32 w-80 h-80 bg-cyan-500/8 rounded-full blur-3xl" />
-        <div className="absolute -bottom-32 left-1/3 w-72 h-72 bg-blue-800/15 rounded-full blur-3xl" />
-        <div className="absolute inset-0" style={{
-          backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px)',
-          backgroundSize: '20px 20px',
-        }} />
-      </div>
+    <div className="h-screen overflow-hidden bg-slate-50 relative">
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.05]"
+        style={{
+          backgroundImage: `url(${logoSchool})`,
+          backgroundRepeat: 'repeat',
+          backgroundSize: '240px 240px',
+          backgroundPosition: 'center',
+        }}
+      />
 
       <div className="relative z-10 h-full px-4 sm:px-6 lg:px-8 py-2 flex flex-col overflow-hidden">
         {/* Header: Centered title + Login button top-right */}
@@ -437,10 +437,10 @@ const LandingLogin = ({ onLogin }) => {
                 <table className="w-full text-sm table-fixed">
                   <thead>
                     <tr className="border-b-2 border-gray-300 bg-gray-100">
-                      <th className="px-4 py-3 text-left font-bold text-slate-900 w-[32%]">Danh sách trực</th>
-                      <th className="px-4 py-3 text-left font-bold text-slate-900 w-[16%]">Buổi</th>
-                      <th className="px-4 py-3 text-left font-bold text-slate-900 w-[12%]">Giờ</th>
-                      <th className="px-4 py-3 text-left font-bold text-slate-900 w-[40%]">Chi tiết nội dung</th>
+                      <th className="px-4 py-3 text-left font-bold text-slate-900 w-[36%]">Danh sách trực</th>
+                      <th className="px-4 py-3 text-left font-bold text-slate-900 w-[14%]">Buổi</th>
+                      <th className="px-4 py-3 text-left font-bold text-slate-900  w-[12%]">Giờ</th>
+                      <th className="px-4 py-3 text-left font-bold text-slate-900 w-[38%]">Chi tiết nội dung</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -458,7 +458,7 @@ const LandingLogin = ({ onLogin }) => {
                       return (
                         <tr key={`today-${rowIdx}`} className="border-b border-gray-200 bg-white hover:bg-gray-50 transition-colors">
                           {rowIdx === 0 && (
-                            <td rowSpan={dayRows.length} className="px-4 py-3 bg-gray-100 text-slate-900 align-top border-r border-gray-300 whitespace-pre-line">
+                            <td rowSpan={dayRows.length} className="px-4 py-3 bg-white text-slate-900 align-top border-r border-gray-300 whitespace-pre-line">
                               {dutyLines.map((line, index) => {
                                 const colonIdx = line.indexOf(':');
                                 const rawLabel = colonIdx !== -1 ? line.slice(0, colonIdx).trim() : line.trim();
