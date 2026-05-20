@@ -58,11 +58,8 @@ export const getDepartments = async (req, res, next) => {
            d.name,
            d.departmentType,
            d.headOfficerId,
-           CASE
-             WHEN o.fullName IS NOT NULL AND o.officerTitle IS NOT NULL AND TRIM(o.fullName) LIKE CONCAT(TRIM(o.officerTitle), '%')
-               THEN TRIM(o.fullName)
-             ELSE CONCAT_WS(' ', NULLIF(TRIM(o.officerTitle), ''), TRIM(o.fullName))
-           END AS headOfficerName,
+           NULLIF(TRIM(o.officerTitle), '') AS headOfficerTitle,
+           NULLIF(TRIM(o.fullName), '') AS headOfficerFullName,
            d.isActive,
            d.createdAt,
            d.updatedAt,
@@ -82,6 +79,51 @@ export const getDepartments = async (req, res, next) => {
            END,
            name ASC`
       );
+
+      // Normalize headOfficerName to avoid duplicated title prefixes like "Thiếu tướng Thiếu tướng ..."
+      const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const cleaned = rows.map((r) => {
+        const title = (r.headOfficerTitle || '').trim();
+        const full = (r.headOfficerFullName || '').trim();
+        let headOfficerName = '';
+
+        if (full) {
+          if (title) {
+            // collapse repeated title prefixes in full name
+            try {
+              const re = new RegExp(`^(${escapeRegex(title)}\s+)+`, 'i');
+              if (re.test(full)) {
+                headOfficerName = full.replace(re, `${title} `).trim();
+              } else {
+                headOfficerName = `${title} ${full}`.trim();
+              }
+            } catch (e) {
+              headOfficerName = `${title} ${full}`.trim();
+            }
+          } else {
+            headOfficerName = full;
+          }
+        } else {
+          headOfficerName = title;
+        }
+
+        return {
+          id: r.id,
+          name: r.name,
+          departmentType: r.departmentType,
+          headOfficerId: r.headOfficerId,
+          headOfficerName,
+          isActive: r.isActive,
+          createdAt: r.createdAt,
+          updatedAt: r.updatedAt,
+          managerCount: r.managerCount,
+          officerCount: r.officerCount,
+        };
+      });
+
+      // replace rows with cleaned
+      rows.length = 0;
+      cleaned.forEach((c) => rows.push(c));
 
       res.json({ success: true, data: rows });
     } finally {
