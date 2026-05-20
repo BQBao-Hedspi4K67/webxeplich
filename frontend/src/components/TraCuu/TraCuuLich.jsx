@@ -36,7 +36,7 @@ const getDisplayTime = (item) => {
 const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
   const [keyword, setKeyword] = useState('');
   const [filterLoai, setFilterLoai] = useState('all'); // 'all' | 'congtac' | 'trucban'
-  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7));
+  // month filter removed
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'calendar'
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -55,8 +55,7 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
     const q = keyword.toLowerCase();
     const matchKeyword = !q || item.tieuDe.toLowerCase().includes(q) || (item.nguoiPhuTrach || '').toLowerCase().includes(q) || (item.diaDiem || '').toLowerCase().includes(q);
     const matchLoai = filterLoai === 'all' || item.type === filterLoai;
-    const matchMonth = !filterMonth || item.ngay.startsWith(filterMonth);
-    return matchKeyword && matchLoai && matchMonth;
+    return matchKeyword && matchLoai;
   }).sort((a, b) => b.ngay > a.ngay ? 1 : -1);
 
   const totalPages = Math.ceil(filtered.length / perPage);
@@ -115,11 +114,7 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
             </select>
           </div>
 
-          {/* Month filter */}
-          <div className="min-w-[150px]">
-            <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Tháng</label>
-            <input type="month" value={filterMonth} onChange={e => { setFilterMonth(e.target.value); setCurrentPage(1); }} className="input-field" />
-          </div>
+          {/* Month filter removed */}
 
           {/* Clear */}
           {(keyword || filterLoai !== 'all') && (
@@ -166,7 +161,7 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
                 <table className="w-full">
                   <thead>
                     <tr>
-                      {['Loại', 'Tên lịch', 'Ngày', 'Thời gian', 'Địa điểm / Vị trí', 'Người phụ trách', ''].map(h => (
+                      {['Loại', 'Tên lịch', 'Ngày', 'Thời gian', 'Địa điểm / Vị trí', 'Chủ trì', ''].map(h => (
                         <th key={h} className="table-th">{h}</th>
                       ))}
                     </tr>
@@ -316,7 +311,7 @@ const TraCuuLich = ({ lichCongTacData = [], lichTrucBanData = [] }) => {
                 { icon: '📅', label: 'Ngày', value: getDisplayDate(selectedItem) },
                 { icon: '🕐', label: 'Thời gian', value: getDisplayTime(selectedItem) },
                 { icon: '📍', label: 'Địa điểm', value: selectedItem.diaDiem || selectedItem.viTri || '—' },
-                { icon: '👤', label: 'Người phụ trách', value: selectedItem.nguoiPhuTrach || '—' },
+                { icon: '👤', label: 'Chủ trì', value: selectedItem.nguoiPhuTrach || '—' },
                 { icon: '🏢', label: 'Đơn vị', value: selectedItem.donVi || '—' },
               ].map((f, i) => (
                 <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl">

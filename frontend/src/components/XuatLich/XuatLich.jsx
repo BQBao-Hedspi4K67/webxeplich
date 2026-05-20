@@ -3,7 +3,7 @@ import { FileText, Eye, Download, Check, Shield, CalendarDays, ChevronLeft, Chev
 import apiClient from '../../services/api';
 
 const XuatLich = ({ xuatLichHistory = [], reloadData, variant = 'page' }) => {
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  // month export removed — keep week-based export only
   const formatLocalDate = (date) => {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -103,16 +103,7 @@ const XuatLich = ({ xuatLichHistory = [], reloadData, variant = 'page' }) => {
     if (exportScope === 'week') {
       return getWeekBoundsFromStartDate(weekStartDate);
     }
-    if (exportScope === 'month' && monthValue) {
-      const [y, m] = String(monthValue).split('-').map(Number);
-      if (!y || !m) return null;
-      const start = new Date(Date.UTC(y, m - 1, 1));
-      const end = new Date(Date.UTC(y, m, 0));
-      return {
-        startDate: start.toISOString().slice(0, 10),
-        endDate: end.toISOString().slice(0, 10),
-      };
-    }
+    // month scope removed
     return null;
   };
   const getDateListByBounds = (bounds) => {
@@ -131,7 +122,6 @@ const XuatLich = ({ xuatLichHistory = [], reloadData, variant = 'page' }) => {
   const [exportType, setExportType] = useState('congtac');
   const [exportScope, setExportScope] = useState('week');
   const [weekStartDate, setWeekStartDate] = useState(currentWeekStart);
-  const [monthValue, setMonthValue] = useState(currentMonth);
   const [previewReady, setPreviewReady] = useState(false);
   const [exported, setExported] = useState(false);
   const [previewData, setPreviewData] = useState({ workSchedules: [], dutySchedules: [] });
@@ -144,12 +134,11 @@ const XuatLich = ({ xuatLichHistory = [], reloadData, variant = 'page' }) => {
     try {
       setLoadingPreview(true);
       const res = await apiClient.exports.preview({
-        type: exportType,
-        scope: exportScope,
-        weekNo: selectedWeekMeta.weekNo,
-        year: selectedWeekMeta.year,
-        month: monthValue,
-      });
+          type: exportType,
+          scope: exportScope,
+          weekNo: selectedWeekMeta.weekNo,
+          year: selectedWeekMeta.year,
+        });
       setPreviewData(res?.data || { workSchedules: [], dutySchedules: [] });
       setPreviewReady(true);
     } catch (err) {
@@ -166,7 +155,6 @@ const XuatLich = ({ xuatLichHistory = [], reloadData, variant = 'page' }) => {
         scope: exportScope,
         weekNo: selectedWeekMeta.weekNo,
         year: selectedWeekMeta.year,
-        month: monthValue,
         format: 'pdf',
       });
 
@@ -477,9 +465,8 @@ const XuatLich = ({ xuatLichHistory = [], reloadData, variant = 'page' }) => {
                 <div className="space-y-2">
                   <select className="input-field text-sm" value={exportScope} onChange={(e) => setExportScope(e.target.value)}>
                     <option value="week">Theo tuần</option>
-                    <option value="month">Theo tháng</option>
                   </select>
-                  {exportScope === 'week' ? (
+                  {exportScope === 'week' && (
                     <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
                       <div className="flex items-center justify-between gap-2">
                         <button
@@ -505,13 +492,6 @@ const XuatLich = ({ xuatLichHistory = [], reloadData, variant = 'page' }) => {
                         </button>
                       </div>
                     </div>
-                  ) : (
-                    <input
-                      type="month"
-                      className="input-field text-sm"
-                      value={monthValue}
-                      onChange={(e) => setMonthValue(e.target.value)}
-                    />
                   )}
                 </div>
               </div>
@@ -673,29 +653,7 @@ const XuatLich = ({ xuatLichHistory = [], reloadData, variant = 'page' }) => {
         </div>
       </div>
 
-      {/* Recent exports */}
-      <div className="card">
-        <h3 className="text-sm font-bold text-slate-700 mb-3">Lịch sử xuất file gần đây</h3>
-        <div className="space-y-2">
-          {xuatLichHistory.map((file, i) => (
-            <div key={i} className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
-              <div className="w-9 h-9 rounded-xl text-red-600 bg-red-50 flex items-center justify-center flex-shrink-0">
-                <FileText size={16} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-slate-800 truncate">{`lich_${file.exportType}_${file.exportScope}.${file.exportFormat}`}</div>
-                <div className="text-xs text-slate-400">{file.itemCount} mục · {new Date(file.createdAt).toLocaleString('vi-VN')}</div>
-              </div>
-              <button className="text-slate-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-all">
-                <Download size={15} />
-              </button>
-            </div>
-          ))}
-          {xuatLichHistory.length === 0 && (
-            <div className="text-sm text-slate-400">Chưa có lịch sử xuất.</div>
-          )}
-        </div>
-      </div>
+      
     </div>
   );
 };

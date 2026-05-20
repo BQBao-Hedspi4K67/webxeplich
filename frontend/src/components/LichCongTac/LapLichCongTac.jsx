@@ -147,9 +147,8 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
   const [data, setData] = useState(lichCongTacData);
   const [officerOptions, setOfficerOptions] = useState(canBoData || []);
   const [dutyData, setDutyData] = useState(dutyScheduleData || []);
-  const [viewMode, setViewMode] = useState(() => sessionStorage.getItem('lapLichCongTacViewMode') || 'week'); // 'week' | 'month'
+  const [viewMode, setViewMode] = useState(() => sessionStorage.getItem('lapLichCongTacViewMode') || 'week'); // only 'week' supported
   const [weekOffset, setWeekOffset] = useState(() => Number(sessionStorage.getItem('lapLichCongTacWeekOffset')) || 0);
-  const [monthOffset, setMonthOffset] = useState(() => Number(sessionStorage.getItem('lapLichCongTacMonthOffset')) || 0);
   const [showModal, setShowModal] = useState(false);
   const [isReadOnlyModal, setIsReadOnlyModal] = useState(false);
   const [selectedDutyDetail, setSelectedDutyDetail] = useState(null);
@@ -162,9 +161,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
     sessionStorage.setItem('lapLichCongTacWeekOffset', String(weekOffset));
   }, [weekOffset]);
 
-  useEffect(() => {
-    sessionStorage.setItem('lapLichCongTacMonthOffset', String(monthOffset));
-  }, [monthOffset]);
+  // month view removed — no monthOffset state
   const [form, setForm] = useState(initialForm);
   const [editId, setEditId] = useState(null);
   const [selectedDay, setSelectedDay] = useState(null);
@@ -234,8 +231,11 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
         const mapped = (res?.data || []).map((o) => ({
           id: o.id,
           hoTen: buildDisplayName(o.officerTitle, o.officerName || o.fullName || o.id),
-          capBac: o.officerTitle || '',
-          donVi: o.department || '',
+          capBac: o.officerTitle || o.capBac || '',
+          donVi: o.department || o.donVi || '',
+          position: o.position || o.chucVu || '',
+          phone: o.phone || o.soDienThoai || o.phoneNumber || '',
+          rawRole: o.role || o.vaiTro || '',
           vaiTro: o.role === 'leader' ? 'Lãnh đạo' : o.role === 'manager' ? 'Quản lý' : 'Cán bộ',
         }));
         if (mapped.length) setOfficerOptions(mapped);
@@ -257,18 +257,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
     ? `Tuần này (${formatDDMM(weekDates[0])} - ${formatDDMM(weekDates[6])})`
     : `Tuần ${toDateOnly(weekDates[0])} - ${toDateOnly(weekDates[6])}`;
 
-  // Month calculation
-  const monthNow = new Date();
-  monthNow.setMonth(monthNow.getMonth() + monthOffset);
-  const monthStart = new Date(monthNow.getFullYear(), monthNow.getMonth(), 1);
-  const monthEnd = new Date(monthNow.getFullYear(), monthNow.getMonth() + 1, 0);
-  const monthStartWeekDay = monthStart.getDay() === 0 ? 7 : monthStart.getDay();
-  const monthDays = [];
-  for (let i = 1; i < monthStartWeekDay; i += 1) monthDays.push(null);
-  for (let d = 1; d <= monthEnd.getDate(); d += 1) {
-    monthDays.push(new Date(monthNow.getFullYear(), monthNow.getMonth(), d));
-  }
-  const monthLabel = monthNow.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' });
+  // Month view removed
 
   const toDateStr = (d) => {
     const y = d.getFullYear();
@@ -292,12 +281,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
     return inRange && matchLoai && matchDonVi;
   });
 
-  const monthData = data.filter((l) => {
-    const lDate = new Date(`${l.ngay}T00:00:00`);
-    const matchLoai = !filterLoai || l.loai === filterLoai;
-    const matchDonVi = !filterDonVi || String(l.donVi || '').split(',').map((x) => x.trim()).includes(filterDonVi);
-    return lDate >= monthStart && lDate <= monthEnd && matchLoai && matchDonVi;
-  });
+  const monthData = [];
 
   const HOLIDAYS = (holidayData || []).reduce((acc, h) => {
     if (h?.ngay) acc[h.ngay] = h.ten;
@@ -311,6 +295,24 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
   const banGiamDocMembers = officerOptions
     .filter((cb) => cb.vaiTro === 'Lãnh đạo' || cb.donVi === 'Ban Giám đốc')
     .slice(0, 4);
+
+  const findOfficerInfo = (duty) => {
+    if (!duty) return {};
+    const byId = (id) => (officerOptions || []).find((o) => String(o.id) === String(id)) || (canBoData || []).find((o) => String(o.id) === String(id));
+    let officer = null;
+    if (duty.officerId) officer = byId(duty.officerId);
+    if (!officer && duty.canBoId) officer = byId(duty.canBoId);
+    if (!officer && duty.tenCanBo) {
+      officer = (officerOptions || []).find((o) => String(o.hoTen || o.fullName || '').trim() === String(duty.tenCanBo || '').trim())
+        || (canBoData || []).find((o) => String(o.hoTen || o.fullName || o.fullNameNormalized || '').trim() === String(duty.tenCanBo || '').trim());
+    }
+    // Normalize fields from canBoData variations
+    if (!officer && (canBoData || []).length) {
+      const fallback = (canBoData || []).find((o) => String(o.tenCanBo || o.hoTen || o.officerName || '').trim() === String(duty.tenCanBo || '').trim());
+      if (fallback) officer = fallback;
+    }
+    return officer || {};
+  };
 
   const getBgdMemberNames = (memberIds = []) => {
     if (!Array.isArray(memberIds) || !memberIds.length) return [];
@@ -363,7 +365,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
     if (isReadOnlyModal) return;
     if (!form.tieuDe || !form.ngay) return;
     if (!form.nguoiPhuTrachId) {
-      alert('Vui lòng chọn người phụ trách.');
+      alert('Vui lòng chọn Chủ trì.');
       return;
     }
     if (!form.thanhPhanThamGia?.length) {
@@ -414,10 +416,6 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
             className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'week' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
             <CalendarDays size={14} className="inline mr-1.5" />Lịch tuần
           </button>
-          <button onClick={() => setViewMode('month')}
-            className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'month' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-            <CalendarDays size={14} className="inline mr-1.5" />Lịch tháng
-          </button>
           {(canCreate || canExportPrint) && (
             <div className="flex items-center gap-2">
               {canExportPrint && (
@@ -441,7 +439,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
       </div>
 
       {/* Week/Month navigation + filter */}
-      {(viewMode === 'week' || viewMode === 'month') && (
+      {viewMode === 'week' && (
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1">
             <button onClick={() => viewMode === 'week' ? setWeekOffset(w => w - 1) : setMonthOffset(m => m - 1)}
@@ -449,7 +447,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
               <ChevronLeft size={16} />
             </button>
             <span className="px-3 text-sm font-semibold text-slate-700 min-w-[200px] text-center">
-              {viewMode === 'week' ? weekLabel : monthLabel}
+              {weekLabel}
             </span>
             <button onClick={() => viewMode === 'week' ? setWeekOffset(w => w + 1) : setMonthOffset(m => m + 1)}
               className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-all">
@@ -470,7 +468,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
             </select>
           </div>
           <span className="text-xs text-slate-400">
-            {viewMode === 'week' ? `${weekData.length} lịch trong tuần` : `${monthData.length} lịch trong tháng`}
+            {`${weekData.length} lịch trong tuần`}
           </span>
         </div>
       )}
@@ -488,103 +486,6 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
               holidays={HOLIDAYS}
               onSelectEvent={handleGridEventClick}
             />
-          </div>
-        </div>
-      ) : viewMode === 'month' ? (
-        /* Monthly calendar view */
-        <div className="card-lg p-0 overflow-hidden">
-          <div className="p-5">
-            <div className="grid grid-cols-7 gap-3 mb-4">
-              {['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'].map((x, i) => (
-                <div key={x} className={`py-3 text-center font-bold text-sm rounded-lg ${i === 5 ? 'bg-amber-50 text-amber-700' : i === 6 ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
-                  {x}
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-3 auto-rows-fr">
-              {monthDays.map((d, idx) => {
-                if (!d) return <div key={`empty-${idx}`} className="min-h-32 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100/50" />;
-                const dateStr = toDateStr(d);
-                const isToday = dateStr === toDateStr(new Date());
-                const isFirstMondayOfMonth = d.getDay() === 1 && d.getDate() <= 7;
-                const isWeekend = d.getDay() === 6 || d.getDay() === 0;
-                const holiday = HOLIDAYS[dateStr];
-                const dayEvents = monthData.filter((x) => x.ngay === dateStr);
-                return (
-                  <div key={dateStr} 
-                    className={`min-h-32 rounded-lg p-3 transition-all duration-200 cursor-pointer group relative overflow-hidden ${
-                      isToday 
-                        ? 'border-2 border-blue-500 bg-gradient-to-br from-blue-50 to-blue-50/30 shadow-lg' 
-                        : isWeekend
-                        ? 'border border-slate-200 bg-gradient-to-br from-slate-50 to-white hover:shadow-md hover:border-slate-300'
-                        : 'border border-slate-200 bg-white hover:shadow-md hover:border-slate-300'
-                    }`}
-                    onClick={() => {
-                      if (canCreate) {
-                        setForm({ ...initialForm, ngay: dateStr });
-                        setEditId(null);
-                        setShowModal(true);
-                      }
-                    }}>
-                    {/* Background accent */}
-                    <div className="absolute top-0 right-0 w-12 h-12 bg-blue-500/5 rounded-bl-lg group-hover:bg-blue-500/10 transition-colors" />
-                    
-                    {/* Day number */}
-                    <div className="flex items-start justify-between mb-2 relative z-10">
-                      <span className={`text-base font-extrabold ${isToday ? 'text-blue-700' : isWeekend ? 'text-slate-400' : 'text-slate-800'}`}>
-                        {d.getDate()}
-                      </span>
-                      {isFirstMondayOfMonth && (
-                        <span className="text-[9px] px-2 py-1 rounded-full font-bold bg-gradient-to-r from-emerald-100 to-emerald-50 text-emerald-700 border border-emerald-200">
-                          Chào cờ
-                        </span>
-                      )}
-                    </div>
-                    {holiday && <div className="text-[10px] text-red-600 font-semibold line-clamp-1 mb-1">{holiday}</div>}
-
-                    {/* Events container */}
-                    <div className="space-y-1.5 relative z-10 max-h-20 overflow-y-auto scrollbar-hide">
-                      {dayEvents.slice(0, 3).map((evt, eIdx) => {
-                        const colorInfo = LOAI_LICH_COLORS[evt.loai] || LOAI_LICH_COLORS.hop;
-                        const start = evt.gioBatDau ? String(evt.gioBatDau).slice(0, 5) : '';
-                        const end = evt.gioKetThuc ? String(evt.gioKetThuc).slice(0, 5) : '';
-                        const timeDisplay = start && end ? `${start}-${end}` : (start || end || '');
-                        const isPending = evt.trangThaiDuyet === 'pending';
-                        return (
-                          <div 
-                            key={evt.id}
-                            className={`text-[11px] px-2 py-1 rounded-md transition-all duration-150 cursor-pointer hover:shadow-sm border border-current border-opacity-30 group/evt ${colorInfo.bg} ${colorInfo.text} ${isPending ? 'opacity-65 border-dashed' : ''}`}
-                            onClick={(e) => { e.stopPropagation(); openEdit(evt); }}
-                            title={evt.tieuDe}>
-                            <div className="flex items-start gap-1">
-                              {timeDisplay && (
-                                <span className="font-bold whitespace-nowrap flex-shrink-0">{timeDisplay}</span>
-                              )}
-                              <span className="font-medium flex-1 group-hover/evt:underline">{evt.tieuDe}</span>
-                            </div>
-                            {isPending && <div className="text-[9px] font-bold mt-0.5 text-amber-700">Chưa duyệt</div>}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* More indicator */}
-                    {dayEvents.length > 3 && (
-                      <div className="mt-1.5 text-[10px] font-bold text-slate-400 pl-2 relative z-10">
-                        +{dayEvents.length - 3} lịch
-                      </div>
-                    )}
-
-                    {/* Add button indicator */}
-                    {canCreate && dayEvents.length === 0 && (
-                      <div className="mt-1 text-center">
-                        <div className="text-[10px] text-slate-300 group-hover:text-blue-400 transition-colors">Nhấn để thêm</div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
           </div>
         </div>
       ) : null}
@@ -630,7 +531,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
               </div>
               <div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Người phụ trách <span className="text-red-500">*</span></label>
+                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Chủ trì <span className="text-red-500">*</span></label>
                   <select disabled={isReadOnlyModal} className="input-field" value={form.nguoiPhuTrachId || ''} onChange={e => setForm({...form, nguoiPhuTrachId: e.target.value})}>
                     <option value="">-- Chọn --</option>
                     {officerOptions.map(cb => <option key={cb.id} value={cb.id}>{buildDisplayName(cb.capBac, cb.hoTen)}</option>)}
@@ -721,7 +622,21 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
               <button onClick={() => setSelectedDutyDetail(null)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
             </div>
             <div className="p-6 space-y-4">
-              {selectedDutyDetail.items?.map((duty, idx) => (
+              {(selectedDutyDetail.items || []).slice().sort((a, b) => {
+                const slotA = Number(a.slotNo || 1);
+                const slotB = Number(b.slotNo || 1);
+                if (a.kieuTruc !== b.kieuTruc) return a.kieuTruc === 'giamdoc' ? -1 : 1;
+                if (a.kieuTruc === 'canbo' && b.kieuTruc === 'canbo') {
+                  const aIsCommander = (a.vaiTroTruc || a.dutyRole || '') === 'commander';
+                  const bIsCommander = (b.vaiTroTruc || b.dutyRole || '') === 'commander';
+                  if (aIsCommander !== bIsCommander) return aIsCommander ? -1 : 1;
+                }
+                if (a.viTri !== b.viTri) {
+                  const order = { 'Trực ban Giám đốc': 0, 'Nhà hiệu bộ': 1, 'Lái xe': 2, 'Bệnh xá': 3 };
+                  return (order[a.viTri] || 99) - (order[b.viTri] || 99);
+                }
+                return slotA - slotB;
+              }).map((duty, idx) => (
                 <div key={`${duty.id || idx}-${idx}`} className="rounded-xl border border-slate-200 p-4 bg-slate-50/40">
                   <div className="font-semibold text-slate-900 mb-3 text-sm">
                     {duty.kieuTruc === 'giamdoc' ? '🎖️ Trực ban Giám đốc' : `📍 ${duty.viTri || 'Trực ban'}`}
@@ -731,6 +646,33 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                       <span className="font-medium text-slate-600">Cán bộ:</span>
                       <span className="text-slate-900 text-right">{duty.tenCanBo || 'Chưa phân công'}</span>
                     </div>
+                    {/* Additional officer details */}
+                    {(() => {
+                      const info = findOfficerInfo(duty) || {};
+                      const phone = duty.soDienThoai || duty.phone || info.soDienThoai || info.phone || info.phoneNumber || '—';
+                      // Chức vụ: nếu rawRole là 'officer' thì hiển thị 'Cán bộ', ngược lại lấy position
+                      const rawRole = info.rawRole || info.role || info.vaiTro || '';
+                      const title = (String(rawRole).toLowerCase() === 'officer' || String(rawRole).toLowerCase() === 'canbo')
+                        ? 'Cán bộ'
+                        : info.position || duty.chucVu || info.chucVu || info.capBac || '—';
+                      const dept = duty.phongBan || info.phongBan || info.donVi || info.department || '—';
+                      return (
+                        <>
+                          <div className="flex justify-between items-start">
+                            <span className="font-medium text-slate-600">SĐT:</span>
+                            <span className="text-slate-900 text-right">{phone}</span>
+                          </div>
+                          <div className="flex justify-between items-start">
+                            <span className="font-medium text-slate-600">Chức vụ:</span>
+                            <span className="text-slate-900 text-right">{title}</span>
+                          </div>
+                          <div className="flex justify-between items-start">
+                            <span className="font-medium text-slate-600">Phòng ban:</span>
+                            <span className="text-slate-900 text-right">{dept}</span>
+                          </div>
+                        </>
+                      );
+                    })()}
                     <div className="flex justify-between items-start">
                       <span className="font-medium text-slate-600">Thời gian:</span>
                       <span className="text-slate-900 text-right">

@@ -67,6 +67,12 @@ const buildDutySummaryLines = (duties = []) => {
     const slotA = Number(a.slotNo || 1);
     const slotB = Number(b.slotNo || 1);
     if (a.kieuTruc !== b.kieuTruc) return a.kieuTruc === 'giamdoc' ? -1 : 1;
+    // Prefer commander among canbo duties
+    if (a.kieuTruc === 'canbo' && b.kieuTruc === 'canbo') {
+      const aIsCommander = (a.vaiTroTruc || a.dutyRole || '') === 'commander';
+      const bIsCommander = (b.vaiTroTruc || b.dutyRole || '') === 'commander';
+      if (aIsCommander !== bIsCommander) return aIsCommander ? -1 : 1;
+    }
     if (a.viTri !== b.viTri) {
       const order = { 'Trực ban Giám đốc': 0, 'Nhà hiệu bộ': 1, 'Lái xe': 2, 'Bệnh xá': 3 };
       return (order[a.viTri] || 99) - (order[b.viTri] || 99);

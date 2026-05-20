@@ -82,6 +82,12 @@ const buildTodayRows = (dutyItems = [], scheduleItems = []) => {
     const slotA = Number(a.slotNo || 1);
     const slotB = Number(b.slotNo || 1);
     if (a.kieuTruc !== b.kieuTruc) return a.kieuTruc === 'giamdoc' ? -1 : 1;
+    // Within same kieuTruc, if both are canbo prefer vaiTroTruc === 'commander' first
+    if (a.kieuTruc === 'canbo' && b.kieuTruc === 'canbo') {
+      const aIsCommander = (a.vaiTroTruc || a.dutyRole || '') === 'commander';
+      const bIsCommander = (b.vaiTroTruc || b.dutyRole || '') === 'commander';
+      if (aIsCommander !== bIsCommander) return aIsCommander ? -1 : 1;
+    }
     if (a.viTri !== b.viTri) {
       const order = { 'Nhà hiệu bộ': 1, 'Lái xe': 2, 'Bệnh xá': 3, 'Trực ban Giám đốc': 0 };
       return (order[a.viTri] || 99) - (order[b.viTri] || 99);
@@ -270,6 +276,23 @@ const Dashboard = ({
 
   const officerOptions = (canBoData || []).filter((item) => !item.trangThai || item.trangThai === 'active');
 
+  const findOfficerInfo = (duty) => {
+    if (!duty) return {};
+    const byId = (id) => (officerOptions || []).find((o) => String(o.id) === String(id)) || (canBoData || []).find((o) => String(o.id) === String(id));
+    let officer = null;
+    if (duty.officerId) officer = byId(duty.officerId);
+    if (!officer && duty.canBoId) officer = byId(duty.canBoId);
+    if (!officer && duty.tenCanBo) {
+      officer = (officerOptions || []).find((o) => String(o.hoTen || o.fullName || '').trim() === String(duty.tenCanBo || '').trim())
+        || (canBoData || []).find((o) => String(o.hoTen || o.fullName || '').trim() === String(duty.tenCanBo || '').trim());
+    }
+    if (!officer && (canBoData || []).length) {
+      const fallback = (canBoData || []).find((o) => String(o.tenCanBo || o.hoTen || o.officerName || o.fullName || '').trim() === String(duty.tenCanBo || '').trim());
+      if (fallback) officer = fallback;
+    }
+    return officer || {};
+  };
+
   const handleGridEventClick = (event) => {
     if (event.eventType === 'duty') {
       setSelectedDutyDetail(event);
@@ -292,7 +315,7 @@ const Dashboard = ({
     if (isReadOnlyModal || !editId) return;
     if (!form.tieuDe || !form.ngay) return;
     if (!form.nguoiPhuTrachId) {
-      alert('Vui lòng chọn người phụ trách.');
+      alert('Vui lòng chọn Chủ trì.');
       return;
     }
     if (!form.thanhPhanThamGia?.length) {
@@ -427,7 +450,7 @@ const Dashboard = ({
                 </select>
               </div>
               <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Người phụ trách <span className="text-red-500">*</span></label>
+                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Chủ trì <span className="text-red-500">*</span></label>
                 <select disabled={isReadOnlyModal} className="input-field" value={form.nguoiPhuTrachId || ''} onChange={e => setForm({ ...form, nguoiPhuTrachId: e.target.value })}>
                   <option value="">-- Chọn --</option>
                   {officerOptions.map(cb => <option key={cb.id} value={cb.id}>{buildDisplayName(cb.capBac, cb.hoTen)}</option>)}
@@ -483,7 +506,21 @@ const Dashboard = ({
               <button onClick={() => setSelectedDutyDetail(null)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
             </div>
             <div className="p-6 space-y-4">
-              {selectedDutyDetail.items?.map((duty, idx) => (
+              {(selectedDutyDetail.items || []).slice().sort((a, b) => {
+                const slotA = Number(a.slotNo || 1);
+                const slotB = Number(b.slotNo || 1);
+                if (a.kieuTruc !== b.kieuTruc) return a.kieuTruc === 'giamdoc' ? -1 : 1;
+                if (a.kieuTruc === 'canbo' && b.kieuTruc === 'canbo') {
+                  const aIsCommander = (a.vaiTroTruc || a.dutyRole || '') === 'commander';
+                  const bIsCommander = (b.vaiTroTruc || b.dutyRole || '') === 'commander';
+                  if (aIsCommander !== bIsCommander) return aIsCommander ? -1 : 1;
+                }
+                if (a.viTri !== b.viTri) {
+                  const order = { 'Nhà hiệu bộ': 1, 'Lái xe': 2, 'Bệnh xá': 3, 'Trực ban Giám đốc': 0 };
+                  return (order[a.viTri] || 99) - (order[b.viTri] || 99);
+                }
+                return slotA - slotB;
+              }).map((duty, idx) => (
                 <div key={`${duty.id || idx}-${idx}`} className="rounded-xl border border-slate-200 p-4 bg-slate-50/40">
                   <div className="font-semibold text-slate-900 mb-3 text-sm">
                     {duty.kieuTruc === 'giamdoc' ? 'Trực ban Giám đốc' : `${duty.viTri || 'Trực ban'}`}
@@ -493,6 +530,31 @@ const Dashboard = ({
                       <span className="font-medium text-slate-600">Cán bộ:</span>
                       <span className="text-slate-900 text-right">{duty.tenCanBo || 'Chưa phân công'}</span>
                     </div>
+                    {(() => {
+                      const info = findOfficerInfo(duty) || {};
+                      const phone = duty.soDienThoai || duty.phone || info.soDienThoai || info.phone || info.phoneNumber || '—';
+                      const rawRole = info.rawRole || info.role || info.vaiTro || '';
+                      const title = (String(rawRole).toLowerCase() === 'officer' || String(rawRole).toLowerCase() === 'canbo')
+                        ? 'Cán bộ'
+                        : info.position || duty.chucVu || info.chucVu || info.capBac || '—';
+                      const dept = duty.phongBan || info.phongBan || info.donVi || info.department || '—';
+                      return (
+                        <>
+                          <div className="flex justify-between items-start">
+                            <span className="font-medium text-slate-600">SĐT:</span>
+                            <span className="text-slate-900 text-right">{phone}</span>
+                          </div>
+                          <div className="flex justify-between items-start">
+                            <span className="font-medium text-slate-600">Chức vụ:</span>
+                            <span className="text-slate-900 text-right">{title}</span>
+                          </div>
+                          <div className="flex justify-between items-start">
+                            <span className="font-medium text-slate-600">Phòng ban:</span>
+                            <span className="text-slate-900 text-right">{dept}</span>
+                          </div>
+                        </>
+                      );
+                    })()}
                     <div className="flex justify-between items-start">
                       <span className="font-medium text-slate-600">Thời gian:</span>
                       <span className="text-slate-900 text-right">

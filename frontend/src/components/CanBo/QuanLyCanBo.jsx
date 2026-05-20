@@ -47,7 +47,7 @@ const UI_ROLE_TO_BACKEND = {
 };
 
 const TITLE_OPTIONS = ['Thiếu tướng', 'Đại tá', 'Thượng tá', 'Trung tá', 'Thiếu tá', 'Đại úy', 'Thượng úy', 'Trung úy'];
-const POSITION_OPTIONS = ['Giám đốc Học viện', 'Phó Giám đốc', 'Trưởng phòng', 'Phó trưởng phòng', 'Giảng viên', 'Cán bộ'];
+const POSITION_OPTIONS = ['Giám đốc', 'Phó Giám đốc', 'Trưởng phòng', 'Phó trưởng phòng', 'Giảng viên', 'Cán bộ'];
 const ACCOUNT_RANK_OPTIONS = ['Thiếu úy', 'Trung úy', 'Thượng úy', 'Đại úy', 'Thiếu tá', 'Trung tá', 'Thượng tá', 'Đại tá', 'Thiếu tướng', 'Trung tướng', 'Thượng tướng', 'Đại tướng'];
 const initialCreateForm = {
   militaryRank: '',
