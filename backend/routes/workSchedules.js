@@ -1,6 +1,6 @@
 import express from 'express';
 import * as workCtrl from '../controllers/workSchedulesController.js';
-import { optionalVerifyToken, verifyToken } from '../middleware/auth.js';
+import { optionalVerifyToken, verifyToken, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
 
