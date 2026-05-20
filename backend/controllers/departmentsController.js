@@ -58,7 +58,11 @@ export const getDepartments = async (req, res, next) => {
            d.name,
            d.departmentType,
            d.headOfficerId,
-           CONCAT_WS(' ', NULLIF(o.officerTitle, ''), o.fullName) AS headOfficerName,
+           CASE
+             WHEN o.fullName IS NOT NULL AND o.officerTitle IS NOT NULL AND TRIM(o.fullName) LIKE CONCAT(TRIM(o.officerTitle), '%')
+               THEN TRIM(o.fullName)
+             ELSE CONCAT_WS(' ', NULLIF(TRIM(o.officerTitle), ''), TRIM(o.fullName))
+           END AS headOfficerName,
            d.isActive,
            d.createdAt,
            d.updatedAt,

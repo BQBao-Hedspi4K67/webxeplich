@@ -103,11 +103,11 @@ const QuanLyPhongBan = ({ user, departmentData = [], reloadData }) => {
           <table className="w-full min-w-[760px]">
             <thead>
               <tr>
-                <th className="table-th">Tên đơn vị</th>
-                <th className="table-th">Loại</th>
-                <th className="table-th">Trưởng phòng</th>
-                <th className="table-th">Nhân sự</th>
-                <th className="table-th"></th>
+                <th className="table-th w-[30%]">Tên đơn vị</th>
+                <th className="table-th w-[15%]">Loại</th>
+                <th className="table-th w-[25%]">Trưởng phòng</th>
+                <th className="table-th w-[20%]">Nhân sự</th>
+                <th className="table-th w-[10%]"></th>
               </tr>
             </thead>
             <tbody>
