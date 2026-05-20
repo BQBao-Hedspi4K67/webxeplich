@@ -437,10 +437,10 @@ const LandingLogin = ({ onLogin }) => {
                 <table className="w-full text-sm table-fixed">
                   <thead>
                     <tr className="border-b-2 border-gray-300 bg-gray-100">
-                      <th className="px-4 py-3 text-left font-bold text-slate-900 w-[28%]">Danh sách trực</th>
+                      <th className="px-4 py-3 text-left font-bold text-slate-900 w-[32%]">Danh sách trực</th>
                       <th className="px-4 py-3 text-left font-bold text-slate-900 w-[16%]">Buổi</th>
                       <th className="px-4 py-3 text-left font-bold text-slate-900 w-[12%]">Giờ</th>
-                      <th className="px-4 py-3 text-left font-bold text-slate-900 w-[44%]">Chi tiết nội dung</th>
+                      <th className="px-4 py-3 text-left font-bold text-slate-900 w-[40%]">Chi tiết nội dung</th>
                     </tr>
                   </thead>
                   <tbody>
