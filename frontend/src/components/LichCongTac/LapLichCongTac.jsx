@@ -618,118 +618,130 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
       {/* Add/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-fade-in-up">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] animate-fade-in-up flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-800">
                 {isReadOnlyModal ? 'Chi tiết Lịch sự kiện' : (editId ? 'Chỉnh sửa Lịch sự kiện' : 'Thêm Lịch sự kiện')}
               </h3>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
             </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Nội dung công tác <span className="text-red-500">*</span></label>
-                <input disabled={isReadOnlyModal} className="input-field" placeholder="Nhập nội dung công tác..." value={form.tieuDe} onChange={e => setForm({...form, tieuDe: e.target.value})} />
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Ngày <span className="text-red-500">*</span></label>
-                  <input disabled={isReadOnlyModal} type="date" className="input-field" value={form.ngay} onChange={e => setForm({...form, ngay: e.target.value})} />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Từ giờ</label>
-                  <input disabled={isReadOnlyModal} type="time" className="input-field" value={form.gioBatDau} onChange={e => setForm({...form, gioBatDau: e.target.value})} />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đến giờ</label>
-                  <input disabled={isReadOnlyModal} type="time" className="input-field" value={form.gioKetThuc} onChange={e => setForm({...form, gioKetThuc: e.target.value})} />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Địa điểm</label>
-                <LocationComboBox
-                  id="lichcongtac-location"
-                  value={form.diaDiem || ''}
-                  disabled={isReadOnlyModal}
-                  open={showLocationOptions}
-                  setOpen={setShowLocationOptions}
-                  onChange={(nextValue) => setForm({ ...form, diaDiem: nextValue })}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Loại lịch</label>
-                <select disabled={isReadOnlyModal} className="input-field" value={form.loai} onChange={e => setForm({...form, loai: e.target.value})}>
-                  {Object.entries(LOAI_LICH_COLORS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Chủ trì <span className="text-red-500">*</span></label>
-                  <select disabled={isReadOnlyModal} className="input-field" value={form.nguoiPhuTrachId || ''} onChange={e => setForm({...form, nguoiPhuTrachId: e.target.value})}>
-                    <option value="">-- Chọn --</option>
-                    {officerOptions.map((cb) => (
-                      <option key={cb.id} value={cb.id}>
-                        {buildOfficerSelectLabel(cb, departmentData)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-2 block">Thành phần tham gia <span className="text-red-500">*</span></label>
-                <div className="border border-slate-200 rounded-xl p-3 space-y-2 max-h-44 overflow-y-auto bg-slate-50/40">
-                  {participantUnits.map((unit) => {
-                    const checked = (form.thanhPhanThamGia || []).includes(unit);
-                    const isBoardUnit = unit === 'Ban Giám đốc';
-                    return (
-                      <div key={unit} className="space-y-2">
-                        <label className="flex items-center gap-2 text-sm text-slate-700">
-                          <input
-                            disabled={isReadOnlyModal}
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(e) => {
-                              const next = e.target.checked
-                                ? [...(form.thanhPhanThamGia || []), unit]
-                                : (form.thanhPhanThamGia || []).filter((x) => x !== unit);
-                              setForm({ ...form, thanhPhanThamGia: next, bgdMemberIds: isBoardUnit && !e.target.checked ? [] : form.bgdMemberIds });
-                              if (isBoardUnit && e.target.checked) {
-                                setShowBgdPicker(true);
-                              }
-                            }}
-                          />
-                          <span>{unit}</span>
-                        </label>
 
-                        {isBoardUnit && checked && (
-                          <div className="ml-6 space-y-2">
-                            <button
-                              disabled={isReadOnlyModal}
-                              type="button"
-                              onClick={() => setShowBgdPicker(true)}
-                              className="px-3 py-1.5 text-xs rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200"
-                            >
-                              Chọn thành viên Ban Giám đốc ({(form.bgdMemberIds || []).length}/4)
-                            </button>
-                            <div className="text-xs text-slate-600">
-                              <span className="font-semibold">Thành viên Ban Giám đốc tham gia:</span>{' '}
-                              {(() => {
-                                const selectedNames = getBgdMemberNames(form.bgdMemberIds || []);
-                                return selectedNames.length ? selectedNames.join(', ') : 'Chưa chọn';
-                              })()}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+            <div className="p-6 flex-1 overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Nội dung công tác <span className="text-red-500">*</span></label>
+                    <input disabled={isReadOnlyModal} className="input-field" placeholder="Nhập nội dung công tác..." value={form.tieuDe} onChange={e => setForm({...form, tieuDe: e.target.value})} />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Ngày <span className="text-red-500">*</span></label>
+                      <input disabled={isReadOnlyModal} type="date" className="input-field" value={form.ngay} onChange={e => setForm({...form, ngay: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Từ giờ</label>
+                      <input disabled={isReadOnlyModal} type="time" className="input-field" value={form.gioBatDau} onChange={e => setForm({...form, gioBatDau: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đến giờ</label>
+                      <input disabled={isReadOnlyModal} type="time" className="input-field" value={form.gioKetThuc} onChange={e => setForm({...form, gioKetThuc: e.target.value})} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Địa điểm</label>
+                    <LocationComboBox
+                      id="lichcongtac-location"
+                      value={form.diaDiem || ''}
+                      disabled={isReadOnlyModal}
+                      open={showLocationOptions}
+                      setOpen={setShowLocationOptions}
+                      onChange={(nextValue) => setForm({ ...form, diaDiem: nextValue })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Loại lịch</label>
+                    <select disabled={isReadOnlyModal} className="input-field" value={form.loai} onChange={e => setForm({...form, loai: e.target.value})}>
+                      {Object.entries(LOAI_LICH_COLORS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Chủ trì <span className="text-red-500">*</span></label>
+                    <select disabled={isReadOnlyModal} className="input-field" value={form.nguoiPhuTrachId || ''} onChange={e => setForm({...form, nguoiPhuTrachId: e.target.value})}>
+                      <option value="">-- Chọn --</option>
+                      {officerOptions.map((cb) => (
+                        <option key={cb.id} value={cb.id}>
+                          {buildOfficerSelectLabel(cb, departmentData)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Ghi chú</label>
-                <textarea disabled={isReadOnlyModal} rows={2} className="input-field resize-none" placeholder="Ghi chú thêm..." value={form.ghiChu} onChange={e => setForm({...form, ghiChu: e.target.value})} />
+
+                <div className="space-y-4">
+                  <div>
+                      <label className="text-xs font-semibold text-slate-600 mb-2 block">Thành phần tham gia <span className="text-red-500">*</span></label>
+                      <div className="border border-slate-200 rounded-xl p-3 space-y-1 bg-slate-50/40 h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300">
+                        {participantUnits.map((unit) => {
+                          const checked = (form.thanhPhanThamGia || []).includes(unit);
+                          const isBoardUnit = unit === 'Ban Giám đốc';
+                          return (
+                            <div key={unit} className="space-y-1">
+                              <label className="flex items-center gap-1 text-sm text-slate-700 py-1">
+                                <input
+                                  disabled={isReadOnlyModal}
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={(e) => {
+                                    const next = e.target.checked
+                                      ? [...(form.thanhPhanThamGia || []), unit]
+                                      : (form.thanhPhanThamGia || []).filter((x) => x !== unit);
+                                    setForm({ ...form, thanhPhanThamGia: next, bgdMemberIds: isBoardUnit && !e.target.checked ? [] : form.bgdMemberIds });
+                                    if (isBoardUnit && e.target.checked) {
+                                      setShowBgdPicker(true);
+                                    }
+                                  }}
+                                />
+                                <span>{unit}</span>
+                              </label>
+
+                              {isBoardUnit && checked && (
+                                <div className="ml-6 space-y-1">
+                                  <button
+                                    disabled={isReadOnlyModal}
+                                    type="button"
+                                    onClick={() => setShowBgdPicker(true)}
+                                    className="px-3 py-1.5 text-xs rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200"
+                                  >
+                                    Chọn thành viên Ban Giám đốc ({(form.bgdMemberIds || []).length}/4)
+                                  </button>
+                                  <div className="text-xs text-slate-600">
+                                    <span className="font-semibold">Thành viên Ban Giám đốc tham gia:</span>{' '}
+                                    {(() => {
+                                      const selectedNames = getBgdMemberNames(form.bgdMemberIds || []);
+                                      return selectedNames.length ? selectedNames.join(', ') : 'Chưa chọn';
+                                    })()}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                  <div className="mt-auto">
+                    <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Ghi chú</label>
+                    <textarea disabled={isReadOnlyModal} rows={3} className="input-field resize-none h-24" placeholder="Ghi chú thêm..." value={form.ghiChu} onChange={e => setForm({...form, ghiChu: e.target.value})} />
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="flex gap-3 px-6 pb-6">
+
+            <div className="flex gap-3 px-6 py-4 border-t border-slate-100">
               <button onClick={() => setShowModal(false)} className="btn-secondary flex-1 justify-center">Hủy</button>
               {!isReadOnlyModal && (
                 <button onClick={handleSave} className="btn-primary flex-1 justify-center">{editId ? 'Lưu' : 'Thêm lịch'}</button>

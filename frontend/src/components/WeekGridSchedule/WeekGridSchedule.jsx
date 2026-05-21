@@ -275,16 +275,38 @@ const WeekGridSchedule = ({
                       <div className="space-y-2 min-w-0">
                         {dayDuties.length > 0 && (
                           <div
-                            className="w-full min-w-0 overflow-hidden text-[11px] px-2 py-1 rounded-md transition-all duration-150 cursor-pointer hover:shadow-sm border border-current border-opacity-30 group/evt bg-blue-50 text-blue-700"
+                            className="w-full min-w-0 overflow-hidden text-[8.9px] px-2 py-1 rounded-md transition-all duration-150 cursor-pointer hover:shadow-sm border border-current border-opacity-30 group/evt bg-blue-50 text-blue-700"
                             onMouseEnter={(e) => handleEventHover({ items: dayDuties }, e, 'duty')}
                             onMouseLeave={() => setHoveredEvent(null)}
                             onClick={() => handleEventClick({ items: dayDuties, session }, 'duty')}
                           >
-                            {dutyLines.map((line, lineIdx) => (
-                              <div key={`${line}-${lineIdx}`} className={`mt-0.5 break-words ${lineIdx < 2 ? 'font-semibold' : ''}`}>
-                                {line}
-                              </div>
-                            ))}
+                            {dutyLines.map((line, lineIdx) => {
+                              const text = String(line || '');
+                              const boldPrefixes = [
+                                'Trực ban Giám đốc:',
+                                'Trực ban cán bộ:',
+                                'TB - Chỉ huy:',
+                                'TB - Cán bộ 1:',
+                                'TB - Cán bộ 2:',
+                                'Lái xe:',
+                                'Bệnh xá:',
+                              ];
+                              const matched = boldPrefixes.find((p) => text.startsWith(p));
+                              if (matched) {
+                                const rest = text.slice(matched.length);
+                                return (
+                                  <div key={`${line}-${lineIdx}`} className="mt-0.5 break-words">
+                                    <span className="font-bold">{matched}</span>
+                                    <span>{rest}</span>
+                                  </div>
+                                );
+                              }
+                              return (
+                                <div key={`${line}-${lineIdx}`} className="mt-0.5 break-words">
+                                  <span>{text}</span>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                         

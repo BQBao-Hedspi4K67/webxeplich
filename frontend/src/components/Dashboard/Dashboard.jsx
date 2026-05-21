@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUpRight, ChevronDown, X } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, X, Plus } from 'lucide-react';
 import WeekGridSchedule from '../WeekGridSchedule/WeekGridSchedule';
 import { LOAI_LICH_COLORS } from '../../data/uiConstants';
 import apiClient from '../../services/api';
@@ -350,6 +350,12 @@ const Dashboard = ({
   holidayData = [],
   reloadData,
 }) => {
+  const canCreate = Boolean(
+    user?.canCreateWorkSchedules
+    || user?.backendRole === 'admin'
+    || user?.backendRole === 'superadmin'
+    || user?.backendRole === 'manager'
+  );
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDutyDetail, setSelectedDutyDetail] = useState(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -384,15 +390,87 @@ const Dashboard = ({
   const weekLabel = `Tuần ${getIsoWeekNo(weekStart)} (${formatDDMM(weekStart)} - ${formatDDMM(weekEnd)}/${weekEnd.getFullYear()})`;
   const todayStr = formatLocalDate(new Date());
 
-  // Prepare weekly data for all duties and schedules
-  const weekDuties = lichTrucBanData.filter((l) => {
-    if (l.kieuTruc === 'canbo') {
-      return weekDates.includes(l.ngay);
-    }
+  // Prepare weekly data for duties: only duties relevant to the current user
+  const normalize = (s) => String(s || '').trim().toLowerCase();
+  const userNameCandidates = new Set([
+    normalize(user?.hoTen),
+    normalize(user?.fullName),
+    normalize(user?.tenCanBo),
+    normalize(user?.name),
+  ].filter(Boolean));
+
+  const isDutyAssignedToUser = (duty) => {
+    if (!duty) return false;
+    // Match by explicit id fields if present
+    if (user?.id && (String(duty.officerId) === String(user.id) || String(duty.canBoId) === String(user.id))) return true;
+    if (user?.userId && (String(duty.officerId) === String(user.userId) || String(duty.canBoId) === String(user.userId))) return true;
+    // Match by name fallbacks
+    const dutyName = normalize(duty.tenCanBo || duty.hoTen || duty.fullName || duty.name);
+    if (dutyName && userNameCandidates.has(dutyName)) return true;
+    return false;
+  };
+
+  // Prepare weekly duties with this rule:
+  // - Collect all duties that fall in this week (director weekly duties that overlap, and canbo for dates in week)
+  // - If the current user is assigned as director for this week, show all duties in the week
+  // - Otherwise, find dates in the week where the user has any duty; for those dates show the full duty list (all duties falling on those dates)
+  const weekAllDuties = lichTrucBanData.filter((l) => {
+    if (l.kieuTruc === 'canbo') return weekDates.includes(l.ngay);
     const start = l.ngay;
     const end = l.denNgay || l.ngay;
     return l.kieuTruc === 'giamdoc' && start <= weekDates[6] && end >= weekDates[0];
   });
+
+  const directorAssignedThisWeek = weekAllDuties.some((l) => l.kieuTruc === 'giamdoc' && isDutyAssignedToUser(l));
+
+  let weekDuties = [];
+  if (directorAssignedThisWeek) {
+    // show whole week's duties
+    weekDuties = weekAllDuties;
+  } else {
+    // find dates in the week where the user has any duty (canbo on that date OR is assigned director
+    // covering that date). We'll then show all duties (canbo + director) that fall on those dates.
+    const datesWithUserDuty = new Set();
+    (weekDates || []).forEach((date) => {
+      const has = weekAllDuties.some((l) => {
+        if (!isDutyAssignedToUser(l)) return false;
+        if (l.kieuTruc === 'canbo') return l.ngay === date;
+        const start = l.ngay;
+        const end = l.denNgay || l.ngay;
+        return start <= date && date <= end;
+      });
+      if (has) datesWithUserDuty.add(date);
+    });
+
+    // include all duties (canbo + giamdoc) that fall on any of the dates the user has duty
+    // For director-week duties we must NOT include the original multi-day object (that would render
+    // director box on all days). Instead, for non-director users, split director duties into per-day
+    // copies only for the overlapping dates the user has duty.
+    const dutiesForDates = [];
+    const userDates = Array.from(datesWithUserDuty);
+
+    // include canbo duties for those dates (as-is)
+    weekAllDuties.forEach((l) => {
+      if (l.kieuTruc === 'canbo' && datesWithUserDuty.has(l.ngay)) {
+        dutiesForDates.push(l);
+      }
+    });
+
+    // for giamdoc duties, create per-day copies only for overlapping user dates
+    weekAllDuties.forEach((l) => {
+      if (l.kieuTruc !== 'giamdoc') return;
+      const start = l.ngay;
+      const end = l.denNgay || l.ngay;
+      userDates.forEach((d) => {
+        if (d >= start && d <= end) {
+          const copy = { ...l, ngay: d, denNgay: d };
+          dutiesForDates.push(copy);
+        }
+      });
+    });
+
+    weekDuties = dutiesForDates;
+  }
   
   const weekSchedules = lichCongTacData.filter((l) => weekDates.includes(l.ngay));
 
@@ -504,17 +582,19 @@ const Dashboard = ({
 
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                setForm(initialForm);
-                setEditId(null);
-                setIsReadOnlyModal(false);
-                setShowScheduleModal(true);
-              }}
-              className="btn-primary text-xs flex items-center gap-2 px-3 py-2"
-            >
-              Thêm lịch
-            </button>
+            {canCreate && (
+              <button
+                onClick={() => {
+                  setForm(initialForm);
+                  setEditId(null);
+                  setIsReadOnlyModal(false);
+                  setShowScheduleModal(true);
+                }}
+                className="btn-primary text-xs flex items-center gap-2 px-3 py-2"
+              >
+                <Plus size={16} className="inline mr-1" /> Thêm lịch
+              </button>
+            )}
             <button onClick={() => onNavigate('lichcongtac')} className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
               Mở lịch chi tiết <ArrowUpRight size={12} />
             </button>
@@ -553,90 +633,106 @@ const Dashboard = ({
 
       {showScheduleModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-fade-in-up">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] animate-fade-in-up flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-800">
                 {isReadOnlyModal ? 'Chi tiết Lịch sự kiện' : 'Chỉnh sửa Lịch sự kiện'}
               </h3>
               <button onClick={() => setShowScheduleModal(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
             </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Nội dung công tác <span className="text-red-500">*</span></label>
-                <input disabled={isReadOnlyModal} className="input-field" value={form.tieuDe || ''} onChange={e => setForm({ ...form, tieuDe: e.target.value })} />
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Ngày <span className="text-red-500">*</span></label>
-                  <input disabled={isReadOnlyModal} type="date" className="input-field" value={form.ngay || ''} onChange={e => setForm({ ...form, ngay: e.target.value })} />
+
+            <div className="p-6 flex-1 overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Left column: basic info */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Nội dung công tác <span className="text-red-500">*</span></label>
+                    <input disabled={isReadOnlyModal} className="input-field" value={form.tieuDe || ''} onChange={e => setForm({ ...form, tieuDe: e.target.value })} />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Ngày <span className="text-red-500">*</span></label>
+                      <input disabled={isReadOnlyModal} type="date" className="input-field" value={form.ngay || ''} onChange={e => setForm({ ...form, ngay: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Từ giờ</label>
+                      <input disabled={isReadOnlyModal} type="time" className="input-field" value={form.gioBatDau || ''} onChange={e => setForm({ ...form, gioBatDau: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đến giờ</label>
+                      <input disabled={isReadOnlyModal} type="time" className="input-field" value={form.gioKetThuc || ''} onChange={e => setForm({ ...form, gioKetThuc: e.target.value })} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Địa điểm</label>
+                    <LocationComboBox
+                      id="dashboard-location"
+                      value={form.diaDiem || ''}
+                      disabled={isReadOnlyModal}
+                      open={showLocationOptions}
+                      setOpen={setShowLocationOptions}
+                      onChange={(nextValue) => setForm({ ...form, diaDiem: nextValue })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Loại lịch</label>
+                    <select disabled={isReadOnlyModal} className="input-field" value={form.loai || 'hop'} onChange={e => setForm({ ...form, loai: e.target.value })}>
+                      {Object.entries(LOAI_LICH_COLORS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Chủ trì <span className="text-red-500">*</span></label>
+                    <select disabled={isReadOnlyModal} className="input-field" value={form.nguoiPhuTrachId || ''} onChange={e => setForm({ ...form, nguoiPhuTrachId: e.target.value })}>
+                      <option value="">-- Chọn --</option>
+                      {officerOptions.map((cb) => (
+                        <option key={cb.id} value={cb.id}>
+                          {buildOfficerSelectLabel(cb, departmentData)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Từ giờ</label>
-                  <input disabled={isReadOnlyModal} type="time" className="input-field" value={form.gioBatDau || ''} onChange={e => setForm({ ...form, gioBatDau: e.target.value })} />
+
+                {/* Right column: permissions / participants / notes */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 mb-2 block">Thành phần tham gia <span className="text-red-500">*</span></label>
+                    <div className="border border-slate-200 rounded-xl p-3 space-y-1 bg-slate-50/40 h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300">
+                      {participantUnits.map((unit) => {
+                        const checked = (form.thanhPhanThamGia || []).includes(unit);
+                        return (
+                          <label key={unit} className="flex items-center gap-1 text-sm text-slate-700 py-1">
+                            <input
+                              disabled={isReadOnlyModal}
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => {
+                                const next = e.target.checked
+                                  ? [...(form.thanhPhanThamGia || []), unit]
+                                  : (form.thanhPhanThamGia || []).filter((x) => x !== unit);
+                                setForm({ ...form, thanhPhanThamGia: next });
+                              }}
+                            />
+                            <span>{unit}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="mt-auto">
+                    <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Ghi chú</label>
+                    <textarea disabled={isReadOnlyModal} rows={3} className="input-field resize-none h-24" value={form.ghiChu || ''} onChange={e => setForm({ ...form, ghiChu: e.target.value })} />
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Đến giờ</label>
-                  <input disabled={isReadOnlyModal} type="time" className="input-field" value={form.gioKetThuc || ''} onChange={e => setForm({ ...form, gioKetThuc: e.target.value })} />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Địa điểm</label>
-                <LocationComboBox
-                  id="dashboard-location"
-                  value={form.diaDiem || ''}
-                  disabled={isReadOnlyModal}
-                  open={showLocationOptions}
-                  setOpen={setShowLocationOptions}
-                  onChange={(nextValue) => setForm({ ...form, diaDiem: nextValue })}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Loại lịch</label>
-                <select disabled={isReadOnlyModal} className="input-field" value={form.loai || 'hop'} onChange={e => setForm({ ...form, loai: e.target.value })}>
-                  {Object.entries(LOAI_LICH_COLORS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Chủ trì <span className="text-red-500">*</span></label>
-                <select disabled={isReadOnlyModal} className="input-field" value={form.nguoiPhuTrachId || ''} onChange={e => setForm({ ...form, nguoiPhuTrachId: e.target.value })}>
-                  <option value="">-- Chọn --</option>
-                  {officerOptions.map((cb) => (
-                    <option key={cb.id} value={cb.id}>
-                      {buildOfficerSelectLabel(cb, departmentData)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-2 block">Thành phần tham gia <span className="text-red-500">*</span></label>
-                <div className="border border-slate-200 rounded-xl p-3 space-y-2 max-h-44 overflow-y-auto bg-slate-50/40">
-                  {participantUnits.map((unit) => {
-                    const checked = (form.thanhPhanThamGia || []).includes(unit);
-                    return (
-                      <label key={unit} className="flex items-center gap-2 text-sm text-slate-700">
-                        <input
-                          disabled={isReadOnlyModal}
-                          type="checkbox"
-                          checked={checked}
-                          onChange={(e) => {
-                            const next = e.target.checked
-                              ? [...(form.thanhPhanThamGia || []), unit]
-                              : (form.thanhPhanThamGia || []).filter((x) => x !== unit);
-                            setForm({ ...form, thanhPhanThamGia: next });
-                          }}
-                        />
-                        <span>{unit}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Ghi chú</label>
-                <textarea disabled={isReadOnlyModal} rows={2} className="input-field resize-none" value={form.ghiChu || ''} onChange={e => setForm({ ...form, ghiChu: e.target.value })} />
               </div>
             </div>
-            <div className="flex gap-3 px-6 pb-6">
+
+            <div className="flex gap-3 px-6 py-4 border-t border-slate-100">
               <button onClick={() => setShowScheduleModal(false)} className="btn-secondary flex-1 justify-center">Hủy</button>
               {!isReadOnlyModal && (
                 <button onClick={handleSaveSchedule} className="btn-primary flex-1 justify-center">Lưu</button>
