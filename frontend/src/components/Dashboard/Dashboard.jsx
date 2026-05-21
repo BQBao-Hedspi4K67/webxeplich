@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowUpRight, X } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowUpRight, ChevronDown, X } from 'lucide-react';
 import WeekGridSchedule from '../WeekGridSchedule/WeekGridSchedule';
 import { LOAI_LICH_COLORS } from '../../data/uiConstants';
 import apiClient from '../../services/api';
@@ -50,11 +50,61 @@ const buildDisplayName = (militaryRank = '', fullName = '') => {
   if (!rank) return name;
   if (!name) return rank;
   const lowerRank = rank.toLowerCase();
-  const lowerName = name.toLowerCase();
-  if (lowerName === lowerRank || lowerName.startsWith(`${lowerRank} `)) {
-    return name;
+  let normalizedName = name;
+  while (normalizedName.toLowerCase().startsWith(`${lowerRank} `)) {
+    normalizedName = normalizedName.slice(rank.length).trim();
   }
-  return `${rank} ${name}`;
+  if (!normalizedName) return rank;
+  return `${rank} ${normalizedName}`;
+};
+
+const getDepartmentTypeLabel = (departmentType = '') => {
+  if (departmentType === 'phong') return 'phòng';
+  if (departmentType === 'khoa') return 'khoa';
+  if (departmentType === 'doi') return 'đội';
+  if (departmentType === 'ban_giam_doc') return 'Ban Giám đốc';
+  return '';
+};
+
+const buildOfficerDepartmentLine = (officer, departments = []) => {
+  if (!officer) return '';
+
+  const officerDepartmentName = String(officer.donVi || officer.department || '').trim();
+  const officerDepartmentId = String(officer.donViId || officer.departmentId || '').trim();
+  const department = (departments || []).find((d) => {
+    if (!d) return false;
+    if (officerDepartmentId && String(d.id) === officerDepartmentId) return true;
+    return String(d.name || '').trim().toLowerCase() === officerDepartmentName.toLowerCase();
+  });
+
+  const role = String(officer.chucVu || officer.position || '').trim();
+  const departmentType = department?.departmentType || officer.departmentType || '';
+  const abbreviation = String(department?.abbreviation || officer.departmentAbbreviation || '').trim();
+  const departmentLabel = department?.name || officerDepartmentName;
+  const typeLabel = getDepartmentTypeLabel(departmentType);
+  const roleNeedsType = !/(phòng|khoa|đội)/i.test(role);
+
+  if (!role && !departmentLabel) return '';
+
+  if (departmentType === 'ban_giam_doc' || departmentLabel.toLowerCase() === 'ban giám đốc') {
+    const shortBoardRole = role.replace(/\s+học viện$/i, '').trim();
+    if (/phó giám đốc/i.test(shortBoardRole)) return 'Phó Giám đốc';
+    if (/giám đốc/i.test(shortBoardRole)) return 'Giám đốc';
+    return shortBoardRole || role;
+  }
+
+  if (abbreviation) {
+    return [role, roleNeedsType ? typeLabel : '', abbreviation].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+  }
+
+  return [role, departmentLabel].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+};
+
+const buildOfficerSelectLabel = (officer, departments = []) => {
+  if (!officer) return '';
+  const name = buildDisplayName(officer.capBac, officer.hoTen);
+  const infoLine = buildOfficerDepartmentLine(officer, departments);
+  return infoLine ? `${name} - ${infoLine}` : name;
 };
 
 const getSessionBucket = (timeValue) => {
@@ -68,6 +118,81 @@ const SESSION_LABELS = {
   night: 'Danh sách trực',
   morning: 'Sáng\n(08:00-16:00)',
   afternoon: 'Chiều\n(16:00-24:00)',
+};
+
+const LOCATION_SUGGESTIONS = [
+  'Phòng hội thảo khoa học tầng 2 - thư viện',
+  'Hội trường lớn',
+];
+
+const LocationComboBox = ({ value, onChange, disabled, open, setOpen, id }) => {
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (!wrapperRef.current) return;
+      if (!wrapperRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [setOpen]);
+
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <input
+        id={id}
+        disabled={disabled}
+        className="input-field pr-11"
+        value={value}
+        onFocus={() => setOpen(true)}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+        }}
+      />
+      <button
+        type="button"
+        disabled={disabled}
+        aria-label={open ? 'Đóng danh sách địa điểm' : 'Mở danh sách địa điểm'}
+        className="absolute inset-y-0 right-0 flex items-center justify-center px-0.5 text-slate-400 hover:text-slate-600 disabled:cursor-not-allowed"
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <ChevronDown size={13} strokeWidth={2.1} />
+      </button>
+      {open && !disabled && (
+        <div className="absolute z-20 mt-1 w-full rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+          {LOCATION_SUGGESTIONS.map((location) => (
+            <button
+              key={location}
+              type="button"
+              className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                onChange(location);
+                setOpen(false);
+              }}
+            >
+              {location}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 };
 
 const buildSlotLabel = (item) => {
@@ -231,6 +356,7 @@ const Dashboard = ({
   const [isReadOnlyModal, setIsReadOnlyModal] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [editId, setEditId] = useState(null);
+  const [showLocationOptions, setShowLocationOptions] = useState(false);
 
   const HOLIDAYS = holidayData.reduce((acc, h) => {
     if (h?.ngay) acc[h.ngay] = h.ten;
@@ -377,9 +503,22 @@ const Dashboard = ({
             <h3 className="text-base font-bold text-slate-800">Lịch công tác</h3>
 
           </div>
-          <button onClick={() => onNavigate('lichcongtac')} className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
-            Mở lịch chi tiết <ArrowUpRight size={12} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setForm(initialForm);
+                setEditId(null);
+                setIsReadOnlyModal(false);
+                setShowScheduleModal(true);
+              }}
+              className="btn-primary text-xs flex items-center gap-2 px-3 py-2"
+            >
+              Thêm lịch
+            </button>
+            <button onClick={() => onNavigate('lichcongtac')} className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
+              Mở lịch chi tiết <ArrowUpRight size={12} />
+            </button>
+          </div>
         </div>
         <div className="p-4">
           <div className="flex items-center justify-between gap-2 mb-3">
@@ -407,6 +546,7 @@ const Dashboard = ({
             schedules={weekSchedules}
             holidays={HOLIDAYS}
             onSelectEvent={handleGridEventClick}
+            
           />
         </div>
       </div>
@@ -441,7 +581,14 @@ const Dashboard = ({
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Địa điểm</label>
-                <input disabled={isReadOnlyModal} className="input-field" value={form.diaDiem || ''} onChange={e => setForm({ ...form, diaDiem: e.target.value })} />
+                <LocationComboBox
+                  id="dashboard-location"
+                  value={form.diaDiem || ''}
+                  disabled={isReadOnlyModal}
+                  open={showLocationOptions}
+                  setOpen={setShowLocationOptions}
+                  onChange={(nextValue) => setForm({ ...form, diaDiem: nextValue })}
+                />
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Loại lịch</label>
@@ -453,7 +600,11 @@ const Dashboard = ({
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Chủ trì <span className="text-red-500">*</span></label>
                 <select disabled={isReadOnlyModal} className="input-field" value={form.nguoiPhuTrachId || ''} onChange={e => setForm({ ...form, nguoiPhuTrachId: e.target.value })}>
                   <option value="">-- Chọn --</option>
-                  {officerOptions.map(cb => <option key={cb.id} value={cb.id}>{buildDisplayName(cb.capBac, cb.hoTen)}</option>)}
+                  {officerOptions.map((cb) => (
+                    <option key={cb.id} value={cb.id}>
+                      {buildOfficerSelectLabel(cb, departmentData)}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -549,7 +700,7 @@ const Dashboard = ({
                             <span className="text-slate-900 text-right">{title}</span>
                           </div>
                           <div className="flex justify-between items-start">
-                            <span className="font-medium text-slate-600">Phòng ban:</span>
+                            <span className="font-medium text-slate-600">Đơn vị:</span>
                             <span className="text-slate-900 text-right">{dept}</span>
                           </div>
                         </>

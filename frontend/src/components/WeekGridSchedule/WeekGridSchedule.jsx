@@ -121,6 +121,7 @@ const WeekGridSchedule = ({
   schedules = [],
   holidays = {},
   onSelectEvent = null,
+
 }) => {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [hoveredEvent, setHoveredEvent] = useState(null);
@@ -160,6 +161,7 @@ const WeekGridSchedule = ({
   duties.forEach((duty) => {
     const startDate = toDateOnly(duty.ngay || duty.date);
     let endDate = toDateOnly(duty.denNgay || duty.endDate);
+
     const isWeeklyDirectorDuty = duty.kieuTruc === 'giamdoc' || duty.dutyType === 'director_weekly' || duty.ca === 'tuan';
     
     // If no explicit end date, use start date (single-day duty)
@@ -234,14 +236,16 @@ const WeekGridSchedule = ({
                 const day = dateObj.getDate();
                 const month = dateObj.getMonth() + 1;
                 const isWeekend = idx >= 5;
+                const isHoliday = Boolean(holidays[dateStr]);
+                const labelClass = isHoliday || isWeekend ? 'text-red-600' : 'text-slate-700';
                 return (
                   <th
                     key={key}
-                    className={`px-3 py-3 text-center font-bold text-slate-700 border-l border-slate-200 max-w-0 ${isWeekend ? 'bg-slate-100' : ''}`}
+                    className={`px-3 py-3 text-center font-bold ${labelClass} border-l border-slate-200 max-w-0 ${isWeekend ? 'bg-slate-100' : ''}`}
                   >
                     <div className="text-xs">{dayLabel}</div>
                     <div className="text-sm font-semibold">{day}/{month}</div>
-                    {holidays[dateStr] && (
+                    {isHoliday && (
                       <div className="text-[10px] text-red-600 mt-1 font-semibold break-words">{holidays[dateStr]}</div>
                     )}
                   </th>

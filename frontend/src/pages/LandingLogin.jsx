@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Eye, EyeOff, Lock, User, X } from 'lucide-react';
+import { Eye, EyeOff, Lock, Printer, User, X } from 'lucide-react';
 import apiClient from '../services/api';
+import XuatLich from '../components/XuatLich/XuatLich';
 import logoSchool from '../assets/logo.png';
 
 const formatLocalDate = (date) => {
@@ -203,6 +204,7 @@ const LandingLogin = ({ onLogin }) => {
   const [weekSchedules, setWeekSchedules] = useState([]);
   const [weekDuties, setWeekDuties] = useState([]);
   const [holidayMap, setHolidayMap] = useState({});
+  const [showExportModal, setShowExportModal] = useState(false);
 
   const weekStart = useMemo(() => getWeekStart(weekOffset), [weekOffset]);
   const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => {
@@ -351,12 +353,21 @@ const LandingLogin = ({ onLogin }) => {
         {/* Header: Centered title + Login button top-right */}
         <div className="flex items-start justify-between gap-4 mb-6">
           <div />
-          <button
-            onClick={() => setShowLoginModal(true)}
-            className="px-4 py-2 rounded-xl bg-blue-600 border border-blue-600 text-white hover:bg-blue-700 transition-all font-semibold"
-          >
-            Đăng nhập
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all font-semibold flex items-center gap-2"
+            >
+              <Printer size={16} />
+              Xuất / In lịch
+            </button>
+            <button
+              onClick={() => setShowLoginModal(true)}
+              className="px-4 py-2 rounded-xl bg-blue-600 border border-blue-600 text-white hover:bg-blue-700 transition-all font-semibold"
+            >
+              Đăng nhập
+            </button>
+          </div>
         </div>
 
         {/* Centered Title Section */}
@@ -411,14 +422,17 @@ const LandingLogin = ({ onLogin }) => {
                 const buttonLabel = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][index];
                 const isActive = date === selectedDate;
                 const isToday = date === todayStr;
+                const isWeekend = index >= 5;
+                const isHoliday = Boolean(holidayMap && holidayMap[date]);
+                const labelClass = isWeekend || isHoliday ? 'text-red-600' : 'text-slate-900';
                 return (
                   <button
                     key={date}
                     onClick={() => setSelectedDate(date)}
-                    className={`rounded-xl px-2 py-2 text-sm font-semibold transition-all border ${isActive ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-gray-200 text-slate-900 border-gray-300 hover:bg-gray-300'} ${isToday && !isActive ? 'ring-1 ring-blue-400' : ''}`}
+                    className={`rounded-xl px-2 py-2 text-sm font-semibold transition-all border ${isActive ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-gray-200 border-gray-300 hover:bg-gray-300'} ${isToday && !isActive ? 'ring-1 ring-blue-400' : ''}`}
                   >
-                    <div>{buttonLabel}</div>
-                    <div className="text-[11px] font-medium mt-0.5 opacity-80">{date.slice(8, 10)}/{date.slice(5, 7)}</div>
+                    <div className={labelClass}>{buttonLabel}</div>
+                    <div className={`text-[11px] font-medium mt-0.5 opacity-80 ${labelClass}`}>{date.slice(8, 10)}/{date.slice(5, 7)}</div>
                   </button>
                 );
               })}
@@ -512,7 +526,6 @@ const LandingLogin = ({ onLogin }) => {
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-300 bg-gray-50">
               <div>
                 <h2 className="text-lg font-bold text-slate-900">Đăng nhập hệ thống</h2>
-                
               </div>
               <button onClick={() => setShowLoginModal(false)} className="text-slate-600 hover:text-slate-900">
                 <X size={18} />
@@ -584,6 +597,25 @@ const LandingLogin = ({ onLogin }) => {
                 )}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-6xl max-h-[92vh] overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl animate-fade-in-up">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Xuất / In lịch</h2>
+                <p className="text-xs text-slate-500">Chọn loại lịch, xem trước và tải PDF.</p>
+              </div>
+              <button onClick={() => setShowExportModal(false)} className="text-slate-600 hover:text-slate-900">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-5">
+              <XuatLich xuatLichHistory={[]} variant="modal" />
+            </div>
           </div>
         </div>
       )}

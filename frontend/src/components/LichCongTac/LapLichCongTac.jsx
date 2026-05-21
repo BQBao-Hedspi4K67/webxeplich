@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Plus, ChevronLeft, ChevronRight, MapPin, User, Clock, X, Edit2, Filter, CalendarDays, Trash2, Printer } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { Plus, ChevronLeft, ChevronRight, ChevronDown, MapPin, User, Clock, X, Edit2, Filter, CalendarDays, Trash2, Printer } from 'lucide-react';
 import { LOAI_LICH_COLORS, WEEK_DAYS } from '../../data/uiConstants';
 import apiClient from '../../services/api';
 import WeekGridSchedule from '../WeekGridSchedule/WeekGridSchedule';
@@ -90,6 +90,55 @@ const buildDisplayName = (militaryRank = '', fullName = '') => {
   return `${rank} ${name}`;
 };
 
+const getDepartmentTypeLabel = (departmentType = '') => {
+  if (departmentType === 'phong') return 'phòng';
+  if (departmentType === 'khoa') return 'khoa';
+  if (departmentType === 'doi') return 'đội';
+  if (departmentType === 'ban_giam_doc') return 'Ban Giám đốc';
+  return '';
+};
+
+const buildOfficerDepartmentLine = (officer, departments = []) => {
+  if (!officer) return '';
+
+  const officerDepartmentName = String(officer.donVi || officer.department || '').trim();
+  const officerDepartmentId = String(officer.donViId || officer.departmentId || '').trim();
+  const department = (departments || []).find((d) => {
+    if (!d) return false;
+    if (officerDepartmentId && String(d.id) === officerDepartmentId) return true;
+    return String(d.name || '').trim().toLowerCase() === officerDepartmentName.toLowerCase();
+  });
+
+  const role = String(officer.chucVu || officer.position || '').trim();
+  const departmentType = department?.departmentType || officer.departmentType || '';
+  const abbreviation = String(department?.abbreviation || officer.departmentAbbreviation || '').trim();
+  const departmentLabel = department?.name || officerDepartmentName;
+  const typeLabel = getDepartmentTypeLabel(departmentType);
+  const roleNeedsType = !/(phòng|khoa|đội)/i.test(role);
+
+  if (!role && !departmentLabel) return '';
+
+  if (departmentType === 'ban_giam_doc' || departmentLabel.toLowerCase() === 'ban giám đốc') {
+    const shortBoardRole = role.replace(/\s+học viện$/i, '').trim();
+    if (/phó giám đốc/i.test(shortBoardRole)) return 'Phó Giám đốc';
+    if (/giám đốc/i.test(shortBoardRole)) return 'Giám đốc';
+    return shortBoardRole || role;
+  }
+
+  if (abbreviation) {
+    return [role, roleNeedsType ? typeLabel : '', abbreviation].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+  }
+
+  return [role, departmentLabel].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+};
+
+const buildOfficerSelectLabel = (officer, departments = []) => {
+  if (!officer) return '';
+  const name = buildDisplayName(officer.capBac, officer.hoTen);
+  const infoLine = buildOfficerDepartmentLine(officer, departments);
+  return infoLine ? `${name} - ${infoLine}` : name;
+};
+
 const getSessionBucket = (timeValue) => {
   const hour = Number.parseInt(String(timeValue || '00:00').split(':')[0], 10);
   if (Number.isNaN(hour) || hour < 8) return 'night';
@@ -101,6 +150,78 @@ const SESSION_LABELS = {
   night: 'Đêm\n(00:00-08:00)',
   morning: 'Sáng\n(08:00-16:00)',
   afternoon: 'Chiều\n(16:00-24:00)',
+};
+
+const LOCATION_SUGGESTIONS = [
+  'Phòng hội thảo khoa học tầng 2 - thư viện',
+  'Hội trường lớn',
+];
+
+const LocationComboBox = ({ value, onChange, disabled, open, setOpen, id }) => {
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (!wrapperRef.current) return;
+      if (!wrapperRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    const handleKey = (e) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [setOpen]);
+
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <input
+        id={id}
+        disabled={disabled}
+        className="input-field pr-11"
+        placeholder="VD: Phòng hội thảo khoa học tầng 2 - thư viện"
+        value={value}
+        onFocus={() => setOpen(true)}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+        }}
+      />
+      <button
+        type="button"
+        disabled={disabled}
+        aria-label={open ? 'Đóng danh sách địa điểm' : 'Mở danh sách địa điểm'}
+        className="absolute inset-y-0 right-0 flex items-center justify-center px-0.5 text-slate-400 hover:text-slate-600 disabled:cursor-not-allowed"
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <ChevronDown size={13} strokeWidth={2.1} />
+      </button>
+      {open && !disabled && (
+        <div className="absolute z-20 mt-1 w-full rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+          {LOCATION_SUGGESTIONS.map((location) => (
+            <button
+              key={location}
+              type="button"
+              className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                onChange(location);
+                setOpen(false);
+              }}
+            >
+              {location}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 };
 
 const initialForm = {
@@ -169,6 +290,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
   const [filterLoai, setFilterLoai] = useState('');
   const [filterDonVi, setFilterDonVi] = useState('');
   const [showBgdPicker, setShowBgdPicker] = useState(false);
+  const [showLocationOptions, setShowLocationOptions] = useState(false);
 
   useEffect(() => {
     setData(lichCongTacData);
@@ -233,6 +355,9 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
           hoTen: buildDisplayName(o.officerTitle, o.officerName || o.fullName || o.id),
           capBac: o.officerTitle || o.capBac || '',
           donVi: o.department || o.donVi || '',
+          donViId: o.departmentId || o.donViId || null,
+          departmentAbbreviation: o.abbreviation || o.departmentAbbreviation || '',
+          departmentType: o.departmentType || '',
           position: o.position || o.chucVu || '',
           phone: o.phone || o.soDienThoai || o.phoneNumber || '',
           rawRole: o.role || o.vaiTro || '',
@@ -521,7 +646,14 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Địa điểm</label>
-                <input disabled={isReadOnlyModal} className="input-field" placeholder="VD: Phòng họp A - Tầng 2" value={form.diaDiem} onChange={e => setForm({...form, diaDiem: e.target.value})} />
+                <LocationComboBox
+                  id="lichcongtac-location"
+                  value={form.diaDiem || ''}
+                  disabled={isReadOnlyModal}
+                  open={showLocationOptions}
+                  setOpen={setShowLocationOptions}
+                  onChange={(nextValue) => setForm({ ...form, diaDiem: nextValue })}
+                />
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Loại lịch</label>
@@ -534,7 +666,11 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                   <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Chủ trì <span className="text-red-500">*</span></label>
                   <select disabled={isReadOnlyModal} className="input-field" value={form.nguoiPhuTrachId || ''} onChange={e => setForm({...form, nguoiPhuTrachId: e.target.value})}>
                     <option value="">-- Chọn --</option>
-                    {officerOptions.map(cb => <option key={cb.id} value={cb.id}>{buildDisplayName(cb.capBac, cb.hoTen)}</option>)}
+                    {officerOptions.map((cb) => (
+                      <option key={cb.id} value={cb.id}>
+                        {buildOfficerSelectLabel(cb, departmentData)}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -667,7 +803,7 @@ const LapLichCongTac = ({ user, lichCongTacData = [], canBoData = [], department
                             <span className="text-slate-900 text-right">{title}</span>
                           </div>
                           <div className="flex justify-between items-start">
-                            <span className="font-medium text-slate-600">Phòng ban:</span>
+                            <span className="font-medium text-slate-600">Đơn vị</span>
                             <span className="text-slate-900 text-right">{dept}</span>
                           </div>
                         </>

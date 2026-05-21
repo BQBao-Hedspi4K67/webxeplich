@@ -109,8 +109,13 @@ const buildDisplayName = (militaryRank = '', fullName = '') => {
   const name = String(fullName || '').trim();
   if (!rank) return name;
   if (!name) return rank;
-  if (name.toLowerCase().startsWith(rank.toLowerCase())) return name;
-  return `${rank} ${name}`;
+  const lowerRank = rank.toLowerCase();
+  let normalizedName = name;
+  while (normalizedName.toLowerCase().startsWith(`${lowerRank} `)) {
+    normalizedName = normalizedName.slice(rank.length).trim();
+  }
+  if (!normalizedName) return rank;
+  return `${rank} ${normalizedName}`;
 };
 
 const resolveOfficerId = (profile, officers = []) => {
