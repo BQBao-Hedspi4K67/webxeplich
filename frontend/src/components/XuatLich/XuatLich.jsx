@@ -447,9 +447,9 @@ const XuatLich = ({ xuatLichHistory = [], reloadData, variant = 'page' }) => {
               <div>
                 <label className="text-xs font-semibold text-slate-500 mb-2 block">Loại lịch</label>
                 <div className="space-y-2">
-                  {[{ v: 'congtac', l: 'Lịch sự kiện', icon: CalendarDays },
-                    { v: 'trucban', l: 'Lịch trực ban', icon: Shield },
-                    { v: 'both', l: 'Cả hai loại', icon: FileText }].map(o => (
+                  {[{ v: 'both', l: 'Cả hai loại', icon: FileText },
+                    { v: 'congtac', l: 'Lịch sự kiện', icon: CalendarDays },
+                    { v: 'trucban', l: 'Lịch trực ban', icon: Shield }].map(o => (
                     <label key={o.v} className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${exportType === o.v ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
                       <input type="radio" name="exportType" value={o.v} checked={exportType === o.v} onChange={e => setExportType(e.target.value)} className="sr-only" />
                       <o.icon size={16} className={exportType === o.v ? 'text-blue-600' : 'text-slate-400'} />

@@ -628,12 +628,13 @@ export const downloadExport = async (req, res, next) => {
 
       const fileNameBase = `lich_${type}_${scope}_${weekNo || month || 'all'}`;
       const actor = req.user;
-
-      await connection.execute(
-        `INSERT INTO export_logs (userId, username, role, exportType, exportScope, exportFormat, itemCount)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [actor.id, actor.username, actor.role, type, scope, 'pdf', (workRows?.length || 0) + (dutyRows?.length || 0)]
-      );
+      if (actor) {
+        await connection.execute(
+          `INSERT INTO export_logs (userId, username, role, exportType, exportScope, exportFormat, itemCount)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [actor.id, actor.username, actor.role, type, scope, 'pdf', (workRows?.length || 0) + (dutyRows?.length || 0)]
+        );
+      }
 
       writePdf(
         res,
